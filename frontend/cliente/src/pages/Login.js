@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -14,22 +14,21 @@ export default function Login() {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  try {
-    const response = await fetch("http://localhost:4000/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData),
-      credentials: "include" 
-    });
+    try {
+      const response = await fetch("http://localhost:4000/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+        credentials: "include"
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-         if (response.ok) {
+      if (response.ok) {
         console.log("Login exitoso:", data);
-        // Redirigir al inicio
-        navigate("/inicio");
+        navigate("/inicio"); // Redirige al inicio
       } else {
         alert(data.error || "Credenciales incorrectas");
       }
@@ -41,8 +40,12 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-lg w-96">
-        <h2 className="text-2xl font-bold mb-4">Iniciar Sesión</h2>
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white p-6 rounded-xl shadow-lg w-96"
+      >
+        <h2 className="text-2xl font-bold mb-4 text-center">Iniciar Sesión</h2>
+
         <input
           type="email"
           name="email"
@@ -50,6 +53,7 @@ export default function Login() {
           className="w-full p-2 border rounded mb-3"
           onChange={handleChange}
         />
+
         <input
           type="password"
           name="password"
@@ -57,9 +61,18 @@ export default function Login() {
           className="w-full p-2 border rounded mb-3"
           onChange={handleChange}
         />
-        <button className="bg-green-500 text-white w-full py-2 rounded hover:bg-green-600">
+
+        <button className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700 transition">
           Ingresar
         </button>
+
+        {/* Aquí va el link de registro */}
+        <p className="text-sm text-center mt-4">
+          ¿No tienes una cuenta?{" "}
+          <Link to="/register" className="text-blue-600 hover:underline">
+            Regístrate
+          </Link>
+        </p>
       </form>
     </div>
   );
