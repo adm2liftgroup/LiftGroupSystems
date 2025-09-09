@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
+import Inicio from "./pages/Inicio";
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
           <div>
             <Link to="/register" className="px-3 hover:underline">Registro</Link>
             <Link to="/login" className="px-3 hover:underline">Iniciar Sesión</Link>
+            
           </div>
         </nav>
 
@@ -20,6 +22,7 @@ function App() {
           <Route path="/" element={<h2 className="p-4">Bienvenido 🚀</h2>} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
+         <Route path="/inicio" element={<Inicio />} />
         </Routes>
       </div>
     </Router>

@@ -21,7 +21,8 @@ async function sendVerificationEmail(email, token) {
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
 
-  const verifyUrl = `${process.env.FRONTEND_URL}/verify?token=${token}`;
+  // 👇 Cambié la URL para que apunte directo al backend (puerto 4000)
+  const verifyUrl = `${process.env.BACKEND_URL}/auth/verify?token=${token}`;
 
   const info = await transporter.sendMail({
     from: `"LiftGroup" <adm2liftgroup@gmail.com>`,
@@ -120,6 +121,7 @@ router.get("/verify", async (req, res) => {
       [user.id]
     );
 
+    // ✅ Ahora redirige al frontend a una página bonita
     return res.redirect(`${process.env.FRONTEND_URL}/verify-success`);
   } catch (err) {
     console.error("🔥 Error en /verify:", err);

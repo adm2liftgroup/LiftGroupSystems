@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -6,14 +7,36 @@ export default function Login() {
     password: ""
   });
 
+  const navigate = useNavigate();
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log("Datos de login:", formData);
-    // Aquí después se conectará al backend
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  try {
+    const response = await fetch("http://localhost:4000/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+      credentials: "include" 
+    });
+
+    const data = await response.json();
+
+         if (response.ok) {
+        console.log("Login exitoso:", data);
+        // Redirigir al inicio
+        navigate("/inicio");
+      } else {
+        alert(data.error || "Credenciales incorrectas");
+      }
+    } catch (error) {
+      console.error("Error al conectar con el servidor:", error);
+      alert("Error de conexión");
+    }
   };
 
   return (
