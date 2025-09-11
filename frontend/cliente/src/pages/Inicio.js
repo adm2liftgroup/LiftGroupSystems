@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FaFolder, FaPlus } from "react-icons/fa";
+import { FaFolder, FaPlus, FaChevronDown, FaChevronRight } from "react-icons/fa";
 
 export default function Inicio() {
   const [montacargas, setMontacargas] = useState([]);
@@ -12,10 +12,9 @@ export default function Inicio() {
     sistema: "",
     capacidad: ""
   });
+  const [isOpen, setIsOpen] = useState(false); // controlar el desplegable
 
-  // Recuperamos usuario y rol del localStorage (lo guardas al hacer login)
-  const user = JSON.parse(localStorage.getItem("user")); 
-  // Ejemplo esperado: { id: 1, nombre: "Juan", rol: "admin" }
+  const user = JSON.parse(localStorage.getItem("user"));
 
   useEffect(() => {
     const fetchData = async () => {
@@ -71,28 +70,40 @@ export default function Inicio() {
 
         {/* Menú Montacargas */}
         <div className="mb-2">
-          <div className="flex items-center cursor-pointer mb-1">
+          <div
+            className="flex items-center cursor-pointer mb-1 hover:text-purple-400"
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            {isOpen ? (
+              <FaChevronDown className="mr-2" />
+            ) : (
+              <FaChevronRight className="mr-2" />
+            )}
             <FaFolder className="mr-2" /> Montacargas
           </div>
 
-          {/* Botón agregar solo visible si el rol es admin */}
-          {user?.rol === "admin" && (
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center text-sm text-purple-400 hover:text-purple-600"
-            >
-              <FaPlus className="mr-1" /> Agregar Montacargas
-            </button>
-          )}
+          {/* Lista desplegable */}
+          {isOpen && (
+            <ul className="ml-6 mt-2">
+              {/* Botón agregar solo si es admin */}
+              {user?.rol === "admin" && (
+                <li>
+                  <button
+                    onClick={() => setShowForm(true)}
+                    className="flex items-center text-sm text-purple-400 hover:text-purple-600 mb-2"
+                  >
+                    <FaPlus className="mr-1" /> Agregar Montacargas
+                  </button>
+                </li>
+              )}
 
-          {/* Lista como carpetas */}
-          <ul className="ml-6 mt-2">
-            {montacargas.map((m, i) => (
-              <li key={i} className="flex items-center mb-1 cursor-pointer">
-                <FaFolder className="mr-2 text-yellow-400" /> {m.Marca} - {m.Modelo}
-              </li>
-            ))}
-          </ul>
+              {montacargas.map((m, i) => (
+                <li key={i} className="flex items-center mb-1 cursor-pointer">
+                  <FaFolder className="mr-2 text-yellow-400" /> {m.Marca} - {m.Modelo}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 
