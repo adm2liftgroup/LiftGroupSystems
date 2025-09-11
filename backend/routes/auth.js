@@ -35,6 +35,13 @@ async function sendVerificationEmail(email, token) {
   console.log("📨 Correo enviado, ID:", info.messageId);
 }
 
+//Endpoint para obtener datos del usuario autenticado
+const { requireAuth } = require("../middlewares/auth");
+
+router.get("/me", requireAuth, async (req, res) => {
+  // req.user ya contiene id,email,rol
+  res.json({ id: req.user.id, email: req.user.email, rol: req.user.rol });
+});
 
 // ================================
 // Registro
@@ -163,12 +170,15 @@ router.post(
         maxAge: 3600 * 1000,
       });
 
-      res.json({ message: "Login exitoso" });
+      // 👇 Aquí añadimos info del usuario en la respuesta
+      res.json({
+        message: "Login exitoso",
+        user: { id: user.id, email: user.email, rol: user.rol }
+      });
     } catch (err) {
       console.error("🔥 Error en /login:", err);
       res.status(500).json({ error: "Error del servidor" });
     }
   }
 );
-
 module.exports = router;

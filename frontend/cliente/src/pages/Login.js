@@ -21,13 +21,17 @@ export default function Login() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
-        credentials: "include"
+        credentials: "include", // 👈 importante para cookies httpOnly
       });
 
       const data = await response.json();
 
       if (response.ok) {
         console.log("Login exitoso:", data);
+
+        // 👇 Guardar info de usuario (id, email, rol) en localStorage
+        localStorage.setItem("user", JSON.stringify(data.user));
+
         navigate("/inicio"); // Redirige al inicio
       } else {
         alert(data.error || "Credenciales incorrectas");
