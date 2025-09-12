@@ -11,7 +11,7 @@ import {
 export default function Inicio() {
   const [montacargas, setMontacargas] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [editingNumero, setEditingNumero] = useState(null); // guardamos "Número"
+  const [editingNumero, setEditingNumero] = useState(null);
   const [formData, setFormData] = useState({
     "Número": "",
     "Marca": "",
@@ -21,6 +21,10 @@ export default function Inicio() {
     "Capacidad": ""
   });
   const [isOpen, setIsOpen] = useState(false);
+
+  // 👉 Nuevo estado para submenú
+  const [selectedMontacargas, setSelectedMontacargas] = useState(null);
+  const [activeTab, setActiveTab] = useState(null);
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
@@ -38,7 +42,6 @@ export default function Inicio() {
   }, []);
 
   const handleChange = (e) => {
-    // e.target.name puede ser "Número" (con tilde) — usamos bracket name dinámico
     const name = e.target.name;
     const value = e.target.value;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -49,7 +52,7 @@ export default function Inicio() {
 
     try {
       if (editingNumero) {
-        // actualizar (no cambiamos "Número")
+        // actualizar
         const res = await fetch(`http://localhost:4000/api/montacargas/${encodeURIComponent(editingNumero)}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -64,7 +67,9 @@ export default function Inicio() {
 
         if (res.ok) {
           const updated = await res.json();
-          setMontacargas(prev => prev.map(m => (String(m["Número"]) === String(editingNumero) ? updated : m)));
+          setMontacargas(prev =>
+            prev.map(m => (String(m["Número"]) === String(editingNumero) ? updated : m))
+          );
           setEditingNumero(null);
         } else {
           console.error("Error al actualizar montacargas");
@@ -109,7 +114,14 @@ export default function Inicio() {
       });
 
       if (res.ok) {
-        setMontacargas(prev => prev.filter(m => String(m["Número"]) !== String(numero)));
+        setMontacargas(prev =>
+          prev.filter(m => String(m["Número"]) !== String(numero))
+        );
+        // si eliminamos el seleccionado, limpiamos
+        if (selectedMontacargas && String(selectedMontacargas["Número"]) === String(numero)) {
+          setSelectedMontacargas(null);
+          setActiveTab(null);
+        }
       } else {
         console.error("Error borrando montacargas");
       }
@@ -138,8 +150,15 @@ export default function Inicio() {
         <h2 className="text-lg font-bold mb-4">Menú</h2>
 
         <div className="mb-2">
-          <div className="flex items-center cursor-pointer mb-1 hover:text-purple-400" onClick={() => setIsOpen(!isOpen)}>
-            {isOpen ? <FaChevronDown className="mr-2" /> : <FaChevronRight className="mr-2" />}
+          <div
+            className="flex items-center cursor-pointer mb-1 hover:text-purple-400"
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            {isOpen ? (
+              <FaChevronDown className="mr-2" />
+            ) : (
+              <FaChevronRight className="mr-2" />
+            )}
             <FaFolder className="mr-2" /> Montacargas
           </div>
 
@@ -147,22 +166,44 @@ export default function Inicio() {
             <ul className="ml-6 mt-2">
               {user?.rol === "admin" && (
                 <li>
-                  <button onClick={() => { setEditingNumero(null); setShowForm(true); }} className="flex items-center text-sm text-purple-400 hover:text-purple-600 mb-2">
+                  <button
+                    onClick={() => {
+                      setEditingNumero(null);
+                      setShowForm(true);
+                    }}
+                    className="flex items-center text-sm text-purple-400 hover:text-purple-600 mb-2"
+                  >
                     <FaPlus className="mr-1" /> Agregar Montacargas
                   </button>
                 </li>
               )}
 
               {montacargas.map((m) => (
-                <li key={String(m["Número"])} className="flex items-center justify-between mb-1 group">
-                  <button className="flex items-center text-left w-full hover:bg-gray-800 p-1 rounded">
-                    <FaFolder className="mr-2 text-yellow-400" /> {m["Número"]} - {m["Marca"]}
+                <li
+                  key={String(m["Número"])}
+                  className="flex items-center justify-between mb-1 group"
+                >
+                  <button
+                    className="flex items-center text-left w-full hover:bg-gray-800 p-1 rounded"
+                    onClick={() => {
+                      setSelectedMontacargas(m);
+                      setActiveTab(null);
+                    }}
+                  >
+                    <FaFolder className="mr-2 text-yellow-400" /> {m["Número"]} -{" "}
+                    {m["Marca"]}
                   </button>
 
                   {user?.rol === "admin" && (
                     <div className="opacity-0 group-hover:opacity-100 flex gap-2">
-                      <FaEdit className="text-blue-400 cursor-pointer hover:text-blue-600" onClick={() => handleEdit(m)} />
-                      <FaTrash className="text-red-400 cursor-pointer hover:text-red-600" onClick={() => handleDelete(m["Número"])} />
+                      <FaEdit
+                        className="text-blue-400 cursor-pointer hover:text-blue-600"
+                        onClick={() => handleEdit(m)}
+                      />
+                      <FaTrash
+                        className="text-red-400 cursor-pointer hover:text-red-600"
+                        onClick={() => handleDelete(m["Número"])}
+                      />
                     </div>
                   )}
                 </li>
@@ -172,38 +213,166 @@ export default function Inicio() {
         </div>
       </div>
 
+      {/* Panel principal */}
       <div className="flex-1 p-6">
-        <h1 className="text-2xl font-bold">Bienvenido</h1>
+        {!selectedMontacargas ? (
+          <h1 className="text-2xl font-bold">Bienvenido</h1>
+        ) : (
+          <div>
+            <h2 className="text-xl font-bold mb-4">
+              {selectedMontacargas["Número"]} - {selectedMontacargas["Marca"]}
+            </h2>
+
+            {/* Submenú */}
+            <div className="flex gap-4 mb-4 flex-wrap">
+              {[
+                "Información del equipo",
+                "Servicios Preventivos Historial",
+                "Inversión Inicial",
+                "Inversión Habilitar",
+                "Refacciones con Cargo",
+                "Programas Preventivos"
+              ].map((tab) => (
+                <button
+                  key={tab}
+                  className={`px-4 py-2 rounded ${
+                    activeTab === tab
+                      ? "bg-purple-600 text-white"
+                      : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                  }`}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            {/* Contenido dinámico */}
+            <div className="p-4 border rounded bg-gray-100">
+              {activeTab === "Información del equipo" && (
+                <div>
+                  <p><strong>Número:</strong> {selectedMontacargas["Número"]}</p>
+                  <p><strong>Marca:</strong> {selectedMontacargas["Marca"]}</p>
+                  <p><strong>Modelo:</strong> {selectedMontacargas["Modelo"]}</p>
+                  <p><strong>Serie:</strong> {selectedMontacargas["Serie"]}</p>
+                  <p><strong>Sistema:</strong> {selectedMontacargas["Sistema"]}</p>
+                  <p><strong>Capacidad:</strong> {selectedMontacargas["Capacidad"]}</p>
+                </div>
+              )}
+
+              {activeTab === "Servicios Preventivos Historial" && (
+                <p>Aquí irá el historial de servicios preventivos...</p>
+              )}
+
+              {activeTab === "Inversión Inicial" && (
+                <p>Aquí se mostrará la inversión inicial...</p>
+              )}
+
+              {activeTab === "Inversión Habilitar" && (
+                <p>Aquí se mostrará la inversión para habilitar...</p>
+              )}
+
+              {activeTab === "Refacciones con Cargo" && (
+                <p>Aquí se mostrarán las refacciones con cargo...</p>
+              )}
+
+              {activeTab === "Programas Preventivos" && (
+                <p>Aquí se integrarán los calendarios automáticos...</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* Modal Formulario */}
       {showForm && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white shadow-lg rounded-lg p-6 w-96 animate-fade-in">
-            <h2 className="text-lg font-semibold mb-4">{editingNumero ? "Editar Montacargas" : "Registrar Montacargas"}</h2>
+            <h2 className="text-lg font-semibold mb-4">
+              {editingNumero ? "Editar Montacargas" : "Registrar Montacargas"}
+            </h2>
 
             <form onSubmit={handleSubmit}>
-              <input type="text" name="Número" value={formData["Número"]} onChange={handleChange} placeholder="Número" className="w-full border p-2 mb-2 rounded" required disabled={!!editingNumero} />
+              <input
+                type="text"
+                name="Número"
+                value={formData["Número"]}
+                onChange={handleChange}
+                placeholder="Número"
+                className="w-full border p-2 mb-2 rounded"
+                required
+                disabled={!!editingNumero}
+              />
 
-              <input type="text" name="Marca" value={formData["Marca"]} onChange={handleChange} placeholder="Marca" className="w-full border p-2 mb-2 rounded" required />
+              <input
+                type="text"
+                name="Marca"
+                value={formData["Marca"]}
+                onChange={handleChange}
+                placeholder="Marca"
+                className="w-full border p-2 mb-2 rounded"
+                required
+              />
 
-              <input type="text" name="Modelo" value={formData["Modelo"]} onChange={handleChange} placeholder="Modelo" className="w-full border p-2 mb-2 rounded" required />
+              <input
+                type="text"
+                name="Modelo"
+                value={formData["Modelo"]}
+                onChange={handleChange}
+                placeholder="Modelo"
+                className="w-full border p-2 mb-2 rounded"
+                required
+              />
 
-              <input type="text" name="Serie" value={formData["Serie"]} onChange={handleChange} placeholder="Serie" className="w-full border p-2 mb-2 rounded" required />
+              <input
+                type="text"
+                name="Serie"
+                value={formData["Serie"]}
+                onChange={handleChange}
+                placeholder="Serie"
+                className="w-full border p-2 mb-2 rounded"
+                required
+              />
 
-              <input type="text" name="Sistema" value={formData["Sistema"]} onChange={handleChange} placeholder="Sistema" className="w-full border p-2 mb-2 rounded" required />
+              <input
+                type="text"
+                name="Sistema"
+                value={formData["Sistema"]}
+                onChange={handleChange}
+                placeholder="Sistema"
+                className="w-full border p-2 mb-2 rounded"
+                required
+              />
 
-              <input type="text" name="Capacidad" value={formData["Capacidad"]} onChange={handleChange} placeholder="Capacidad" className="w-full border p-2 mb-4 rounded" required />
+              <input
+                type="text"
+                name="Capacidad"
+                value={formData["Capacidad"]}
+                onChange={handleChange}
+                placeholder="Capacidad"
+                className="w-full border p-2 mb-4 rounded"
+                required
+              />
 
               <div className="flex justify-end">
-                <button type="button" onClick={() => setShowForm(false)} className="mr-2 bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Cancelar</button>
-                <button type="submit" className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">{editingNumero ? "Actualizar" : "Guardar"}</button>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="mr-2 bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+                >
+                  {editingNumero ? "Actualizar" : "Guardar"}
+                </button>
               </div>
             </form>
-
           </div>
         </div>
       )}
     </div>
   );
 }
-
