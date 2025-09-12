@@ -1,3 +1,3 @@
 export default function ServiciosHistorial() {
-  return <p>Servicios Historial</p>;
+  return <p>Servicios Preventivos Historial</p>;
 }

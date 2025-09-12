@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 
+// 👉 usamos la variable de entorno
+const API_URL = process.env.REACT_APP_API_URL;
+
 export default function Login() {
   const [formData, setFormData] = useState({
     email: "",
@@ -17,7 +20,7 @@ export default function Login() {
     e.preventDefault();
 
     try {
-      const response = await fetch("http://localhost:4000/auth/login", {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -70,7 +73,6 @@ export default function Login() {
           Ingresar
         </button>
 
-        {/* Aquí va el link de registro */}
         <p className="text-sm text-center mt-4">
           ¿No tienes una cuenta?{" "}
           <Link to="/register" className="text-blue-600 hover:underline">

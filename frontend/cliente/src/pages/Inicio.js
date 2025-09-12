@@ -15,6 +15,9 @@ import InversionHabilitar from "./views/InversionHabilitar";
 import RefaccionesCargo from "./views/RefaccionesCargo";
 import ProgramasPreventivos from "./views/ProgramasPreventivos";
 
+
+const API_URL = process.env.REACT_APP_API_URL;
+
 export default function Inicio() {
   const [montacargas, setMontacargas] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -29,16 +32,16 @@ export default function Inicio() {
   });
   const [isOpen, setIsOpen] = useState(false);
 
-  // 👉 Nuevo estado para submenú
   const [selectedMontacargas, setSelectedMontacargas] = useState(null);
   const [activeTab, setActiveTab] = useState(null);
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
+  // 👉 Cargar montacargas al inicio  
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch("http://localhost:4000/api/montacargas");
+        const res = await fetch(`${API_URL}/api/montacargas`);
         const data = await res.json();
         setMontacargas(Array.isArray(data) ? data : []);
       } catch (err) {
@@ -60,7 +63,7 @@ export default function Inicio() {
     try {
       if (editingNumero) {
         // actualizar
-        const res = await fetch(`http://localhost:4000/api/montacargas/${encodeURIComponent(editingNumero)}`, {
+        const res = await fetch(`${API_URL}/api/montacargas/${encodeURIComponent(editingNumero)}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -83,7 +86,7 @@ export default function Inicio() {
         }
       } else {
         // crear
-        const res = await fetch("http://localhost:4000/api/montacargas", {
+        const res = await fetch(`${API_URL}/api/montacargas`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData)
@@ -116,7 +119,7 @@ export default function Inicio() {
     if (!window.confirm("¿Seguro que quieres eliminar este Montacargas?")) return;
 
     try {
-      const res = await fetch(`http://localhost:4000/api/montacargas/${encodeURIComponent(numero)}`, {
+      const res = await fetch(`${API_URL}/api/montacargas/${encodeURIComponent(numero)}`, {
         method: "DELETE"
       });
 
@@ -124,7 +127,6 @@ export default function Inicio() {
         setMontacargas(prev =>
           prev.filter(m => String(m["Número"]) !== String(numero))
         );
-        // si eliminamos el seleccionado, limpiamos
         if (selectedMontacargas && String(selectedMontacargas["Número"]) === String(numero)) {
           setSelectedMontacargas(null);
           setActiveTab(null);

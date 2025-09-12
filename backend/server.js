@@ -19,13 +19,28 @@ app.use(helmet());
 app.use(express.json());
 app.use(cookieParser());
 
-// CORS
+// ======================
+// CORS (permite PC y celular)
+// ======================
+const allowedOrigins = [
+  "http://localhost:3000",          // frontend en tu PC
+  "http://192.168.0.193:3000"       // frontend en tu celular en red local
+];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL, // ej: http://localhost:3000
-  credentials: true,                // permite enviar cookies
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("No permitido por CORS"));
+    }
+  },
+  credentials: true, // permite cookies
 }));
 
+// ======================
 // Rate limiting
+// ======================
 const limiter = rateLimit({ 
   windowMs: 15 * 60 * 1000, 
   max: 100 
@@ -45,7 +60,6 @@ app.use("/api/montacargas", montacargasRoutes);
 // Ejemplo de ruta protegida
 // ======================
 function authMiddleware(req, res, next) {
-  // lee cookie token o header Authorization
   const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.split(" ")[1]);
   if (!token) return res.status(401).json({ error: "No autorizado" });
 
@@ -65,6 +79,6 @@ app.get("/protected", authMiddleware, (req, res) => {
 // ======================
 // Arrancar servidor
 // ======================
-app.listen(process.env.PORT || 4000, () =>
-  console.log(`Servidor en http://localhost:${process.env.PORT || 4000}`)
+app.listen(process.env.PORT || 4000, "0.0.0.0", () =>
+  console.log(`Servidor en http://0.0.0.0:${process.env.PORT || 4000}`)
 );

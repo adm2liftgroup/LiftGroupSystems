@@ -1,3 +1,3 @@
 export default function ServiciosHistorial() {
-  return <p>Refacciones Cargo</p>;
+  return <p>Refacciones Con Cargo</p>;
 }

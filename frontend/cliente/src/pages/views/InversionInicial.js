@@ -1,3 +1,3 @@
 export default function ServiciosHistorial() {
-  return <p>InversiónInicial</p>;
+  return <p>Inversión Inicial</p>;
 }

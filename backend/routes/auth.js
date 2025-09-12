@@ -9,7 +9,6 @@ const nodemailer = require("nodemailer");
 const pool = require("../db"); // exporta Pool desde backend/db.js
 require("dotenv").config();
 
-
 // ================================
 // Helper: enviar email de verificación
 // ================================
@@ -21,7 +20,7 @@ async function sendVerificationEmail(email, token) {
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
 
-  // 👇 Cambié la URL para que apunte directo al backend (puerto 4000)
+  // 👇 URL apunta al backend
   const verifyUrl = `${process.env.BACKEND_URL}/auth/verify?token=${token}`;
 
   const info = await transporter.sendMail({
@@ -35,11 +34,12 @@ async function sendVerificationEmail(email, token) {
   console.log("📨 Correo enviado, ID:", info.messageId);
 }
 
-//Endpoint para obtener datos del usuario autenticado
+// ================================
+// Endpoint: datos del usuario autenticado
+// ================================
 const { requireAuth } = require("../middlewares/auth");
 
 router.get("/me", requireAuth, async (req, res) => {
-  // req.user ya contiene id,email,rol
   res.json({ id: req.user.id, email: req.user.email, rol: req.user.rol });
 });
 
@@ -62,50 +62,33 @@ router.post(
     console.log("📥 POST /register recibido con body:", req.body);
 
     try {
-      // 1) Revisar existencia
-      console.log("🔍 Buscando si ya existe el usuario con email:", email);
       const exists = await pool.query('SELECT id FROM "Usuarios" WHERE email = $1', [email]);
-
       if (exists.rows.length) {
-        console.log("⚠️ Ya existe usuario con ese correo:", email);
         return res.status(400).json({ error: "Este correo ya está registrado" });
       }
 
-      // 2) Hash password
-      console.log("🔐 Hasheando contraseña...");
-      const saltRounds = 10;
-      const hashed = await bcrypt.hash(password, saltRounds);
-
-      // 3) Generar token de verificación
-      console.log("🎟️ Generando token de verificación...");
+      const hashed = await bcrypt.hash(password, 10);
       const token = crypto.randomBytes(32).toString("hex");
       const expires = new Date(Date.now() + 24 * 3600 * 1000); // 24h
 
-      // 4) Insertar usuario
-      console.log("💾 Insertando usuario en DB...");
       const inserted = await pool.query(
         `INSERT INTO "Usuarios" (nombre, email, password, verification_token, verification_expires)
          VALUES ($1,$2,$3,$4,$5) RETURNING id, email`,
         [nombre, email, hashed, token, expires]
       );
 
-      console.log("✅ Usuario insertado con id:", inserted.rows[0].id);
-
-      // 5) Enviar email
-      console.log("📧 Enviando correo de verificación a:", email);
       await sendVerificationEmail(email, token);
 
       return res.json({
         success: true,
-        message: "Registro exitoso. Revisa tu correo para verificar tu cuenta."
+        message: "Registro exitoso. Revisa tu correo para verificar tu cuenta.",
       });
     } catch (err) {
       console.error("🔥 Error en /register:", err);
-      return res.status(500).json({ error: err.message || "Ocurrió un error al registrar el usuario. Intenta nuevamente." });
+      return res.status(500).json({ error: "Error en el servidor al registrar usuario" });
     }
   }
 );
-
 
 // ================================
 // Verificación de correo
@@ -120,6 +103,7 @@ router.get("/verify", async (req, res) => {
       [token]
     );
     if (!q.rows.length) return res.status(400).send("Token inválido");
+
     const user = q.rows[0];
     if (user.verification_expires < new Date()) return res.status(400).send("Token expirado");
 
@@ -128,14 +112,12 @@ router.get("/verify", async (req, res) => {
       [user.id]
     );
 
-    // ✅ Ahora redirige al frontend a una página bonita
     return res.redirect(`${process.env.FRONTEND_URL}/verify-success`);
   } catch (err) {
     console.error("🔥 Error en /verify:", err);
     res.status(500).send("Error del servidor");
   }
 });
-
 
 // ================================
 // Login
@@ -154,14 +136,15 @@ router.post(
       if (!q.rows.length) return res.status(400).json({ error: "Credenciales inválidas" });
 
       const user = q.rows[0];
-
       if (!user.email_verified) return res.status(400).json({ error: "Email no verificado" });
 
       const ok = await bcrypt.compare(password, user.password);
       if (!ok) return res.status(400).json({ error: "Credenciales inválidas" });
 
       const payload = { id: user.id, email: user.email, rol: user.rol };
-      const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "1h" });
+      const token = jwt.sign(payload, process.env.JWT_SECRET, {
+        expiresIn: process.env.JWT_EXPIRES_IN || "1h",
+      });
 
       res.cookie("token", token, {
         httpOnly: true,
@@ -170,10 +153,9 @@ router.post(
         maxAge: 3600 * 1000,
       });
 
-      // 👇 Aquí añadimos info del usuario en la respuesta
       res.json({
         message: "Login exitoso",
-        user: { id: user.id, email: user.email, rol: user.rol }
+        user: { id: user.id, email: user.email, rol: user.rol },
       });
     } catch (err) {
       console.error("🔥 Error en /login:", err);
@@ -181,4 +163,25 @@ router.post(
     }
   }
 );
+
+// ================================
+// Confirmación de correo (versión JWT)
+// ================================
+router.get("/confirm/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    await pool.query(
+      'UPDATE "Usuarios" SET confirmado = true WHERE id = $1',
+      [decoded.id]
+    );
+
+    res.redirect(`${process.env.FRONTEND_URL}/confirmacion?status=ok`);
+  } catch (error) {
+    console.error("Error confirmando correo:", error.message);
+    res.redirect(`${process.env.FRONTEND_URL}/confirmacion?status=error`);
+  }
+});
+
 module.exports = router;
