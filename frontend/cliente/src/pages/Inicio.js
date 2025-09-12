@@ -8,6 +8,13 @@ import {
   FaEdit,
 } from "react-icons/fa";
 
+import InformacionEquipo from "./views/InformacionEquipo";
+import ServiciosHistorial from "./views/ServiciosHistorial";
+import InversionInicial from "./views/InversionInicial";
+import InversionHabilitar from "./views/InversionHabilitar";
+import RefaccionesCargo from "./views/RefaccionesCargo";
+import ProgramasPreventivos from "./views/ProgramasPreventivos";
+
 export default function Inicio() {
   const [montacargas, setMontacargas] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -250,35 +257,13 @@ export default function Inicio() {
             {/* Contenido dinámico */}
             <div className="p-4 border rounded bg-gray-100">
               {activeTab === "Información del equipo" && (
-                <div>
-                  <p><strong>Número:</strong> {selectedMontacargas["Número"]}</p>
-                  <p><strong>Marca:</strong> {selectedMontacargas["Marca"]}</p>
-                  <p><strong>Modelo:</strong> {selectedMontacargas["Modelo"]}</p>
-                  <p><strong>Serie:</strong> {selectedMontacargas["Serie"]}</p>
-                  <p><strong>Sistema:</strong> {selectedMontacargas["Sistema"]}</p>
-                  <p><strong>Capacidad:</strong> {selectedMontacargas["Capacidad"]}</p>
-                </div>
+                <InformacionEquipo montacargas={selectedMontacargas} />
               )}
-
-              {activeTab === "Servicios Preventivos Historial" && (
-                <p>Aquí irá el historial de servicios preventivos...</p>
-              )}
-
-              {activeTab === "Inversión Inicial" && (
-                <p>Aquí se mostrará la inversión inicial...</p>
-              )}
-
-              {activeTab === "Inversión Habilitar" && (
-                <p>Aquí se mostrará la inversión para habilitar...</p>
-              )}
-
-              {activeTab === "Refacciones con Cargo" && (
-                <p>Aquí se mostrarán las refacciones con cargo...</p>
-              )}
-
-              {activeTab === "Programas Preventivos" && (
-                <p>Aquí se integrarán los calendarios automáticos...</p>
-              )}
+              {activeTab === "Servicios Preventivos Historial" && <ServiciosHistorial />}
+              {activeTab === "Inversión Inicial" && <InversionInicial />}
+              {activeTab === "Inversión Habilitar" && <InversionHabilitar />}
+              {activeTab === "Refacciones con Cargo" && <RefaccionesCargo />}
+              {activeTab === "Programas Preventivos" && <ProgramasPreventivos />}
             </div>
           </div>
         )}
