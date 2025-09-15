@@ -15,7 +15,6 @@ import InversionHabilitar from "./views/InversionHabilitar";
 import RefaccionesCargo from "./views/RefaccionesCargo";
 import ProgramasPreventivos from "./views/ProgramasPreventivos";
 
-
 const API_URL = process.env.REACT_APP_API_URL;
 
 export default function Inicio() {
@@ -23,12 +22,12 @@ export default function Inicio() {
   const [showForm, setShowForm] = useState(false);
   const [editingNumero, setEditingNumero] = useState(null);
   const [formData, setFormData] = useState({
-    "Número": "",
-    "Marca": "",
-    "Modelo": "",
-    "Serie": "",
-    "Sistema": "",
-    "Capacidad": ""
+    numero: "",
+    Marca: "",
+    Modelo: "",
+    Serie: "",
+    Sistema: "",
+    Capacidad: ""
   });
   const [isOpen, setIsOpen] = useState(false);
 
@@ -67,18 +66,18 @@ export default function Inicio() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            "Marca": formData["Marca"],
-            "Modelo": formData["Modelo"],
-            "Serie": formData["Serie"],
-            "Sistema": formData["Sistema"],
-            "Capacidad": formData["Capacidad"]
+            Marca: formData.Marca,
+            Modelo: formData.Modelo,
+            Serie: formData.Serie,
+            Sistema: formData.Sistema,
+            Capacidad: formData.Capacidad
           })
         });
 
         if (res.ok) {
           const updated = await res.json();
           setMontacargas(prev =>
-            prev.map(m => (String(m["Número"]) === String(editingNumero) ? updated : m))
+            prev.map(m => (String(m.numero) === String(editingNumero) ? updated : m))
           );
           setEditingNumero(null);
         } else {
@@ -102,12 +101,12 @@ export default function Inicio() {
 
       // reset
       setFormData({
-        "Número": "",
-        "Marca": "",
-        "Modelo": "",
-        "Serie": "",
-        "Sistema": "",
-        "Capacidad": ""
+        numero: "",
+        Marca: "",
+        Modelo: "",
+        Serie: "",
+        Sistema: "",
+        Capacidad: ""
       });
       setShowForm(false);
     } catch (err) {
@@ -125,9 +124,9 @@ export default function Inicio() {
 
       if (res.ok) {
         setMontacargas(prev =>
-          prev.filter(m => String(m["Número"]) !== String(numero))
+          prev.filter(m => String(m.numero) !== String(numero))
         );
-        if (selectedMontacargas && String(selectedMontacargas["Número"]) === String(numero)) {
+        if (selectedMontacargas && String(selectedMontacargas.numero) === String(numero)) {
           setSelectedMontacargas(null);
           setActiveTab(null);
         }
@@ -141,14 +140,14 @@ export default function Inicio() {
 
   const handleEdit = (m) => {
     setFormData({
-      "Número": m["Número"],
-      "Marca": m["Marca"],
-      "Modelo": m["Modelo"],
-      "Serie": m["Serie"],
-      "Sistema": m["Sistema"],
-      "Capacidad": m["Capacidad"]
+      numero: m.numero,
+      Marca: m.Marca,
+      Modelo: m.Modelo,
+      Serie: m.Serie,
+      Sistema: m.Sistema,
+      Capacidad: m.Capacidad
     });
-    setEditingNumero(m["Número"]);
+    setEditingNumero(m.numero);
     setShowForm(true);
   };
 
@@ -189,7 +188,7 @@ export default function Inicio() {
 
               {montacargas.map((m) => (
                 <li
-                  key={String(m["Número"])}
+                  key={String(m.numero)}
                   className="flex items-center justify-between mb-1 group"
                 >
                   <button
@@ -199,8 +198,8 @@ export default function Inicio() {
                       setActiveTab(null);
                     }}
                   >
-                    <FaFolder className="mr-2 text-yellow-400" /> {m["Número"]} -{" "}
-                    {m["Marca"]}
+                    <FaFolder className="mr-2 text-yellow-400" /> {m.numero} -{" "}
+                    {m.Marca}
                   </button>
 
                   {user?.rol === "admin" && (
@@ -211,7 +210,7 @@ export default function Inicio() {
                       />
                       <FaTrash
                         className="text-red-400 cursor-pointer hover:text-red-600"
-                        onClick={() => handleDelete(m["Número"])}
+                        onClick={() => handleDelete(m.numero)}
                       />
                     </div>
                   )}
@@ -229,7 +228,7 @@ export default function Inicio() {
         ) : (
           <div>
             <h2 className="text-xl font-bold mb-4">
-              {selectedMontacargas["Número"]} - {selectedMontacargas["Marca"]}
+              {selectedMontacargas.numero} - {selectedMontacargas.Marca}
             </h2>
 
             {/* Submenú */}
@@ -265,7 +264,9 @@ export default function Inicio() {
               {activeTab === "Inversión Inicial" && <InversionInicial />}
               {activeTab === "Inversión Habilitar" && <InversionHabilitar />}
               {activeTab === "Refacciones con Cargo" && <RefaccionesCargo />}
-              {activeTab === "Programas Preventivos" && <ProgramasPreventivos />}
+              {activeTab === "Programas Preventivos" && (
+                <ProgramasPreventivos id={selectedMontacargas.numero} />
+              )}
             </div>
           </div>
         )}
@@ -282,8 +283,8 @@ export default function Inicio() {
             <form onSubmit={handleSubmit}>
               <input
                 type="text"
-                name="Número"
-                value={formData["Número"]}
+                name="numero"
+                value={formData.numero}
                 onChange={handleChange}
                 placeholder="Número"
                 className="w-full border p-2 mb-2 rounded"
@@ -294,7 +295,7 @@ export default function Inicio() {
               <input
                 type="text"
                 name="Marca"
-                value={formData["Marca"]}
+                value={formData.Marca}
                 onChange={handleChange}
                 placeholder="Marca"
                 className="w-full border p-2 mb-2 rounded"
@@ -304,7 +305,7 @@ export default function Inicio() {
               <input
                 type="text"
                 name="Modelo"
-                value={formData["Modelo"]}
+                value={formData.Modelo}
                 onChange={handleChange}
                 placeholder="Modelo"
                 className="w-full border p-2 mb-2 rounded"
@@ -314,7 +315,7 @@ export default function Inicio() {
               <input
                 type="text"
                 name="Serie"
-                value={formData["Serie"]}
+                value={formData.Serie}
                 onChange={handleChange}
                 placeholder="Serie"
                 className="w-full border p-2 mb-2 rounded"
@@ -324,7 +325,7 @@ export default function Inicio() {
               <input
                 type="text"
                 name="Sistema"
-                value={formData["Sistema"]}
+                value={formData.Sistema}
                 onChange={handleChange}
                 placeholder="Sistema"
                 className="w-full border p-2 mb-2 rounded"
@@ -334,7 +335,7 @@ export default function Inicio() {
               <input
                 type="text"
                 name="Capacidad"
-                value={formData["Capacidad"]}
+                value={formData.Capacidad}
                 onChange={handleChange}
                 placeholder="Capacidad"
                 className="w-full border p-2 mb-4 rounded"

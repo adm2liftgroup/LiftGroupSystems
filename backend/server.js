@@ -52,9 +52,11 @@ app.use(limiter);
 // ======================
 const authRoutes = require("./routes/auth");
 const montacargasRoutes = require("./routes/montacargas");
+const mantenimientosRoutes = require("./routes/mantenimientos");
 
 app.use("/auth", authRoutes);
 app.use("/api/montacargas", montacargasRoutes);
+app.use("/api/mantenimientos", mantenimientosRoutes);
 
 // ======================
 // Ejemplo de ruta protegida

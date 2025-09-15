@@ -1,19 +1,36 @@
-
-// backend/routes/montacargas.js
 const express = require("express");
 const router = express.Router();
-const pool = require("../db"); // Pool de pg
+const pool = require("../db");
 
 // Obtener todos los montacargas
 router.get("/", async (req, res) => {
   try {
-    // usar comillas para respetar el nombre con mayúscula "Montacargas" y la columna "Número"
     const result = await pool.query(
-      'SELECT "Número","Marca","Modelo","Serie","Sistema","Capacidad" FROM "Montacargas" ORDER BY "Número" ASC'
+      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad" FROM "Montacargas" ORDER BY numero ASC'
     );
-    res.json(result.rows); // devuelve array de objetos
+    res.json(result.rows);
   } catch (err) {
     console.error("GET /api/montacargas error:", err);
+    res.status(500).json({ error: "Error al obtener Montacargas" });
+  }
+});
+
+// Obtener un montacargas específico por ID
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad" FROM "Montacargas" WHERE numero = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Montacargas no encontrado" });
+    }
+
+    res.json({ success: true, montacargas: result.rows[0] });
+  } catch (err) {
+    console.error("GET /api/montacargas/:id error:", err);
     res.status(500).json({ error: "Error al obtener Montacargas" });
   }
 });
@@ -21,17 +38,11 @@ router.get("/", async (req, res) => {
 // Crear montacargas
 router.post("/", async (req, res) => {
   try {
-    // usar bracket access por seguridad si tu frontend envía propiedades con tilde
-    const Numero = req.body["Número"];
-    const Marca = req.body["Marca"];
-    const Modelo = req.body["Modelo"];
-    const Serie = req.body["Serie"];
-    const Sistema = req.body["Sistema"];
-    const Capacidad = req.body["Capacidad"];
+    const { numero, Marca, Modelo, Serie, Sistema, Capacidad } = req.body;
 
     const result = await pool.query(
-      'INSERT INTO "Montacargas" ("Número","Marca","Modelo","Serie","Sistema","Capacidad") VALUES ($1,$2,$3,$4,$5,$6) RETURNING "Número","Marca","Modelo","Serie","Sistema","Capacidad"',
-      [Numero, Marca, Modelo, Serie, Sistema, Capacidad]
+      'INSERT INTO "Montacargas" (numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad") VALUES ($1, $2, $3, $4, $5, $6) RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad"',
+      [numero, Marca, Modelo, Serie, Sistema, Capacidad]
     );
 
     res.status(201).json(result.rows[0]);
@@ -41,19 +52,15 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Actualizar montacargas (no cambia la PK "Número")
-router.put("/:numero", async (req, res) => {
+// Actualizar montacargas
+router.put("/:id", async (req, res) => {
   try {
-    const numeroParam = req.params.numero; // viene en la URL
-    const Marca = req.body["Marca"];
-    const Modelo = req.body["Modelo"];
-    const Serie = req.body["Serie"];
-    const Sistema = req.body["Sistema"];
-    const Capacidad = req.body["Capacidad"];
+    const { id } = req.params;
+    const { Marca, Modelo, Serie, Sistema, Capacidad } = req.body;
 
     const result = await pool.query(
-      'UPDATE "Montacargas" SET "Marca"=$1, "Modelo"=$2, "Serie"=$3, "Sistema"=$4, "Capacidad"=$5 WHERE "Número"=$6 RETURNING "Número","Marca","Modelo","Serie","Sistema","Capacidad"',
-      [Marca, Modelo, Serie, Sistema, Capacidad, numeroParam]
+      'UPDATE "Montacargas" SET "Marca"=$1, "Modelo"=$2, "Serie"=$3, "Sistema"=$4, "Capacidad"=$5 WHERE numero=$6 RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad"',
+      [Marca, Modelo, Serie, Sistema, Capacidad, id]
     );
 
     if (result.rowCount === 0) {
@@ -62,28 +69,28 @@ router.put("/:numero", async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("PUT /api/montacargas/:numero error:", err);
+    console.error("PUT /api/montacargas/:id error:", err);
     res.status(500).json({ error: "Error al actualizar Montacargas" });
   }
 });
 
 // Eliminar montacargas
-router.delete("/:numero", async (req, res) => {
+router.delete("/:id", async (req, res) => {
   try {
-    const numeroParam = req.params.numero;
+    const { id } = req.params;
 
     const result = await pool.query(
-      'DELETE FROM "Montacargas" WHERE "Número"=$1 RETURNING "Número"',
-      [numeroParam]
+      'DELETE FROM "Montacargas" WHERE numero=$1 RETURNING numero',
+      [id]
     );
 
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Montacargas no encontrado" });
     }
 
-    res.json({ message: "Montacargas eliminado correctamente", "Número": result.rows[0]["Número"] });
+    res.json({ message: "Montacargas eliminado correctamente", numero: result.rows[0].numero });
   } catch (err) {
-    console.error("DELETE /api/montacargas/:numero error:", err);
+    console.error("DELETE /api/montacargas/:id error:", err);
     res.status(500).json({ error: "Error al eliminar Montacargas" });
   }
 });

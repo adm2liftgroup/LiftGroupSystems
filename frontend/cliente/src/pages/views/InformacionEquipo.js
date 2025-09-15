@@ -3,7 +3,7 @@ export default function InformacionEquipo({ montacargas }) {
 
   return (
     <div>
-      <p><strong>Número:</strong> {montacargas["Número"]}</p>
+      <p><strong>Número:</strong> {montacargas["numero"]}</p>
       <p><strong>Marca:</strong> {montacargas["Marca"]}</p>
       <p><strong>Modelo:</strong> {montacargas["Modelo"]}</p>
       <p><strong>Serie:</strong> {montacargas["Serie"]}</p>
