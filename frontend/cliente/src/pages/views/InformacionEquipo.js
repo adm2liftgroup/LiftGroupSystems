@@ -8,7 +8,8 @@ export default function InformacionEquipo({ montacargas }) {
       <p><strong>Modelo:</strong> {montacargas["Modelo"]}</p>
       <p><strong>Serie:</strong> {montacargas["Serie"]}</p>
       <p><strong>Sistema:</strong> {montacargas["Sistema"]}</p>
-      <p><strong>Capacidad:</strong> {montacargas["Capacidad"]}</p>
+      <p><strong>Capacidad:</strong> {montacargas["Capacidad"]} lbs</p>
+
     </div>
   );
 }

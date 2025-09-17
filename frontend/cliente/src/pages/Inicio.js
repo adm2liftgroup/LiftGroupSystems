@@ -6,6 +6,10 @@ import {
   FaChevronRight,
   FaTrash,
   FaEdit,
+  FaBars,
+  FaSearch,
+  FaAngleLeft,
+  FaAngleRight,
 } from "react-icons/fa";
 
 import InformacionEquipo from "./views/InformacionEquipo";
@@ -19,6 +23,7 @@ const API_URL = process.env.REACT_APP_API_URL;
 
 export default function Inicio() {
   const [montacargas, setMontacargas] = useState([]);
+  const [filteredMontacargas, setFilteredMontacargas] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingNumero, setEditingNumero] = useState(null);
   const [formData, setFormData] = useState({
@@ -30,13 +35,16 @@ export default function Inicio() {
     Capacidad: ""
   });
   const [isOpen, setIsOpen] = useState(false);
-
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedMontacargas, setSelectedMontacargas] = useState(null);
   const [activeTab, setActiveTab] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // 👉 Cargar montacargas al inicio  
+  // Cargar montacargas al inicio
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -49,6 +57,23 @@ export default function Inicio() {
     };
     fetchData();
   }, []);
+
+  // Filtrar montacargas según término de búsqueda
+  useEffect(() => {
+    const filtered = montacargas.filter(m => 
+      m.numero.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.Marca.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.Modelo.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredMontacargas(filtered);
+    setCurrentPage(1); // Resetear a primera página al buscar
+  }, [searchTerm, montacargas]);
+
+  // Calcular montacargas para la página actual
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredMontacargas.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredMontacargas.length / itemsPerPage);
 
   const handleChange = (e) => {
     const name = e.target.name;
@@ -151,11 +176,61 @@ export default function Inicio() {
     setShowForm(true);
   };
 
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  const nextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const prevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
   return (
-    <div className="flex">
+    <div className="flex flex-col md:flex-row">
+      {/* Botón de menú móvil */}
+      <div className="md:hidden bg-gray-900 p-2 flex justify-between items-center">
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="text-white p-2"
+        >
+          <FaBars />
+        </button>
+        <h1 className="text-white text-lg font-bold">Sistema Montacargas</h1>
+      </div>
+
       {/* Sidebar */}
-      <div className="w-80 bg-gray-900 text-white h-screen p-4">
+      <div 
+        className={`w-full md:w-80 bg-gray-900 text-white md:h-screen p-4 fixed md:relative z-10 transform transition-transform duration-300 ease-in-out ${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+        style={{ height: '100vh', overflowY: 'auto' }}
+      >
+        <button 
+          className="md:hidden absolute top-4 right-4 text-white"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          ✕
+        </button>
+        
         <h2 className="text-lg font-bold mb-4">Menú</h2>
+
+        <div className="mb-4">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Buscar montacargas..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full p-2 pl-8 rounded bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-purple-500"
+            />
+            <FaSearch className="absolute left-2 top-3 text-gray-400" />
+          </div>
+        </div>
 
         <div className="mb-2">
           <div
@@ -168,71 +243,160 @@ export default function Inicio() {
               <FaChevronRight className="mr-2" />
             )}
             <FaFolder className="mr-2" /> Montacargas
+            <span className="ml-2 text-sm text-gray-400">({filteredMontacargas.length})</span>
           </div>
 
           {isOpen && (
-            <ul className="ml-6 mt-2">
+            <div>
               {user?.rol === "admin" && (
-                <li>
-                  <button
-                    onClick={() => {
-                      setEditingNumero(null);
-                      setShowForm(true);
-                    }}
-                    className="flex items-center text-sm text-purple-400 hover:text-purple-600 mb-2"
-                  >
-                    <FaPlus className="mr-1" /> Agregar Montacargas
-                  </button>
-                </li>
+                <button
+                  onClick={() => {
+                    setEditingNumero(null);
+                    setShowForm(true);
+                  }}
+                  className="flex items-center text-sm text-purple-400 hover:text-purple-600 mb-2 ml-6"
+                >
+                  <FaPlus className="mr-1" /> Agregar Montacargas
+                </button>
               )}
 
-              {montacargas.map((m) => (
-                <li
-                  key={String(m.numero)}
-                  className="flex items-center justify-between mb-1 group"
+              <div className="mb-2 ml-4 flex items-center">
+                <span className="text-sm text-gray-400 mr-2">Mostrar:</span>
+                <select 
+                  value={itemsPerPage} 
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  className="bg-gray-800 text-white p-1 rounded text-sm"
                 >
-                  <button
-                    className="flex items-center text-left w-full hover:bg-gray-800 p-1 rounded"
-                    onClick={() => {
-                      setSelectedMontacargas(m);
-                      setActiveTab(null);
-                    }}
-                  >
-                    <FaFolder className="mr-2 text-yellow-400" /> {m.numero} -{" "}
-                    {m.Marca}
-                  </button>
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
 
-                  {user?.rol === "admin" && (
-                    <div className="opacity-0 group-hover:opacity-100 flex gap-2">
-                      <FaEdit
-                        className="text-blue-400 cursor-pointer hover:text-blue-600"
-                        onClick={() => handleEdit(m)}
-                      />
-                      <FaTrash
-                        className="text-red-400 cursor-pointer hover:text-red-600"
-                        onClick={() => handleDelete(m.numero)}
-                      />
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
+              <ul className="ml-4 mt-2">
+                {currentItems.map((m) => (
+                  <li
+                    key={String(m.numero)}
+                    className="flex items-center justify-between mb-1 group"
+                  >
+                    <button
+                      className="flex items-center text-left w-full hover:bg-gray-800 p-1 rounded"
+                      onClick={() => {
+                        setSelectedMontacargas(m);
+                        setActiveTab(null);
+                        setIsMobileMenuOpen(false);
+                      }}
+                    >
+                      <FaFolder className="mr-2 text-yellow-400" /> {m.numero} -{" "}
+                      {m.Marca}
+                    </button>
+
+                    {user?.rol === "admin" && (
+                      <div className="opacity-0 group-hover:opacity-100 flex gap-2">
+                        <FaEdit
+                          className="text-blue-400 cursor-pointer hover:text-blue-600"
+                          onClick={() => handleEdit(m)}
+                        />
+                        <FaTrash
+                          className="text-red-400 cursor-pointer hover:text-red-600"
+                          onClick={() => handleDelete(m.numero)}
+                        />
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+
+              {/* Paginación */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center mt-4 space-x-2 ml-4">
+                  <button
+                    onClick={prevPage}
+                    disabled={currentPage === 1}
+                    className="p-1 rounded bg-gray-800 disabled:opacity-50"
+                  >
+                    <FaAngleLeft />
+                  </button>
+                  
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    // Mostrar páginas alrededor de la actual
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => paginate(pageNum)}
+                        className={`w-8 h-8 rounded ${
+                          currentPage === pageNum
+                            ? "bg-purple-600 text-white"
+                            : "bg-gray-800"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  
+                  <button
+                    onClick={nextPage}
+                    disabled={currentPage === totalPages}
+                    className="p-1 rounded bg-gray-800 disabled:opacity-50"
+                  >
+                    <FaAngleRight />
+                  </button>
+                  
+                  <span className="text-sm text-gray-400">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
 
+      {/* Overlay para móviles */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-0 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        ></div>
+      )}
+
       {/* Panel principal */}
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-4 md:p-6">
         {!selectedMontacargas ? (
-          <h1 className="text-2xl font-bold">Bienvenido</h1>
+          <div className="flex flex-col items-center justify-center h-full">
+            <h1 className="text-2xl font-bold mb-4">Bienvenido</h1>
+            <p className="text-gray-600 text-center">
+              Selecciona un montacargas del menú para ver su información
+            </p>
+          </div>
         ) : (
           <div>
-            <h2 className="text-xl font-bold mb-4">
-              {selectedMontacargas.numero} - {selectedMontacargas.Marca}
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">
+                {selectedMontacargas.numero} - {selectedMontacargas.Marca}
+              </h2>
+              <button
+                className="md:hidden bg-gray-200 p-2 rounded"
+                onClick={() => setIsMobileMenuOpen(true)}
+              >
+                <FaBars />
+              </button>
+            </div>
 
             {/* Submenú */}
-            <div className="flex gap-4 mb-4 flex-wrap">
+            <div className="flex gap-2 mb-4 flex-wrap">
               {[
                 "Información del equipo",
                 "Servicios Preventivos Historial",
@@ -243,7 +407,7 @@ export default function Inicio() {
               ].map((tab) => (
                 <button
                   key={tab}
-                  className={`px-4 py-2 rounded ${
+                  className={`px-3 py-1 text-sm md:px-4 md:py-2 md:text-base rounded ${
                     activeTab === tab
                       ? "bg-purple-600 text-white"
                       : "bg-gray-200 text-gray-800 hover:bg-gray-300"
@@ -256,7 +420,7 @@ export default function Inicio() {
             </div>
 
             {/* Contenido dinámico */}
-            <div className="p-4 border rounded bg-gray-100">
+            <div className="p-4 border rounded bg-gray-100 overflow-x-auto">
               {activeTab === "Información del equipo" && (
                 <InformacionEquipo montacargas={selectedMontacargas} />
               )}
@@ -267,6 +431,11 @@ export default function Inicio() {
               {activeTab === "Programas Preventivos" && (
                 <ProgramasPreventivos id={selectedMontacargas.numero} />
               )}
+              {!activeTab && (
+                <div className="text-center text-gray-500 py-8">
+                  Selecciona una pestaña para ver la información
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -274,8 +443,8 @@ export default function Inicio() {
 
       {/* Modal Formulario */}
       {showForm && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white shadow-lg rounded-lg p-6 w-96 animate-fade-in">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white shadow-lg rounded-lg p-4 md:p-6 w-11/12 md:w-96 max-h-screen overflow-y-auto animate-fade-in">
             <h2 className="text-lg font-semibold mb-4">
               {editingNumero ? "Editar Montacargas" : "Registrar Montacargas"}
             </h2>

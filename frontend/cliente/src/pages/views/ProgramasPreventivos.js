@@ -20,6 +20,10 @@ function parseDateToLocal(date) {
 export default function ProgramasPreventivos({ id }) {
   console.log("ID recibido como prop:", id);
   
+  // Obtener usuario del localStorage
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const isAdmin = user?.rol === "admin";
+  
   // Validación robusta del ID
   const montacargasId = React.useMemo(() => {
     const numId = Number(id);
@@ -36,8 +40,11 @@ export default function ProgramasPreventivos({ id }) {
   const [montacargasInfo, setMontacargasInfo] = useState(null);
   const [mostrarTodos, setMostrarTodos] = useState(false);
   const [anioFiltro, setAnioFiltro] = useState("");
+  const [fechaActual, setFechaActual] = useState(new Date());
 
   console.log("montacargasId convertido:", montacargasId);
+  console.log("Usuario:", user);
+  console.log("Es admin:", isAdmin);
 
   // Mostrar error si el ID no es válido
   if (!montacargasId) {
@@ -133,8 +140,13 @@ export default function ProgramasPreventivos({ id }) {
     }
   };
 
-  // Crear programa anual automático
+  // Crear programa anual automático - SOLO ADMIN
   const handleCrearPrograma = async () => {
+    if (!isAdmin) {
+      setError("❌ Solo los administradores pueden crear programas de mantenimiento");
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
@@ -206,11 +218,42 @@ export default function ProgramasPreventivos({ id }) {
     dayHeaderFormat: (date) => moment(date).format('dddd, MMM D'),
   };
 
+  // Función para navegar entre meses y años
+  const onNavigate = (newDate) => {
+    setFechaActual(newDate);
+  };
+
+  // Botones de navegación personalizados
+  const CustomToolbar = ({ label, onNavigate, onView }) => {
+    return (
+      <div className="rbc-toolbar flex flex-wrap items-center justify-between mb-4">
+        <span className="rbc-btn-group">
+          <button type="button" onClick={() => onNavigate('TODAY')} className="bg-gray-300 px-3 py-1 rounded mr-2">
+            Hoy
+          </button>
+          <button type="button" onClick={() => onNavigate('PREV')} className="bg-gray-300 px-3 py-1 rounded mr-2">
+            ◀
+          </button>
+          <button type="button" onClick={() => onNavigate('NEXT')} className="bg-gray-300 px-3 py-1 rounded">
+            ▶
+          </button>
+        </span>
+        
+        <span className="rbc-toolbar-label text-lg font-semibold">
+          {label}
+        </span>
+        
+        
+      </div>
+    );
+  };
+
   return (
     <div className="p-6">
       <h2 className="text-2xl font-bold mb-6 text-gray-800">
         📅 Programas Preventivos – Montacargas #{montacargasId}
         {montacargasInfo && ` - ${montacargasInfo.Marca || ''} ${montacargasInfo.Modelo || ''}`}
+        {!isAdmin && <span className="text-sm text-gray-500 ml-2">(Solo lectura)</span>}
       </h2>
 
       {error && (
@@ -225,49 +268,62 @@ export default function ProgramasPreventivos({ id }) {
         </div>
       )}
 
-      {/* Configuración Automática */}
-      <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-        <h3 className="text-lg font-semibold mb-3">🔄 Programa Automático Anual</h3>
-        <div className="flex flex-wrap gap-4 items-center mb-4">
-          <label className="flex items-center gap-2">
-            <span className="font-medium">Año programa:</span>
-            <input
-              type="number"
-              value={anio}
-              onChange={(e) => setAnio(Number(e.target.value))}
-              className="p-2 border border-gray-300 rounded w-24"
-              min="2020"
-              max="2030"
-            />
-          </label>
+      {/* Configuración Automática - SOLO PARA ADMIN */}
+      {isAdmin && (
+        <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+          <h3 className="text-lg font-semibold mb-3">🔄 Programa Automático Anual</h3>
+          <div className="flex flex-wrap gap-4 items-center mb-4">
+            <label className="flex items-center gap-2">
+              <span className="font-medium">Año programa:</span>
+              <input
+                type="number"
+                value={anio}
+                onChange={(e) => setAnio(Number(e.target.value))}
+                className="p-2 border border-gray-300 rounded w-24"
+                min="2020"
+                max="2030"
+              />
+            </label>
 
-          <label className="flex items-center gap-2">
-            <span className="font-medium">Día del mes:</span>
-            <input
-              type="number"
-              value={dia}
-              onChange={(e) => setDia(Number(e.target.value))}
-              className="p-2 border border-gray-300 rounded w-20"
-              min="1"
-              max="28"
-            />
-          </label>
+            <label className="flex items-center gap-2">
+              <span className="font-medium">Día del mes:</span>
+              <input
+                type="number"
+                value={dia}
+                onChange={(e) => setDia(Number(e.target.value))}
+                className="p-2 border border-gray-300 rounded w-20"
+                min="1"
+                max="28"
+              />
+            </label>
 
-          <button
-            disabled={loading}
-            onClick={handleCrearPrograma}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded disabled:bg-gray-400"
-          >
-            {loading ? "⏳ Creando..." : "🚀 Crear Programa Anual"}
-          </button>
+            <button
+              disabled={loading}
+              onClick={handleCrearPrograma}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded disabled:bg-gray-400"
+            >
+              {loading ? "⏳ Creando..." : "🚀 Crear Programa Anual"}
+            </button>
+          </div>
+          
+          <div className="text-sm text-blue-700">
+            <strong>Patrón automático:</strong> Básico (Ene,Feb,Abr,May,Jul,Ago,Oct,Nov), Intermedio (Mar,Jun,Sep), Avanzado (Dic)
+          </div>
         </div>
-        
-        <div className="text-sm text-blue-700">
-          <strong>Patrón automático:</strong> Básico (Ene,Feb,Abr,May,Jul,Ago,Oct,Nov), Intermedio (Mar,Jun,Sep), Avanzado (Dic)
-        </div>
-      </div>
+      )}
 
-      {/* Filtros de visualización */}
+      {/* Mensaje para usuarios no administradores */}
+      {!isAdmin && (
+        <div className="mb-6 p-4 bg-yellow-50 rounded-lg">
+          <h3 className="text-lg font-semibold mb-3">👤 Modo de solo lectura</h3>
+          <p className="text-yellow-700">
+            Eres un usuario normal. Solo puedes consultar los programas de mantenimiento existentes.
+            Contacta a un administrador para crear nuevos programas.
+          </p>
+        </div>
+      )}
+
+      {/* Filtros de visualización - Disponible para todos */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
         <h3 className="text-lg font-semibold mb-3">👁️ Visualización</h3>
         <div className="flex flex-wrap gap-4 items-center">
@@ -300,7 +356,7 @@ export default function ProgramasPreventivos({ id }) {
         </div>
       </div>
 
-      {/* Calendario */}
+      {/* Calendario - Disponible para todos */}
       <div className="bg-white p-4 rounded-lg shadow mb-6">
         <h3 className="text-lg font-semibold mb-4">
           Calendario {anioFiltro ? `- Año ${anioFiltro}` : "- Todos los años"}
@@ -309,7 +365,9 @@ export default function ProgramasPreventivos({ id }) {
         {eventos.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <p>No hay mantenimientos programados {anioFiltro ? `para el año ${anioFiltro}` : ""}</p>
-            <p className="text-sm mt-2">Usa el botón "Crear Programa Anual" para generar los mantenimientos</p>
+            {isAdmin && (
+              <p className="text-sm mt-2">Usa el botón "Crear Programa Anual" para generar los mantenimientos</p>
+            )}
           </div>
         ) : (
           <div style={{ height: 600 }}>
@@ -320,6 +378,20 @@ export default function ProgramasPreventivos({ id }) {
               endAccessor="end"
               style={{ height: "100%" }}
               views={["month", "agenda"]}
+              view={"month"}
+              date={fechaActual}
+              onNavigate={onNavigate}
+              onView={(view) => {
+                // Esta función maneja el cambio de vista
+                const calendarElement = document.querySelector('.rbc-calendar');
+                if (calendarElement) {
+                  if (view === 'agenda') {
+                    calendarElement.style.height = '800px';
+                  } else {
+                    calendarElement.style.height = '600px';
+                  }
+                }
+              }}
               eventPropGetter={eventStyleGetter}
               formats={formats}
               messages={{
@@ -332,13 +404,34 @@ export default function ProgramasPreventivos({ id }) {
                 time: "Hora",
                 event: "Evento",
               }}
+              components={{
+                toolbar: (props) => (
+                  <CustomToolbar 
+                    {...props} 
+                    onNavigate={(action) => {
+                      if (action === 'PREV') {
+                        const newDate = new Date(fechaActual);
+                        newDate.setMonth(newDate.getMonth() - 1);
+                        setFechaActual(newDate);
+                      } else if (action === 'NEXT') {
+                        const newDate = new Date(fechaActual);
+                        newDate.setMonth(newDate.getMonth() + 1);
+                        setFechaActual(newDate);
+                      } else if (action === 'TODAY') {
+                        setFechaActual(new Date());
+                      }
+                    }}
+                    onView={props.onView}
+                  />
+                )
+              }}
               popup
             />
           </div>
         )}
       </div>
 
-      {/* Resumen y estadísticas */}
+      {/* Resumen y estadísticas - Disponible para todos */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="p-4 bg-green-50 rounded-lg">
           <h4 className="font-semibold mb-3">📊 Resumen por año</h4>
@@ -368,7 +461,7 @@ export default function ProgramasPreventivos({ id }) {
 
         {/* Leyenda */}
         <div className="p-4 bg-gray-50 rounded-lg">
-          <h4 className="font-semibold mb-3">🎨 Simbología</h4>
+          <h4 className="font-semibold mb-3">Simbología</h4>
           <div className="space-y-2">
             <div className="flex items-center">
               <span className="inline-block w-4 h-4 mr-2 rounded-sm bg-green-500"></span>
@@ -394,6 +487,7 @@ export default function ProgramasPreventivos({ id }) {
           <p><strong>Años con programas:</strong> {añosUnicos.join(', ') || 'Ninguno'}</p>
           <p><strong>Montacargas ID:</strong> {montacargasId}</p>
           <p><strong>Mostrando:</strong> {mostrarTodos ? 'Todos los años' : anioFiltro ? `Año ${anioFiltro}` : `Año ${anio}`}</p>
+          <p><strong>Permisos:</strong> {isAdmin ? 'Administrador' : 'Usuario'}</p>
         </div>
       </div>
     </div>
