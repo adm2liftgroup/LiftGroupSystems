@@ -18,6 +18,7 @@ import InversionInicial from "./views/InversionInicial";
 import InversionHabilitar from "./views/InversionHabilitar";
 import RefaccionesCargo from "./views/RefaccionesCargo";
 import ProgramasPreventivos from "./views/ProgramasPreventivos";
+import Perfil from "./views/Perfil";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -42,7 +43,20 @@ export default function Inicio() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  // 👉 Lógica para manejar el usuario de forma segura
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+    } catch (error) {
+      console.error("Error al obtener el usuario de localStorage:", error);
+      setUser(null);
+    }
+  }, []);
 
   // Cargar montacargas al inicio
   useEffect(() => {
@@ -60,7 +74,7 @@ export default function Inicio() {
 
   // Filtrar montacargas según término de búsqueda
   useEffect(() => {
-    const filtered = montacargas.filter(m => 
+    const filtered = montacargas.filter(m =>
       m.numero.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.Marca.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.Modelo.toLowerCase().includes(searchTerm.toLowerCase())
@@ -219,6 +233,39 @@ export default function Inicio() {
         
         <h2 className="text-lg font-bold mb-4">Menú</h2>
 
+        {/* 👉 Icono de usuario y nombre */}
+        {user && (
+          <div
+            className="flex items-center space-x-2 mb-4 p-2 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
+            onClick={() => {
+              setActiveTab("Perfil");
+              setSelectedMontacargas(null); // 🔑 Limpia montacargas para que no interfiera
+              setIsMobileMenuOpen(false);
+            }}
+          >
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              viewBox="0 0 24 24" 
+              fill="currentColor" 
+              className="w-8 h-8 text-purple-400"
+            >
+              <path 
+                fillRule="evenodd" 
+                d="M18.685 19.097A9.723 9.723 0 0021.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12c0 1.331.29 2.613.832 3.815A8.694 8.694 0 0012 21.75c1.233 0 2.408-.344 3.465-.957a1.652 1.652 0 002.668 1.054c.677-.853.585-1.583.486-1.748.163-.092.327-.19.491-.29A9.723 9.723 0 0018.685 19.097zM12 20.25a8.25 8.25 0 100-16.5 8.25 8.25 0 000 16.5zm-2.25-6a2.25 2.25 0 114.5 0 2.25 2.25 0 01-4.5 0z" 
+                clipRule="evenodd" 
+              />
+            </svg>
+            <div>
+              <span className="text-sm font-semibold">
+                {user.nombre || user.email}
+              </span>
+              <span className="block text-xs text-gray-400">
+                {user.rol}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="mb-4">
           <div className="relative">
             <input
@@ -374,7 +421,7 @@ export default function Inicio() {
 
       {/* Panel principal */}
       <div className="flex-1 p-4 md:p-6">
-        {!selectedMontacargas ? (
+        {!selectedMontacargas && activeTab !== "Perfil" ? (
           <div className="flex flex-col items-center justify-center h-full">
             <h1 className="text-2xl font-bold mb-4">Bienvenido</h1>
             <p className="text-gray-600 text-center">
@@ -385,7 +432,7 @@ export default function Inicio() {
           <div>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">
-                {selectedMontacargas.numero} - {selectedMontacargas.Marca}
+                {activeTab === "Perfil" ? "Perfil de Usuario" : `${selectedMontacargas.numero} - ${selectedMontacargas.Marca}`}
               </h2>
               <button
                 className="md:hidden bg-gray-200 p-2 rounded"
@@ -395,29 +442,31 @@ export default function Inicio() {
               </button>
             </div>
 
-            {/* Submenú */}
-            <div className="flex gap-2 mb-4 flex-wrap">
-              {[
-                "Información del equipo",
-                "Servicios Preventivos Historial",
-                "Inversión Inicial",
-                "Inversión Habilitar",
-                "Refacciones con Cargo",
-                "Programas Preventivos"
-              ].map((tab) => (
-                <button
-                  key={tab}
-                  className={`px-3 py-1 text-sm md:px-4 md:py-2 md:text-base rounded ${
-                    activeTab === tab
-                      ? "bg-purple-600 text-white"
-                      : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-                  }`}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
+            {/* Submenú - Solo muestra las pestañas relacionadas con montacargas cuando hay uno seleccionado */}
+            {selectedMontacargas && (
+              <div className="flex gap-2 mb-4 flex-wrap">
+                {[
+                  "Información del equipo",
+                  "Servicios Preventivos Historial",
+                  "Inversión Inicial",
+                  "Inversión Habilitar",
+                  "Refacciones con Cargo",
+                  "Programas Preventivos"
+                ].map((tab) => (
+                  <button
+                    key={tab}
+                    className={`px-3 py-1 text-sm md:px-4 md:py-2 md:text-base rounded ${
+                      activeTab === tab
+                        ? "bg-purple-600 text-white"
+                        : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                    }`}
+                    onClick={() => setActiveTab(tab)}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Contenido dinámico */}
             <div className="p-4 border rounded bg-gray-100 overflow-x-auto">
@@ -431,10 +480,16 @@ export default function Inicio() {
               {activeTab === "Programas Preventivos" && (
                 <ProgramasPreventivos id={selectedMontacargas.numero} />
               )}
-              {!activeTab && (
+              {activeTab === "Perfil" && <Perfil />}
+              
+              {!activeTab && selectedMontacargas && (
                 <div className="text-center text-gray-500 py-8">
                   Selecciona una pestaña para ver la información
                 </div>
+              )}
+              
+              {!activeTab && !selectedMontacargas && activeTab === "Perfil" && (
+                <Perfil />
               )}
             </div>
           </div>
