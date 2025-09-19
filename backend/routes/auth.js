@@ -10,6 +10,26 @@ const pool = require("../db"); // exporta Pool desde backend/db.js
 require("dotenv").config();
 
 // ================================
+// Middleware: requireAuth
+// ================================
+const requireAuth = (req, res, next) => {
+  try {
+    const token = req.cookies.token;
+    
+    if (!token) {
+      return res.status(401).json({ error: "Acceso no autorizado. Token requerido." });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.error("Error en autenticación:", error.message);
+    return res.status(401).json({ error: "Token inválido o expirado." });
+  }
+};
+
+// ================================
 // Helper: enviar email de verificación
 // ================================
 async function sendVerificationEmail(email, token) {
@@ -37,10 +57,26 @@ async function sendVerificationEmail(email, token) {
 // ================================
 // Endpoint: datos del usuario autenticado
 // ================================
-const { requireAuth } = require("../middlewares/auth");
-
 router.get("/me", requireAuth, async (req, res) => {
-  res.json({ id: req.user.id, email: req.user.email, rol: req.user.rol });
+  try {
+    // Obtener todos los datos del usuario desde la base de datos
+    const q = await pool.query('SELECT id, nombre, email, rol FROM "Usuarios" WHERE id = $1', [req.user.id]);
+    
+    if (!q.rows.length) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    
+    const user = q.rows[0];
+    res.json({ 
+      id: user.id, 
+      nombre: user.nombre,
+      email: user.email, 
+      rol: user.rol 
+    });
+  } catch (err) {
+    console.error("Error en /me:", err);
+    res.status(500).json({ error: "Error del servidor" });
+  }
 });
 
 // ================================
@@ -141,7 +177,13 @@ router.post(
       const ok = await bcrypt.compare(password, user.password);
       if (!ok) return res.status(400).json({ error: "Credenciales inválidas" });
 
-      const payload = { id: user.id, email: user.email, rol: user.rol };
+      const payload = { 
+        id: user.id, 
+        email: user.email, 
+        rol: user.rol,
+        nombre: user.nombre
+      };
+      
       const token = jwt.sign(payload, process.env.JWT_SECRET, {
         expiresIn: process.env.JWT_EXPIRES_IN || "1h",
       });
@@ -155,8 +197,14 @@ router.post(
 
       res.json({
         message: "Login exitoso",
-        user: { id: user.id, email: user.email, rol: user.rol },
+        user: { 
+          id: user.id, 
+          nombre: user.nombre,
+          email: user.email, 
+          rol: user.rol 
+        },
       });
+      
     } catch (err) {
       console.error("🔥 Error en /login:", err);
       res.status(500).json({ error: "Error del servidor" });

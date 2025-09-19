@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 
-// 👉 usamos la variable de entorno
 const API_URL = process.env.REACT_APP_API_URL;
 
 export default function Login() {
@@ -24,18 +23,32 @@ export default function Login() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
-        credentials: "include", // 👈 importante para cookies httpOnly
+        credentials: "include",
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        console.log("Login exitoso:", data);
+        console.log("✅ Login exitoso:", data);
+        console.log("👤 Datos del usuario recibidos:", data.user); // ← DEBUG
+        
+        // Verificar qué campos tiene el usuario
+        if (data.user) {
+          console.log("🔍 Campos del usuario:");
+          console.log("   - id:", data.user.id);
+          console.log("   - nombre:", data.user.nombre);
+          console.log("   - email:", data.user.email);
+          console.log("   - rol:", data.user.rol);
+        }
 
-        // 👇 Guardar info de usuario (id, email, rol) en localStorage
+        // Guardar info de usuario en localStorage
         localStorage.setItem("user", JSON.stringify(data.user));
+        
+        // Verificar qué se guardó en localStorage
+        const storedUser = localStorage.getItem("user");
+        console.log("💾 Usuario guardado en localStorage:", JSON.parse(storedUser));
 
-        navigate("/inicio"); // Redirige al inicio
+        navigate("/inicio");
       } else {
         alert(data.error || "Credenciales incorrectas");
       }
