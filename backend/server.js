@@ -4,7 +4,6 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 // ======================
@@ -57,26 +56,6 @@ const mantenimientosRoutes = require("./routes/mantenimientos");
 app.use("/auth", authRoutes);
 app.use("/api/montacargas", montacargasRoutes);
 app.use("/api/mantenimientos", mantenimientosRoutes);
-
-// ======================
-// Ejemplo de ruta protegida
-// ======================
-function authMiddleware(req, res, next) {
-  const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.split(" ")[1]);
-  if (!token) return res.status(401).json({ error: "No autorizado" });
-
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = payload; // { id, email, rol }
-    next();
-  } catch {
-    return res.status(401).json({ error: "Token inválido" });
-  }
-}
-
-app.get("/protected", authMiddleware, (req, res) => {
-  res.json({ message: "Acceso permitido", user: req.user });
-});
 
 // ======================
 // Arrancar servidor

@@ -6,25 +6,39 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
-const pool = require("../db"); // exporta Pool desde backend/db.js
+const pool = require("../db");
 require("dotenv").config();
 
 // ================================
-// Middleware: requireAuth
+// Middleware: requireAuth (SOLO HEADER)
 // ================================
 const requireAuth = (req, res, next) => {
   try {
-    const token = req.cookies.token;
+    console.log("🔍 Headers Authorization:", req.headers.authorization);
+    
+    let token = null;
+    
+    if (req.headers.authorization) {
+      const authHeader = req.headers.authorization;
+      if (authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      } else {
+        token = authHeader;
+      }
+      console.log("✅ Token encontrado en Authorization header");
+    }
     
     if (!token) {
+      console.log("❌ No token found in Authorization header");
       return res.status(401).json({ error: "Acceso no autorizado. Token requerido." });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
+    console.log("✅ Token válido, usuario ID:", decoded.id);
     next();
   } catch (error) {
-    console.error("Error en autenticación:", error.message);
+    console.error("❌ Error en autenticación:", error.message);
     return res.status(401).json({ error: "Token inválido o expirado." });
   }
 };
@@ -40,7 +54,6 @@ async function sendVerificationEmail(email, token) {
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
 
-  // 👇 URL apunta al backend
   const verifyUrl = `${process.env.BACKEND_URL}/auth/verify?token=${token}`;
 
   const info = await transporter.sendMail({
@@ -59,14 +72,18 @@ async function sendVerificationEmail(email, token) {
 // ================================
 router.get("/me", requireAuth, async (req, res) => {
   try {
-    // Obtener todos los datos del usuario desde la base de datos
+    console.log("📥 GET /me recibido para usuario ID:", req.user.id);
+    
     const q = await pool.query('SELECT id, nombre, email, rol FROM "Usuarios" WHERE id = $1', [req.user.id]);
     
     if (!q.rows.length) {
+      console.log("❌ Usuario no encontrado en BD ID:", req.user.id);
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
     
     const user = q.rows[0];
+    console.log("✅ Datos de usuario encontrados:", user);
+    
     res.json({ 
       id: user.id, 
       nombre: user.nombre,
@@ -105,7 +122,7 @@ router.post(
 
       const hashed = await bcrypt.hash(password, 10);
       const token = crypto.randomBytes(32).toString("hex");
-      const expires = new Date(Date.now() + 24 * 3600 * 1000); // 24h
+      const expires = new Date(Date.now() + 24 * 3600 * 1000);
 
       const inserted = await pool.query(
         `INSERT INTO "Usuarios" (nombre, email, password, verification_token, verification_expires)
@@ -156,7 +173,7 @@ router.get("/verify", async (req, res) => {
 });
 
 // ================================
-// Login
+// Login (ACTUALIZADO para devolver token)
 // ================================
 router.post(
   "/login",
@@ -195,6 +212,7 @@ router.post(
         maxAge: 3600 * 1000,
       });
 
+      // 👇 Ahora sí devolvemos token y user
       res.json({
         message: "Login exitoso",
         user: { 
@@ -203,6 +221,7 @@ router.post(
           email: user.email, 
           rol: user.rol 
         },
+        token: token
       });
       
     } catch (err) {
@@ -213,7 +232,55 @@ router.post(
 );
 
 // ================================
-// Confirmación de correo (versión JWT)
+// Actualizar perfil de usuario
+// ================================
+router.put("/profile", requireAuth, [
+  body("nombre").notEmpty().withMessage("El nombre es requerido")
+], async (req, res) => {
+  console.log("📥 PUT /profile recibido");
+  console.log("🔐 Usuario autenticado:", req.user);
+  console.log("📋 Datos recibidos:", req.body);
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    console.log("❌ Errores de validación:", errors.array());
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { nombre } = req.body;
+  const userId = req.user.id;
+
+  try {
+    console.log("🔄 Actualizando usuario ID:", userId, "con nombre:", nombre);
+    
+    const result = await pool.query(
+      'UPDATE "Usuarios" SET nombre = $1 WHERE id = $2 RETURNING id, nombre, email, rol',
+      [nombre, userId]
+    );
+
+    console.log("✅ Resultado de la consulta:", result.rows);
+
+    if (result.rows.length === 0) {
+      console.log("❌ Usuario no encontrado ID:", userId);
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    const updatedUser = result.rows[0];
+    console.log("✅ Usuario actualizado:", updatedUser);
+    
+    res.json({
+      message: "Perfil actualizado exitosamente",
+      user: updatedUser
+    });
+  } catch (err) {
+    console.error("🔥 Error en /profile:", err);
+    console.error("🔍 Detalles del error:", err.message);
+    res.status(500).json({ error: "Error del servidor al actualizar perfil" });
+  }
+});
+
+// ================================
+// Confirmación de correo
 // ================================
 router.get("/confirm/:token", async (req, res) => {
   try {
