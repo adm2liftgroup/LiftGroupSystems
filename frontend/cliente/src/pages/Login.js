@@ -30,23 +30,23 @@ export default function Login() {
 
       if (response.ok) {
         console.log("✅ Login exitoso:", data);
-        console.log("👤 Datos del usuario recibidos:", data.user); // ← DEBUG
+        console.log("👤 Datos del usuario recibidos:", data.user);
+        console.log("🔑 Token recibido:", data.token); // ← DEBUG del token
         
-        // Verificar qué campos tiene el usuario
-        if (data.user) {
-          console.log("🔍 Campos del usuario:");
-          console.log("   - id:", data.user.id);
-          console.log("   - nombre:", data.user.nombre);
-          console.log("   - email:", data.user.email);
-          console.log("   - rol:", data.user.rol);
+        // GUARDAR EL TOKEN EN LOCALSTORAGE (esto es lo que faltaba)
+        if (data.token) {
+          localStorage.setItem("token", data.token);
+          console.log("💾 Token guardado en localStorage");
         }
-
+        
         // Guardar info de usuario en localStorage
         localStorage.setItem("user", JSON.stringify(data.user));
         
         // Verificar qué se guardó en localStorage
         const storedUser = localStorage.getItem("user");
+        const storedToken = localStorage.getItem("token");
         console.log("💾 Usuario guardado en localStorage:", JSON.parse(storedUser));
+        console.log("💾 Token guardado en localStorage:", storedToken);
 
         navigate("/inicio");
       } else {

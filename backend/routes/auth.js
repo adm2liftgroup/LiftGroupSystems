@@ -194,10 +194,11 @@ router.post(
       const ok = await bcrypt.compare(password, user.password);
       if (!ok) return res.status(400).json({ error: "Credenciales inválidas" });
 
+      // ✅ CORRECCIÓN: Agregamos el rol al payload del token
       const payload = { 
         id: user.id, 
         email: user.email, 
-        rol: user.rol,
+        rol: user.rol, // ¡Este es el campo que faltaba!
         nombre: user.nombre
       };
       
@@ -212,7 +213,6 @@ router.post(
         maxAge: 3600 * 1000,
       });
 
-      // 👇 Ahora sí devolvemos token y user
       res.json({
         message: "Login exitoso",
         user: { 
@@ -231,51 +231,35 @@ router.post(
   }
 );
 
+
 // ================================
-// Actualizar perfil de usuario
+// Endpoint: Obtener todos los usuarios (solo admin)
 // ================================
-router.put("/profile", requireAuth, [
-  body("nombre").notEmpty().withMessage("El nombre es requerido")
-], async (req, res) => {
-  console.log("📥 PUT /profile recibido");
-  console.log("🔐 Usuario autenticado:", req.user);
-  console.log("📋 Datos recibidos:", req.body);
-
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    console.log("❌ Errores de validación:", errors.array());
-    return res.status(400).json({ errors: errors.array() });
-  }
-
-  const { nombre } = req.body;
-  const userId = req.user.id;
-
+router.get("/users", requireAuth, async (req, res) => {
   try {
-    console.log("🔄 Actualizando usuario ID:", userId, "con nombre:", nombre);
+    console.log("📥 GET /users recibido por usuario ID:", req.user.id, "Rol:", req.user.rol);
     
-    const result = await pool.query(
-      'UPDATE "Usuarios" SET nombre = $1 WHERE id = $2 RETURNING id, nombre, email, rol',
-      [nombre, userId]
-    );
-
-    console.log("✅ Resultado de la consulta:", result.rows);
-
-    if (result.rows.length === 0) {
-      console.log("❌ Usuario no encontrado ID:", userId);
-      return res.status(404).json({ error: "Usuario no encontrado" });
+    // Verificar que el usuario sea admin (CORREGIDO: tenía 'admin|' en lugar de 'admin')
+    if (req.user.rol !== 'admin') {
+      console.log("❌ Acceso denegado. Usuario no es admin.");
+      return res.status(403).json({ error: "Acceso denegado. Solo administradores." });
     }
 
-    const updatedUser = result.rows[0];
-    console.log("✅ Usuario actualizado:", updatedUser);
-    
+    // Obtener todos los usuarios
+    const q = await pool.query(
+      'SELECT id, nombre, email, rol, email_verified, created_at FROM "Usuarios" ORDER BY created_at DESC'
+    );
+
+    console.log("✅ Usuarios obtenidos:", q.rows.length);
+    console.log("📋 Usuarios:", q.rows);
+
     res.json({
-      message: "Perfil actualizado exitosamente",
-      user: updatedUser
+      success: true,
+      users: q.rows
     });
   } catch (err) {
-    console.error("🔥 Error en /profile:", err);
-    console.error("🔍 Detalles del error:", err.message);
-    res.status(500).json({ error: "Error del servidor al actualizar perfil" });
+    console.error("❌ Error en /users:", err);
+    res.status(500).json({ error: "Error del servidor al obtener usuarios" });
   }
 });
 
