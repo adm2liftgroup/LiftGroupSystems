@@ -41,27 +41,24 @@ export default function ProgramasPreventivos({ id }) {
   const [mostrarTodos, setMostrarTodos] = useState(false);
   const [anioFiltro, setAnioFiltro] = useState("");
   const [fechaActual, setFechaActual] = useState(new Date());
+  
+  // Estados para edición
+  const [mostrarModalEdicion, setMostrarModalEdicion] = useState(false);
+  const [mantenimientoEditando, setMantenimientoEditando] = useState(null);
+  const [formEdicion, setFormEdicion] = useState({
+    tipo: "",
+    fecha: "",
+    tecnico_id: ""
+  });
 
   console.log("montacargasId convertido:", montacargasId);
   console.log("Usuario:", user);
   console.log("Es admin:", isAdmin);
 
-  // Mostrar error si el ID no es válido
-  if (!montacargasId) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          ❌ Error: ID de montacargas no válido. Recibido: "{id}"
-        </div>
-        <p className="mt-4 text-gray-600">
-          Por favor, selecciona un montacargas válido desde el menú principal.
-        </p>
-      </div>
-    );
-  }
-
   // Cargar información del montacargas
   useEffect(() => {
+    if (!montacargasId) return; // No cargar si no hay ID válido
+
     const fetchMontacargasInfo = async () => {
       try {
         const res = await fetch(`${API_URL}/api/montacargas/${montacargasId}`);
@@ -80,52 +77,56 @@ export default function ProgramasPreventivos({ id }) {
   }, [montacargasId]);
 
   // Cargar todos los mantenimientos
-  useEffect(() => {
-    const fetchTodosMantenimientos = async () => {
-      try {
-        setError("");
-        console.log("Cargando todos los mantenimientos para montacargas:", montacargasId);
-        
-        const res = await fetch(
-          `${API_URL}/api/mantenimientos/todos?montacargasId=${montacargasId}`
-        );
-        
-        if (!res.ok) {
-          throw new Error(`Error HTTP: ${res.status}`);
-        }
-        
-        const data = await res.json();
-        console.log("Todos los mantenimientos:", data);
+  const cargarMantenimientos = async () => {
+    if (!montacargasId) return; // No cargar si no hay ID válido
 
-        if (data.success) {
-          const todosLosEventos = data.mantenimientos.map((m) => ({
-            id: m.id,
-            title: `${m.tipo} - ${m.mes}/${m.anio}`,
-            start: parseDateToLocal(m.fecha),
-            end: parseDateToLocal(m.fecha),
-            allDay: true,
-            tipo: m.tipo,
-            mes: m.mes,
-            anio: m.anio,
-            montacargas_id: m.montacargas_id
-          }));
-          setTodosEventos(todosLosEventos);
-          
-          // Filtrar por año actual por defecto
-          const eventosAnioActual = todosLosEventos.filter(evento => 
-            evento.start.getFullYear() === anio
-          );
-          setEventos(eventosAnioActual);
-        } else {
-          setError(data.error || "Error al cargar mantenimientos");
-        }
-      } catch (err) {
-        console.error("Error cargando mantenimientos:", err);
-        setError("No se pudieron cargar los mantenimientos. Verifica la conexión.");
+    try {
+      setError("");
+      console.log("Cargando todos los mantenimientos para montacargas:", montacargasId);
+      
+      const res = await fetch(
+        `${API_URL}/api/mantenimientos/todos?montacargasId=${montacargasId}`
+      );
+      
+      if (!res.ok) {
+        throw new Error(`Error HTTP: ${res.status}`);
       }
-    };
+      
+      const data = await res.json();
+      console.log("Todos los mantenimientos:", data);
 
-    fetchTodosMantenimientos();
+      if (data.success) {
+        const todosLosEventos = data.mantenimientos.map((m) => ({
+          id: m.id,
+          title: `${m.tipo} - ${m.mes}/${m.anio}`,
+          start: parseDateToLocal(m.fecha),
+          end: parseDateToLocal(m.fecha),
+          allDay: true,
+          tipo: m.tipo,
+          mes: m.mes,
+          anio: m.anio,
+          montacargas_id: m.montacargas_id,
+          fecha_original: m.fecha,
+          tecnico_id: m.tecnico_id
+        }));
+        setTodosEventos(todosLosEventos);
+        
+        // Filtrar por año actual por defecto
+        const eventosAnioActual = todosLosEventos.filter(evento => 
+          evento.start.getFullYear() === anio
+        );
+        setEventos(eventosAnioActual);
+      } else {
+        setError(data.error || "Error al cargar mantenimientos");
+      }
+    } catch (err) {
+      console.error("Error cargando mantenimientos:", err);
+      setError("No se pudieron cargar los mantenimientos. Verifica la conexión.");
+    }
+  };
+
+  useEffect(() => {
+    cargarMantenimientos();
   }, [montacargasId, anio]);
 
   // Filtrar eventos por año
@@ -137,6 +138,147 @@ export default function ProgramasPreventivos({ id }) {
         evento.start.getFullYear() === parseInt(year)
       );
       setEventos(eventosFiltrados);
+    }
+  };
+
+  // ======================
+  // FUNCIONES DE EDICIÓN Y ELIMINACIÓN
+  // ======================
+
+  // Abrir modal de edición
+  const abrirModalEdicion = (evento) => {
+    if (!isAdmin) {
+      setError("❌ Solo los administradores pueden editar mantenimientos");
+      return;
+    }
+
+    setMantenimientoEditando(evento);
+    setFormEdicion({
+      tipo: evento.tipo,
+      fecha: evento.fecha_original ? evento.fecha_original.split('T')[0] : 
+             `${evento.anio}-${evento.mes.toString().padStart(2, '0')}-15`,
+      tecnico_id: evento.tecnico_id || ""
+    });
+    setMostrarModalEdicion(true);
+  };
+
+  // Cerrar modal de edición
+  const cerrarModalEdicion = () => {
+    setMostrarModalEdicion(false);
+    setMantenimientoEditando(null);
+    setFormEdicion({ tipo: "", fecha: "", tecnico_id: "" });
+  };
+
+  // Actualizar mantenimiento
+  const handleActualizarMantenimiento = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const res = await fetch(`${API_URL}/api/mantenimientos/${mantenimientoEditando.id}`, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formEdicion),
+      });
+      
+      const data = await res.json();
+      console.log("Respuesta actualización:", data);
+
+      if (res.ok && data.success) {
+        setSuccess("✅ Mantenimiento actualizado correctamente");
+        cerrarModalEdicion();
+        cargarMantenimientos(); // Recargar datos
+        
+        setTimeout(() => setSuccess(""), 3000);
+      } else {
+        setError(data.error || "❌ Error al actualizar mantenimiento");
+      }
+    } catch (err) {
+      console.error("Error actualizando mantenimiento:", err);
+      setError("❌ Error de conexión con el servidor");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Eliminar mantenimiento
+  const handleEliminarMantenimiento = async (mantenimientoId) => {
+    if (!isAdmin) {
+      setError("❌ Solo los administradores pueden eliminar mantenimientos");
+      return;
+    }
+
+    if (!window.confirm("¿Estás seguro de que deseas eliminar este mantenimiento?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+
+      const res = await fetch(`${API_URL}/api/mantenimientos/${mantenimientoId}`, {
+        method: "DELETE",
+      });
+      
+      const data = await res.json();
+      console.log("Respuesta eliminación:", data);
+
+      if (res.ok && data.success) {
+        setSuccess("✅ Mantenimiento eliminado correctamente");
+        cargarMantenimientos(); // Recargar datos
+        
+        setTimeout(() => setSuccess(""), 3000);
+      } else {
+        setError(data.error || "❌ Error al eliminar mantenimiento");
+      }
+    } catch (err) {
+      console.error("Error eliminando mantenimiento:", err);
+      setError("❌ Error de conexión con el servidor");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Eliminar programa completo de un año
+  const handleEliminarProgramaAnual = async (anioEliminar) => {
+    if (!isAdmin) {
+      setError("❌ Solo los administradores pueden eliminar programas");
+      return;
+    }
+
+    const mantenimientosDelAnio = todosEventos.filter(e => e.anio === anioEliminar);
+    
+    if (mantenimientosDelAnio.length === 0) {
+      setError(`No hay mantenimientos para el año ${anioEliminar}`);
+      return;
+    }
+
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar TODOS los mantenimientos del año ${anioEliminar}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+
+      // Eliminar cada mantenimiento del año
+      for (const mantenimiento of mantenimientosDelAnio) {
+        await fetch(`${API_URL}/api/mantenimientos/${mantenimiento.id}`, {
+          method: "DELETE",
+        });
+      }
+
+      setSuccess(`✅ Programa completo del año ${anioEliminar} eliminado correctamente`);
+      cargarMantenimientos(); // Recargar datos
+      
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      console.error("Error eliminando programa anual:", err);
+      setError("❌ Error al eliminar el programa anual");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -171,12 +313,7 @@ export default function ProgramasPreventivos({ id }) {
 
       if (res.ok && data.success) {
         setSuccess(data.message || "✅ Programa creado exitosamente");
-        
-        // Recargar la página después de 2 segundos
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-        
+        cargarMantenimientos(); // Recargar datos en lugar de recargar página
       } else {
         setError(data.error || data.message || "❌ Error al crear programa");
       }
@@ -205,7 +342,8 @@ export default function ProgramasPreventivos({ id }) {
         borderRadius: 6,
         padding: "2px 5px",
         fontSize: "12px",
-        fontWeight: "bold"
+        fontWeight: "bold",
+        cursor: isAdmin ? "pointer" : "default"
       } 
     };
   };
@@ -221,6 +359,13 @@ export default function ProgramasPreventivos({ id }) {
   // Función para navegar entre meses y años
   const onNavigate = (newDate) => {
     setFechaActual(newDate);
+  };
+
+  // Manejar clic en evento del calendario
+  const handleSelectEvent = (event) => {
+    if (isAdmin) {
+      abrirModalEdicion(event);
+    }
   };
 
   // Botones de navegación personalizados
@@ -242,11 +387,23 @@ export default function ProgramasPreventivos({ id }) {
         <span className="rbc-toolbar-label text-lg font-semibold">
           {label}
         </span>
-        
-        
       </div>
     );
   };
+
+  // Mostrar error si el ID no es válido (esto va al FINAL, después de todos los hooks)
+  if (!montacargasId) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          ❌ Error: ID de montacargas no válido. Recibido: "{id}"
+        </div>
+        <p className="mt-4 text-gray-600">
+          Por favor, selecciona un montacargas válido desde el menú principal.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -323,7 +480,7 @@ export default function ProgramasPreventivos({ id }) {
         </div>
       )}
 
-      {/* Filtros de visualización - Disponible para todos */}
+      {/* Filtros de visualización */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
         <h3 className="text-lg font-semibold mb-3">👁️ Visualización</h3>
         <div className="flex flex-wrap gap-4 items-center">
@@ -356,10 +513,11 @@ export default function ProgramasPreventivos({ id }) {
         </div>
       </div>
 
-      {/* Calendario - Disponible para todos */}
+      {/* Calendario */}
       <div className="bg-white p-4 rounded-lg shadow mb-6">
         <h3 className="text-lg font-semibold mb-4">
           Calendario {anioFiltro ? `- Año ${anioFiltro}` : "- Todos los años"}
+          {isAdmin && <span className="text-sm text-gray-500 ml-2">(Haz clic en un evento para editarlo)</span>}
         </h3>
         
         {eventos.length === 0 ? (
@@ -381,8 +539,8 @@ export default function ProgramasPreventivos({ id }) {
               view={"month"}
               date={fechaActual}
               onNavigate={onNavigate}
+              onSelectEvent={isAdmin ? handleSelectEvent : null}
               onView={(view) => {
-                // Esta función maneja el cambio de vista
                 const calendarElement = document.querySelector('.rbc-calendar');
                 if (calendarElement) {
                   if (view === 'agenda') {
@@ -431,7 +589,148 @@ export default function ProgramasPreventivos({ id }) {
         )}
       </div>
 
-      {/* Resumen y estadísticas - Disponible para todos */}
+      {/* Lista de mantenimientos con acciones */}
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <h3 className="text-lg font-semibold mb-4">📋 Lista de Mantenimientos</h3>
+        
+        {añosUnicos.length === 0 ? (
+          <p className="text-gray-500 text-center py-4">No hay mantenimientos programados</p>
+        ) : (
+          añosUnicos.map(year => {
+            const eventosDelAño = todosEventos.filter(e => e.anio === year).sort((a, b) => a.mes - b.mes);
+            
+            return (
+              <div key={year} className="mb-6 border border-gray-200 rounded-lg">
+                <div className="bg-gray-50 px-4 py-3 flex justify-between items-center">
+                  <h4 className="font-semibold">Año {year}</h4>
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleEliminarProgramaAnual(year)}
+                      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
+                      title="Eliminar todo el programa de este año"
+                    >
+                      🗑️ Eliminar Programa
+                    </button>
+                  )}
+                </div>
+                
+                <div className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {eventosDelAño.map(evento => (
+                      <div key={evento.id} className="border border-gray-200 rounded-lg p-3">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${
+                            evento.tipo === "Básico" ? "bg-green-100 text-green-800" :
+                            evento.tipo === "Intermedio" ? "bg-yellow-100 text-yellow-800" :
+                            "bg-red-100 text-red-800"
+                          }`}>
+                            {evento.tipo}
+                          </span>
+                          {isAdmin && (
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => abrirModalEdicion(evento)}
+                                className="text-blue-600 hover:text-blue-800 text-sm"
+                                title="Editar"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => handleEliminarMantenimiento(evento.id)}
+                                className="text-red-600 hover:text-red-800 text-sm"
+                                title="Eliminar"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <p className="font-medium">Mes: {evento.mes}/{evento.anio}</p>
+                        <p className="text-sm text-gray-600">
+                          Fecha: {evento.start.toLocaleDateString()}
+                        </p>
+                        {evento.tecnico_id && (
+                          <p className="text-sm text-gray-600">Técnico: {evento.tecnico_id}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Modal de Edición */}
+      {mostrarModalEdicion && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">✏️ Editar Mantenimiento</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo de Mantenimiento
+                </label>
+                <select
+                  value={formEdicion.tipo}
+                  onChange={(e) => setFormEdicion({...formEdicion, tipo: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded"
+                >
+                  <option value="">Seleccionar tipo</option>
+                  <option value="Básico">Básico</option>
+                  <option value="Intermedio">Intermedio</option>
+                  <option value="Avanzado">Avanzado</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fecha
+                </label>
+                <input
+                  type="date"
+                  value={formEdicion.fecha}
+                  onChange={(e) => setFormEdicion({...formEdicion, fecha: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ID del Técnico (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={formEdicion.tecnico_id}
+                  onChange={(e) => setFormEdicion({...formEdicion, tecnico_id: e.target.value})}
+                  placeholder="ID del técnico asignado"
+                  className="w-full p-2 border border-gray-300 rounded"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={cerrarModalEdicion}
+                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleActualizarMantenimiento}
+                disabled={loading || !formEdicion.tipo || !formEdicion.fecha}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+              >
+                {loading ? "Guardando..." : "Guardar Cambios"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resumen y estadísticas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="p-4 bg-green-50 rounded-lg">
           <h4 className="font-semibold mb-3">📊 Resumen por año</h4>
@@ -476,6 +775,14 @@ export default function ProgramasPreventivos({ id }) {
               <span>Avanzado</span>
             </div>
           </div>
+          {isAdmin && (
+            <div className="mt-4 p-3 bg-blue-50 rounded">
+              <h5 className="font-medium mb-2">Acciones disponibles:</h5>
+              <p className="text-sm">• Haz clic en eventos del calendario para editarlos</p>
+              <p className="text-sm">• Usa los íconos ✏️ y 🗑️ en la lista</p>
+              <p className="text-sm">• Elimina programas completos por año</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -487,7 +794,7 @@ export default function ProgramasPreventivos({ id }) {
           <p><strong>Años con programas:</strong> {añosUnicos.join(', ') || 'Ninguno'}</p>
           <p><strong>Montacargas ID:</strong> {montacargasId}</p>
           <p><strong>Mostrando:</strong> {mostrarTodos ? 'Todos los años' : anioFiltro ? `Año ${anioFiltro}` : `Año ${anio}`}</p>
-          <p><strong>Permisos:</strong> {isAdmin ? 'Administrador' : 'Usuario'}</p>
+          <p><strong>Permisos:</strong> {isAdmin ? 'Administrador (Edición habilitada)' : 'Usuario (Solo lectura)'}</p>
         </div>
       </div>
     </div>
