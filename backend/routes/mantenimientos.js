@@ -11,16 +11,14 @@ function getTipoMantenimiento(mes) {
   return "Básico";
 }
 
-// ======================
-// Obtener mantenimientos por año
-// ======================
+// BLOQUE 1: Obtener mantenimientos por año
 router.get("/", async (req, res) => {
   try {
     console.log("GET /api/mantenimientos - Query params:", req.query);
     
     const { anio, montacargasId } = req.query;
 
-    if (!anio || !montacargasId) {
+    if (!anio || !montacargasId) { // Validaciones iniciales
       return res.status(400).json({ success: false, error: "anio y montacargasId son requeridos" });
     }
 
@@ -34,7 +32,7 @@ router.get("/", async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    const result = await pool.query( // Consulta con la BD 
       `SELECT id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, creado_en 
        FROM mantenimientos_programados 
        WHERE montacargas_id = $1 AND anio = $2 
@@ -48,10 +46,9 @@ router.get("/", async (req, res) => {
     res.status(500).json({ success: false, error: "Error al obtener mantenimientos" });
   }
 });
+// FIN BLOQUE 1: Obtener mantenimientos por año
 
-// ======================
-// Obtener TODOS los mantenimientos de un montacargas
-// ======================
+// BLOQUE 2: Obtener todos los mantenimientos de un montacargas
 router.get("/todos", async (req, res) => {
   try {
     console.log("GET /api/mantenimientos/todos - Query params:", req.query);
@@ -71,7 +68,7 @@ router.get("/todos", async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    const result = await pool.query( // Consulta todos los registros del montacargas
       `SELECT id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, creado_en 
        FROM mantenimientos_programados 
        WHERE montacargas_id = $1 
@@ -86,17 +83,16 @@ router.get("/todos", async (req, res) => {
     res.status(500).json({ success: false, error: "Error al obtener mantenimientos" });
   }
 });
+// FIN DEL BLOQUE 2: Obtener todos los mantenimientos de un montacargas
 
-// ======================
-// Crear mantenimientos anuales AUTOMÁTICOS
-// ======================
+// BLOQUE 3: Crear mantenimientos anuales automáticos 
 router.post("/", async (req, res) => {
   try {
     console.log("POST /api/mantenimientos - Body:", req.body);
     
     const { anio, dia, montacargasId } = req.body;
 
-    if (!anio || !dia || !montacargasId) {
+    if (!anio || !dia || !montacargasId) { 
       return res.status(400).json({ success: false, error: "anio, dia y montacargasId son requeridos" });
     }
 
@@ -144,7 +140,7 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const mantenimientos = [];
+    const mantenimientos = []; // Inserción de los 12 meses
     
     for (let mes = 1; mes <= 12; mes++) {
       const fecha = new Date(anioNum, mes - 1, diaNum);
@@ -161,7 +157,7 @@ router.post("/", async (req, res) => {
         mantenimientos.push(result.rows[0]);
       } catch (err) {
         console.error(`Error insertando mes ${mes}:`, err);
-        // Rollback de los inserts anteriores
+        // Rollback en caso de error
         for (let i = 1; i < mes; i++) {
           await pool.query(
             "DELETE FROM mantenimientos_programados WHERE montacargas_id = $1 AND anio = $2 AND mes = $3",
@@ -182,10 +178,9 @@ router.post("/", async (req, res) => {
     res.status(500).json({ success: false, error: "Error al registrar programa" });
   }
 });
+// FIN DEL BLOQUE 3: Crear mantenimientos anuales automáticos 
 
-// ======================
-// Crear mantenimiento manual para un mes específico
-// ======================
+// BLOQUE 4: Crear mantenimiento manual para un mes específico
 router.post("/manual", async (req, res) => {
   try {
     console.log("POST /api/mantenimientos/manual - Body:", req.body);
@@ -226,7 +221,7 @@ router.post("/manual", async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    const result = await pool.query( // Insertar el mantenimiento manual
       `INSERT INTO mantenimientos_programados 
        (montacargas_id, mes, anio, tipo, fecha) 
        VALUES ($1, $2, $3, $4, $5) 
@@ -244,10 +239,9 @@ router.post("/manual", async (req, res) => {
     res.status(500).json({ success: false, error: "Error al crear mantenimiento manual" });
   }
 });
+// FIN DEL BLOQUE 4: Crear mantenimiento manual para un mes específico
 
-// ======================
-// Eliminar mantenimiento
-// ======================
+// BLOQUE 5: Eliminar mantenimiento
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -267,10 +261,9 @@ router.delete("/:id", async (req, res) => {
     res.status(500).json({ success: false, error: "Error al eliminar mantenimiento" });
   }
 });
+// FIN DEL BLOQUE 5: Eliminar mantenimiento
 
-// ======================
-// Actualizar mantenimiento
-// ======================
+// BLOQUE 6: Actualizar mantenimiento
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -295,7 +288,6 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// En tu router de mantenimientos, modifica el endpoint PUT
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -319,8 +311,9 @@ router.put("/:id", async (req, res) => {
     res.status(500).json({ success: false, error: "Error al actualizar mantenimiento" });
   }
 });
+// FIN DEL BLOQUE 6: Actualizar mantenimiento
 
-// Nuevo endpoint para obtener mantenimientos del mes actual
+// BLOQUE 7: Obtener mantenimientos del mes actual
 router.get("/mes-actual", async (req, res) => {
   try {
     const mesActual = new Date().getMonth() + 1;
@@ -341,5 +334,6 @@ router.get("/mes-actual", async (req, res) => {
     res.status(500).json({ success: false, error: "Error al obtener mantenimientos" });
   }
 });
+// FIN DEL BLOQUE 7: Obtener mantenimientos del mes actual
 
 module.exports = router;

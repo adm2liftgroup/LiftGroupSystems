@@ -6,9 +6,7 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 
-// ======================
 // Inicialización
-// ======================
 const app = express();
 
 // Seguridad
@@ -18,12 +16,10 @@ app.use(helmet());
 app.use(express.json());
 app.use(cookieParser());
 
-// ======================
-// CORS (permite PC y celular)
-// ======================
+// CORS permite PC y celular
 const allowedOrigins = [
-  "http://localhost:3000",          // frontend en tu PC
-  "http://192.168.0.193:3000"       // frontend en tu celular en red local
+  "http://localhost:3000",          // frontend para la PC
+  "http://192.168.0.193:3000"       // frontend en el celular para la red local
 ];
 
 app.use(cors({
@@ -37,18 +33,14 @@ app.use(cors({
   credentials: true, // permite cookies
 }));
 
-// ======================
 // Rate limiting
-// ======================
 const limiter = rateLimit({ 
   windowMs: 15 * 60 * 1000, 
   max: 100 
 });
 app.use(limiter);
 
-// ======================
 // Rutas
-// ======================
 const authRoutes = require("./routes/auth");
 const montacargasRoutes = require("./routes/montacargas");
 const mantenimientosRoutes = require("./routes/mantenimientos");
@@ -57,9 +49,7 @@ app.use("/auth", authRoutes);
 app.use("/api/montacargas", montacargasRoutes);
 app.use("/api/mantenimientos", mantenimientosRoutes);
 
-// ======================
 // Arrancar servidor
-// ======================
 app.listen(process.env.PORT || 4000, "0.0.0.0", () =>
   console.log(`Servidor en http://0.0.0.0:${process.env.PORT || 4000}`)
 );

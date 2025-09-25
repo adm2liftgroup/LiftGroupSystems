@@ -1,3 +1,4 @@
+// FALTA TERMINARLO DE DOCUMENTAR PORQUE YA ME CONFUNDÍ
 import React, { useState, useEffect } from "react";
 import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
@@ -6,7 +7,7 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 const localizer = momentLocalizer(moment);
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:4000";
 
-// BLOQUE: Función auxiliar (parsear fechas) 
+// BLOQUE 1: Función auxiliar (parsear fechas) 
 function parseDateToLocal(date) {
   if (!date) return null;
   
@@ -17,13 +18,13 @@ function parseDateToLocal(date) {
   
   return new Date(date);
 }
-// FIN DEL BLOQUE: Función auxiliar
+// FIN DEL BLOQUE 1: Función auxiliar
 
-// BLOQUE: Componente principal
+// BLOQUE 2: Componente principal
 export default function ProgramasPreventivos({ id }) {
   console.log("ID recibido como prop:", id);
   
-  // BLOQUE: Usuarios y permisos
+  // BLOQUE 3: Usuarios y permisos
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const isAdmin = user?.rol === "admin";
   
@@ -32,9 +33,9 @@ export default function ProgramasPreventivos({ id }) {
     const numId = Number(id);
     return isNaN(numId) || numId <= 0 ? null : numId;
   }, [id]);
-  // FIN DEL BLOQUE: Usuarios y permisos
+  // FIN DEL BLOQUE 3: Usuarios y permisos
 
-  // BLOQUE: Estados 
+  // BLOQUE 4: Estados 
   const [eventos, setEventos] = useState([]);
   const [todosEventos, setTodosEventos] = useState([]);
   const [anio, setAnio] = useState(new Date().getFullYear());
@@ -55,13 +56,13 @@ export default function ProgramasPreventivos({ id }) {
     fecha: "",
     tecnico_id: ""
   });
-  // FIN DEL BLOQUE: Estados 
+  // FIN DEL BLOQUE 4: Estados 
 
   console.log("montacargasId convertido:", montacargasId);
   console.log("Usuario:", user);
   console.log("Es admin:", isAdmin);
 
-  // BLOQUE: Cargar info del montacargas
+  // BLOQUE 5: Cargar info del montacargas
   useEffect(() => {
     if (!montacargasId) return; // No cargar si no hay ID válido
 
@@ -81,9 +82,9 @@ export default function ProgramasPreventivos({ id }) {
 
     fetchMontacargasInfo();
   }, [montacargasId]);
-  // FIN DEL BLOQUE: Cargar info del montacargas
+  // FIN DEL BLOQUE 5: Cargar info del montacargas
 
-  // BLOQUE: Cargar todos los mantenimientos
+  // BLOQUE 6: Cargar todos los mantenimientos
   const cargarMantenimientos = async () => {
     if (!montacargasId) return; // No cargar si no hay ID válido
 
@@ -135,9 +136,9 @@ export default function ProgramasPreventivos({ id }) {
   useEffect(() => {
     cargarMantenimientos();
   }, [montacargasId, anio]);
-  // FIN DEL BLOQUE: Cargar todos los mantenimientos 
+  // FIN DEL BLOQUE 6: Cargar todos los mantenimientos 
 
-  // BLOQUE: Funciones de filtrado
+  // BLOQUE 7: Funciones de filtrado
   const filtrarPorAnio = (year) => {
     if (!year) {
       setEventos(todosEventos);
@@ -148,13 +149,9 @@ export default function ProgramasPreventivos({ id }) {
       setEventos(eventosFiltrados);
     }
   };
-  // FIN DEL BLOQUE: Funciones de filtrado
+  // FIN DEL BLOQUE 7: Funciones de filtrado
 
-  // ======================
-  // FUNCIONES DE EDICIÓN Y ELIMINACIÓN
-  // ======================
-
-  // BLOQUE: Abrir modal de edición
+  // BLOQUE 8: Abrir modal de edición
   const abrirModalEdicion = (evento) => {
     if (!isAdmin) {
       setError("Solo los administradores pueden editar mantenimientos");
@@ -170,15 +167,17 @@ export default function ProgramasPreventivos({ id }) {
     });
     setMostrarModalEdicion(true);
   };
+  // FIN DEL BLOQUE 8: Abrir modal de edición
 
-  // Cerrar modal de edición
+  // BLOQUE 9: Cerrar modal de edición
   const cerrarModalEdicion = () => {
     setMostrarModalEdicion(false);
     setMantenimientoEditando(null);
     setFormEdicion({ tipo: "", fecha: "", tecnico_id: "" });
   };
+// FIN DEL BLOQUE 9: Cerrar modal de edición
 
-  // Actualizar mantenimiento
+  // BLOQUE 10: Actualizar mantenimiento
   const handleActualizarMantenimiento = async () => {
     try {
       setLoading(true);
@@ -211,8 +210,9 @@ export default function ProgramasPreventivos({ id }) {
       setLoading(false);
     }
   };
+  // FIN DEL BLOQUE 10: Actualizar mantenimiento
 
-  // Eliminar mantenimiento
+  // BLOQUE 11: Eliminar mantenimiento
   const handleEliminarMantenimiento = async (mantenimientoId) => {
     if (!isAdmin) {
       setError("Solo los administradores pueden eliminar mantenimientos");
@@ -249,8 +249,9 @@ export default function ProgramasPreventivos({ id }) {
       setLoading(false);
     }
   };
+  // BLOQUE 12: Eliminar mantenimiento
 
-  // Eliminar programa completo de un año
+  // BLOQUE 13: Eliminar programa completo de un año
   const handleEliminarProgramaAnual = async (anioEliminar) => {
     if (!isAdmin) {
       setError("Solo los administradores pueden eliminar programas");
@@ -290,8 +291,9 @@ export default function ProgramasPreventivos({ id }) {
       setLoading(false);
     }
   };
+// BLOQUE 13: Eliminar programa completo de un año
 
-  // Crear programa anual automático - SOLO ADMIN
+// BLOQUE 14: Crear programa anual automático - SOLO ADMIN
   const handleCrearPrograma = async () => {
     if (!isAdmin) {
       setError("Solo los administradores pueden crear programas de mantenimiento");
@@ -335,7 +337,7 @@ export default function ProgramasPreventivos({ id }) {
   };
   // FIN DEL BLOQUE: Funciones de edición y eliminación
 
-  // BLOQUE: Utilidades de vista calendario
+  // BLOQUE 15: Utilidades de vista calendario
   const añosUnicos = [...new Set(todosEventos.map(evento => evento.start.getFullYear()))].sort((a, b) => b - a);
 
   // Estilos de eventos por tipo
@@ -377,6 +379,7 @@ export default function ProgramasPreventivos({ id }) {
       abrirModalEdicion(event);
     }
   };
+// FIN DEL BLOQUE 15: Utilidades de vista calendario
 
   // Botones de navegación personalizados
   const CustomToolbar = ({ label, onNavigate, onView }) => {
@@ -400,9 +403,9 @@ export default function ProgramasPreventivos({ id }) {
       </div>
     );
   };
-  // FIN DEL BLOQUE: Utilidades de vista calendario
+  // FIN DEL BLOQUE 15: Utilidades de vista calendario
 
-  // BLOQUE: Validación de ID inválido
+  // BLOQUE 16: Validación de ID inválido
   if (!montacargasId) {
     return (
       <div className="p-6">
@@ -415,9 +418,9 @@ export default function ProgramasPreventivos({ id }) {
       </div>
     );
   }
-  // FIN DEL BLOQUE: Validación de ID inválido
+  // FIN DEL BLOQUE 16: Validación de ID inválido
 
-  // BLOQUE: Return UI 
+  // BLOQUE 17: Return UI 
   return (
     <div className="p-6">
       <h2 className="text-2xl font-bold mb-6 text-gray-800">
@@ -812,7 +815,7 @@ export default function ProgramasPreventivos({ id }) {
       </div>
     </div>
   );
-  // FIN DEL BLOQUE: Return UI
+  // FIN DEL BLOQUE 17: Return UI
 
 }
-// FIN DEL BLOQUE: Componente pricipal
+// FIN DEL BLOQUE 1: Componente pricipal

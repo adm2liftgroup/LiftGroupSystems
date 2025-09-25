@@ -13,13 +13,13 @@ export default function Login() {
   // Hook para redirigir después del login 
   const navigate = useNavigate();
 
-  // BLOQUE: Manejo de cambios en inputs
+  // BLOQUE 1: Manejo de cambios en inputs
   const handleChange = (e) => { // Actualiza dinámicamente email o password según el input
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
-  // FIN DEL BLOQUE: Manejo de cambios en inputs 
+  // FIN DEL BLOQUE 1: Manejo de cambios en inputs 
 
-  // BLOQUE: Manejo del envío del formulario (login)
+  // BLOQUE 2: Manejo del envío del formulario (login)
   const handleSubmit = async (e) => {
     e.preventDefault(); // Evita recargar la página
 
@@ -34,14 +34,14 @@ export default function Login() {
       const data = await response.json();
 
       if (response.ok) { // login exitoso
-        console.log("✅ Login exitoso:", data);
-        console.log("👤 Datos del usuario recibidos:", data.user);
-        console.log("🔑 Token recibido:", data.token); // DEBUG del token
+        console.log("Login exitoso:", data);
+        console.log("Datos del usuario recibidos:", data.user);
+        console.log("Token recibido:", data.token); // DEBUG del token
         
         // GUARDAR EL TOKEN EN LOCALSTORAGE 
         if (data.token) {
           localStorage.setItem("token", data.token);
-          console.log("💾 Token guardado en localStorage");
+          console.log("Token guardado en localStorage");
         }
         
         // Guardar info de usuario en localStorage
@@ -50,8 +50,8 @@ export default function Login() {
         // Verificar qué se guardó en localStorage
         const storedUser = localStorage.getItem("user");
         const storedToken = localStorage.getItem("token");
-        console.log("💾 Usuario guardado en localStorage:", JSON.parse(storedUser));
-        console.log("💾 Token guardado en localStorage:", storedToken);
+        console.log("Usuario guardado en localStorage:", JSON.parse(storedUser));
+        console.log("Token guardado en localStorage:", storedToken);
 
         // Redirigir a la página principal
         navigate("/inicio");
@@ -63,9 +63,9 @@ export default function Login() {
       alert("Error de conexión");
     }
   };
-  // FIN DEL BLOQUE: Manejo del envío del formulario (login)
+  // FIN DEL BLOQUE 2: Manejo del envío del formulario (login)
 
-  // BLOQUE: Renderizado del formulario de login
+  // BLOQUE 3: Renderizado del formulario de login
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <form
@@ -108,4 +108,4 @@ export default function Login() {
     </div>
   );
 }
-  // FIN DEL BLOQUE: Renderizado del formulario de login
+  // FIN DEL BLOQUE 3: Renderizado del formulario de login

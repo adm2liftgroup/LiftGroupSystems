@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 
-// Obtener todos los montacargas
+// BLOQUE 1: Obtener todos los montacargas
 router.get("/", async (req, res) => {
   try {
     const result = await pool.query(
@@ -14,8 +14,9 @@ router.get("/", async (req, res) => {
     res.status(500).json({ error: "Error al obtener Montacargas" });
   }
 });
+// FIN DEL BLOQUE 1: Obtener todos los montacargas
 
-// Obtener un montacargas específico por ID
+// BLOQUE 2: Obtener un montacargas específico por ID
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -34,8 +35,9 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Error al obtener Montacargas" });
   }
 });
+// FIN DEL BLOQUE 2: Obtener un montacargas específico por ID
 
-// Crear montacargas
+// BLOQUE 3: Crear montacargas
 router.post("/", async (req, res) => {
   try {
     const { numero, Marca, Modelo, Serie, Sistema, Capacidad } = req.body;
@@ -51,8 +53,9 @@ router.post("/", async (req, res) => {
     res.status(500).json({ error: "Error al crear Montacargas" });
   }
 });
+// FIN DEL BLOQUE 3: Crear montacargas
 
-// Actualizar montacargas
+// BLOQUE 4: Actualizar montacargas
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -73,8 +76,9 @@ router.put("/:id", async (req, res) => {
     res.status(500).json({ error: "Error al actualizar Montacargas" });
   }
 });
+// FIN DEL BLOQUE 4: Actualizar montacargas
 
-// Eliminar montacargas
+// BLOQUE 5: Eliminar montacargas
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -94,5 +98,6 @@ router.delete("/:id", async (req, res) => {
     res.status(500).json({ error: "Error al eliminar Montacargas" });
   }
 });
+// FIN DEL BLOQUE 5: Eliminar montacargas
 
 module.exports = router;

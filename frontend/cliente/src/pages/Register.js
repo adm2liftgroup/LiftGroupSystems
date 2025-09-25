@@ -5,7 +5,7 @@ import { useNavigate, Link } from "react-router-dom";
 // URL de la API: Primero toma el .env, si no existe usa la API local como fallback 
 const API_URL = process.env.REACT_APP_API_URL || "http://192.168.0.193:4000";
 
-// BLOQUE: Componente principal Register
+// Componente principal Register
 export default function Register() {
   // Estados para manejar formulario, carga y mensajes 
   const [form, setForm] = useState({ nombre: "", email: "", password: "", confirmPassword: "" });
@@ -17,7 +17,7 @@ export default function Register() {
 
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); // Valida que el email tenga un formato correcto
 
-  // BLOQUE: Envío del formulario de registro
+  // BLOQUE 1: Envío del formulario de registro
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -77,9 +77,9 @@ export default function Register() {
       setLoading(false);
     }
   };
-  // FIN DEL BLOQUE: Envío del formulario de registro
+  // FIN DEL BLOQUE 1: Envío del formulario de registro
 
-  // BLOQUE: Renderizado del formulario de registro
+  // BLOQUE 2: Renderizado del formulario de registro
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
       <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">

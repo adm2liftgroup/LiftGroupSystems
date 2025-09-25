@@ -8,7 +8,7 @@ const nodemailer = require("nodemailer");
 const pool = require("../db"); // conexión a PostgreSQL
 require("dotenv").config();
 
-// BLOQUE: Middleware requireAuth
+// BLOQUE 1: Middleware requireAuth
 // Este middleware protege rutas privadas, verifica el tokeb  JWT en el header "Authorization", si es válido, agrega los datos del usuario a req.user, si no, devuelve 401 (no autorizado)
 const requireAuth = (req, res, next) => {
   try {
@@ -41,9 +41,9 @@ const requireAuth = (req, res, next) => {
     return res.status(401).json({ error: "Token inválido o expirado." });
   }
 };
-// FIN DEL BLOQUE: Middleware requireAuth 
+// FIN DEL BLOQUE 1: Middleware requireAuth 
 
-//  BLOQUE: Helper para enviar email de verificación
+//  BLOQUE 2: Helper para enviar email de verificación
 // Usando en el registro para mandar un correo con el link de verificación al usuario
 async function sendVerificationEmail(email, token) {
   let transporter = nodemailer.createTransport({
@@ -65,13 +65,13 @@ async function sendVerificationEmail(email, token) {
 
   console.log("Correo enviado, ID:", info.messageId);
 }
-// FIN DEL BLOQUE: Helper para enviar email de verificación
+// FIN DEL BLOQUE 2: Helper para enviar email de verificación
 
-// BLOQUE: Endpoint GET /me 
+// BLOQUE 3: Endpoint GET /me 
 // Devuelve los datos del usuario autenticado (usando requireAuth para validar el token)
 router.get("/me", requireAuth, async (req, res) => {
   try {
-    console.log("📥 GET /me recibido para usuario ID:", req.user.id);
+    console.log("GET /me recibido para usuario ID:", req.user.id);
     
     const q = await pool.query('SELECT id, nombre, email, rol FROM "Usuarios" WHERE id = $1', [req.user.id]);
     
@@ -81,7 +81,7 @@ router.get("/me", requireAuth, async (req, res) => {
     }
     
     const user = q.rows[0];
-    console.log("✅ Datos de usuario encontrados:", user);
+    console.log("Datos de usuario encontrados:", user);
     
     res.json({ 
       id: user.id, 
@@ -94,10 +94,11 @@ router.get("/me", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Error del servidor" });
   }
 });
-// FIN DEL BLOQUE: Endpoint GET /me
+// FIN DEL BLOQUE 3: Endpoint GET /me
 
-// BLOQUE: Registro (POST /register)
-// Valida datos del formulario, verifica si el correo ya está registrado, hashea la contraseña con bcrypt, genera un token de verificación temporal, inserta en la BD y envía correo de verificación 
+// BLOQUE 4: Registro (POST /register)
+// Valida datos del formulario, verifica si el correo ya está registrado, hashea la contraseña con bcrypt, genera un token de verificación temporal, 
+// inserta en la BD y envía correo de verificación 
 router.post(
   "/register",
   body("email").isEmail().normalizeEmail(),
@@ -111,7 +112,7 @@ router.post(
     }
 
     const { nombre, email, password } = req.body;
-    console.log("📥 POST /register recibido con body:", req.body);
+    console.log("POST /register recibido con body:", req.body);
 
     try { // Verifica si el email ya existe 
       const exists = await pool.query('SELECT id FROM "Usuarios" WHERE email = $1', [email]);
@@ -144,9 +145,9 @@ router.post(
     }
   }
 );
-// FIN DEL BLOQUE: Registro (POST /register)
+// FIN DEL BLOQUE 4: Registro (POST /register)
 
-// BLOQUE: Verificación de correo (GET /verify)
+// BLOQUE 5: Verificación de correo (GET /verify)
 // El usuario entra al link enviado por email, si el token existe y no ha expirado activa email_verified, redirige al frontend en una página de éxito
 router.get("/verify", async (req, res) => {
   const { token } = req.query;
@@ -173,9 +174,9 @@ router.get("/verify", async (req, res) => {
     res.status(500).send("Error del servidor");
   }
 });
-// FIN DEL BLOQUE: Verificación de correo (GET /verify)
+// FIN DEL BLOQUE 5: Verificación de correo (GET /verify)
 
-// BLOQUE: Login (POST /login)
+// BLOQUE 6: Login (POST /login)
 // Verifica email y contraseña, confirma que el email esté verificado, devuelve un token JWT con id, email, nombre y rol, guarda también el token en cookie httpOnly
 router.post(
   "/login",
@@ -233,9 +234,9 @@ router.post(
     }
   }
 );
-// FIN DEL BLOQUE: Login (POST /login)
+// FIN DEL BLOQUE 6: Login (POST /login)
 
-// BLOQUE: Obtener todos los usuarios (GET /users)
+// BLOQUE 7: Obtener todos los usuarios (GET /users)
 // Solo accesible para usuarios con rol "admin", devuelve lista de todos los usuarios registrados
 router.get("/users", requireAuth, async (req, res) => {
   try {
@@ -264,10 +265,9 @@ router.get("/users", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Error del servidor al obtener usuarios" });
   }
 });
-//FIN DEL BLOQUE: Obtener todos los usuarios (GET /users)
+//FIN DEL BLOQUE 7: Obtener todos los usuarios (GET /users)
 
-// ================================
-// Confirmación de correo
+// BLOQUE 8: Confirmación de correo
 router.get("/confirm/:token", async (req, res) => {
   try {
     const { token } = req.params;
@@ -284,5 +284,6 @@ router.get("/confirm/:token", async (req, res) => {
     res.redirect(`${process.env.FRONTEND_URL}/confirmacion?status=error`);
   }
 });
+// FIN DEL BLOQUE 8: Confirmación de correo
 
 module.exports = router;

@@ -22,9 +22,9 @@ import Perfil from "./views/Perfil";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-// BLOQUE: Componente principal Inicio
+// BLOQUE 1: Componente principal Inicio
 export default function Inicio() {
-  // Bloque Estados principales
+  // Estados principales
   const [montacargas, setMontacargas] = useState([]);
   const [filteredMontacargas, setFilteredMontacargas] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -47,9 +47,8 @@ export default function Inicio() {
 
   // Usuario autenticado
   const [user, setUser] = useState(null);
-  // FIN DEL BLOQUE: Estados pricipales 
 
-  // BLOQUE: Cargar usuario desde localStorage
+  // BLOQUE 2: Cargar usuario desde localStorage
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem("user");
@@ -61,9 +60,9 @@ export default function Inicio() {
       setUser(null);
     }
   }, []);
-  // FIN DEL BLOQUE: Cargar usuario desde localStorage 
+  // FIN DEL BLOQUE 2: Cargar usuario desde localStorage 
 
-  // BLOQUE: Cargar montacargas desde API
+  // BLOQUE 3: Cargar montacargas desde API
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -76,9 +75,9 @@ export default function Inicio() {
     };
     fetchData();
   }, []);
-  // FIN DEL BLOQUE: Cargar montacargas desde API 
+  // FIN DEL BLOQUE 3: Cargar montacargas desde API 
 
-  // BLOQUE: Filtado de montacargas 
+  // BLOQUE 4: Filtado de montacargas 
   useEffect(() => {
     const filtered = montacargas.filter(m =>
       m.numero.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -88,16 +87,16 @@ export default function Inicio() {
     setFilteredMontacargas(filtered);
     setCurrentPage(1); // Resetear a primera página al buscar
   }, [searchTerm, montacargas]);
-  // FIN DEL BLOQUE: Filtado de montacargas
+  // FIN DEL BLOQUE 4: Filtado de montacargas
 
-  // BLOQUE: Paginación 
+  // BLOQUE 5: Paginación 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredMontacargas.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredMontacargas.length / itemsPerPage);
-  // FIN DEL BLOQUE Paginación 
+  // FIN DEL BLOQUE 5: Paginación 
 
-  // BLOQUE: Manejo de formulario (crear/editar)
+  // BLOQUE 6: Manejo de formulario (crear/editar)
   const handleChange = (e) => {
     const name = e.target.name;
     const value = e.target.value;
@@ -161,9 +160,9 @@ export default function Inicio() {
       console.error("Error en petición:", err);
     }
   };
-  // FIN DEL BLOQUE: Manejo de formulario 
+  // FIN DEL BLOQUE 6: Manejo de formulario 
 
-  // BLOQUE: Eliminar montacargas
+  // BLOQUE 7: Eliminar montacargas
   const handleDelete = async (numero) => {
     if (!window.confirm("¿Seguro que quieres eliminar este Montacargas?")) return;
 
@@ -188,9 +187,9 @@ export default function Inicio() {
       console.error("Error eliminando Montacargas:", err);
     }
   };
-  // FIN DEL BLOQUE: Eliminar montacargas
+  // FIN DEL BLOQUE 7: Eliminar montacargas
 
-  // BLOQUE: Preparar edición y paginación 
+  // BLOQUE 8: Preparar edición y paginación 
   const handleEdit = (m) => {
     setFormData({
       numero: m.numero,
@@ -217,9 +216,9 @@ export default function Inicio() {
       setCurrentPage(currentPage - 1);
     }
   };
-  // FIN DEL BLOQUE: Preparar edición y paginación 
+  // FIN DEL BLOQUE 8: Preparar edición y paginación 
 
-  // BLOQUE: Return UI principal
+  // BLOQUE 9: Return UI principal
   return (
     <div className="flex flex-col md:flex-row">
       {/* Botón de menú móvil */}
@@ -603,6 +602,6 @@ export default function Inicio() {
       )}
     </div>
   );
-  // FIN DEL BLOQUE: Return UI principal
+  // FIN DEL BLOQUE 9: Return UI principal
 }
-// FIN DEL BLOQUE: Componente Inicio
+// FIN DEL BLOQUE 1: Componente Inicio

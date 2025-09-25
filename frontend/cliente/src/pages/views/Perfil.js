@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 
-// Panel de Administración
-//Panel exclusivo para usuarios administradores 
-//Se muestan: -Total de usuarios, -Estadísticas (verificados, admins), -Tabla detallada de usuarios
-//Props: -users: lista de usuarios, loaging: estado de carga, error: mensaje de error si falla el fetch
+// BLOQUE 1: Panel de Administración
+//Panel exclusivo para usuarios administradores, se muestan, total de usuarios, estadísticas (verificados, admins), tabla detallada de usuarios
+//Props: users - lista de usuarios, loaging - estado de carga, error - mensaje de error si falla el fetch
 const AdminPanel = ({ users, loading, error }) => {
   // Función para formatear la fecha
   const formatDate = (dateString) => {
@@ -23,7 +22,6 @@ const AdminPanel = ({ users, loading, error }) => {
   };
 
   //Renderizado del panel
-
   return (
     <div className="p-4 md:p-8 bg-white rounded-2xl shadow-lg w-full max-w-6xl mx-auto">
       <h2 className="text-2xl font-bold mb-2 text-gray-800">Panel de Administración</h2>
@@ -128,10 +126,9 @@ const AdminPanel = ({ users, loading, error }) => {
     </div>
   );
 };
+// FIN DEL BLOQUE 1: Panel de Administración
 
-//FIN DEL BLOQUE AdminPanel
-
-//BLOQUE : Perfil
+// BLOQUE 2: Perfil
 //Vista que tiene el usuario de su perfil de usuario
 //Funcionalidades: -Cargar y mostrar datos del usuario logueado, -Controlar sesión, -Renderizar un menú lateral, -Si el usuario es admin, mostrar el AdminPanel
 const Perfil = () => {
@@ -152,9 +149,9 @@ const Perfil = () => {
   // Verificación de que el usuario es admin 
   const isAdmin = userData?.rol === "admin";
 
-// FIN DEL BLOQUE: Perfil
+// FIN DEL BLOQUE 2: Perfil
 
-  // BLOQUE: Fetch de datos de usuario 
+  // BLOQUE 3: Fetch de datos de usuario 
   // Se encarga de: -Validar el token en localStorage, -Hacer peticiones a auth/me, -Guardar datos de usuario si es válido, -Restringir a login si no hay token válido
   const fetchUserData = useCallback(async () => {
     setLoading(true);
@@ -204,9 +201,9 @@ const Perfil = () => {
     }
   }, []);
 
-  // FIN DEL BLOQUE: Fetch de datos de usuario
+  // FIN DEL BLOQUE 3: Fetch de datos de usuario
 
-  // BLOQUE Logout
+  // BLOQUE 4: Logout
   // Función para cerra sesión: -Limpia token y datos de usuario en localStorage, -Cambia estado a "redirecting", -Redirige a la raíz "/" despues de  1.5 segundo
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -217,17 +214,16 @@ const Perfil = () => {
       window.location.href = "/";
     }, 1500);
   };
+  // FIN DEL BLOQUE 4: Logout 
 
-  // FIN DEL BLOQUE Logout 
-
-  // BLOQUE useEffect cargar datos
+  // BLOQUE 5: useEffect cargar datos
   //Se ejecuta al montar el componente, llama a fetchUserData() para obtener datos del usuario logueado
   useEffect(() => {
     fetchUserData();
   }, [fetchUserData]);
-  // FIN DEL BLOQUE useEffect cargar datos 
+  // FIN DEL BLOQUE 5: useEffect cargar datos 
 
-  // BLOQUE Redirección si no hay login
+  // BLOQUE 6: Redirección si no hay login
   // Si el estado "shouldRedirect" está activo, significa que no hay sesión válida y se redirige al login
   useEffect(() => {
     if (shouldRedirect) {
@@ -235,10 +231,9 @@ const Perfil = () => {
       window.location.href = "/";
     }
   }, [shouldRedirect]);
-  // FIN DEL BLOQUE Redirección si no hay login
+  // FIN DEL BLOQUE 6: Redirección si no hay login
 
-
-  // BLOQUE: Fetch de usuarios (solo admin)
+  // BLOQUE 7: Fetch de usuarios (solo admin)
   // Solo se ejecuta si el usuario es administrador, y obtiene todos los usuarios desde /auth/users.
   const fetchUsers = useCallback(async () => {
     if (!isAdmin) return;
@@ -280,11 +275,11 @@ const Perfil = () => {
       fetchUsers();
     }
   }, [activeTab, isAdmin, fetchUsers]);
+  // FIN DEL BLOQUE 7: Fetch de usuarios (solo admin)
 
-  // FIN DEL BLOQUE: Fetch de usuarios (solo admin)
-
-  // BLOQUE: Renderizado
-  // Se encarga de mostar diferentes vistas según el estado: -Pantalla de carga, -Pantalla de logout/redirección, -Menú responsive (mobile/desktop), -Perfil normal (usuario común), -Panel admin (para rol "amdmin")
+  // BLOQUE 8: Renderizado
+  // Se encarga de mostar diferentes vistas según el estado: -Pantalla de carga, -Pantalla de logout/redirección, -Menú responsive (mobile/desktop),
+  // -Perfil normal (usuario común), -Panel admin (para rol "amdmin")
   if (loading) {
     // Vista mientras carga el perfil
     return (
@@ -320,9 +315,9 @@ const Perfil = () => {
       </div>
     );
   }
-  // FIN DEL BLOQUE: Renderizado
+  // FIN DEL BLOQUE 8: Renderizado
 
-  // BLOQUE: Return UI principal
+  // BLOQUE 9: Return UI principal
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
       {/* Mobile Menu Button */}
@@ -471,5 +466,5 @@ const Perfil = () => {
     </div>
   );
 };
-
+// FIN DEL BLOQUE 9: Return UI principal
 export default Perfil;
