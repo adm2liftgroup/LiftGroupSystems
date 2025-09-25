@@ -6,6 +6,7 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 const localizer = momentLocalizer(moment);
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:4000";
 
+// BLOQUE: Función auxiliar (parsear fechas) 
 function parseDateToLocal(date) {
   if (!date) return null;
   
@@ -16,11 +17,13 @@ function parseDateToLocal(date) {
   
   return new Date(date);
 }
+// FIN DEL BLOQUE: Función auxiliar
 
+// BLOQUE: Componente principal
 export default function ProgramasPreventivos({ id }) {
   console.log("ID recibido como prop:", id);
   
-  // Obtener usuario del localStorage
+  // BLOQUE: Usuarios y permisos
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const isAdmin = user?.rol === "admin";
   
@@ -29,7 +32,9 @@ export default function ProgramasPreventivos({ id }) {
     const numId = Number(id);
     return isNaN(numId) || numId <= 0 ? null : numId;
   }, [id]);
+  // FIN DEL BLOQUE: Usuarios y permisos
 
+  // BLOQUE: Estados 
   const [eventos, setEventos] = useState([]);
   const [todosEventos, setTodosEventos] = useState([]);
   const [anio, setAnio] = useState(new Date().getFullYear());
@@ -50,12 +55,13 @@ export default function ProgramasPreventivos({ id }) {
     fecha: "",
     tecnico_id: ""
   });
+  // FIN DEL BLOQUE: Estados 
 
   console.log("montacargasId convertido:", montacargasId);
   console.log("Usuario:", user);
   console.log("Es admin:", isAdmin);
 
-  // Cargar información del montacargas
+  // BLOQUE: Cargar info del montacargas
   useEffect(() => {
     if (!montacargasId) return; // No cargar si no hay ID válido
 
@@ -75,8 +81,9 @@ export default function ProgramasPreventivos({ id }) {
 
     fetchMontacargasInfo();
   }, [montacargasId]);
+  // FIN DEL BLOQUE: Cargar info del montacargas
 
-  // Cargar todos los mantenimientos
+  // BLOQUE: Cargar todos los mantenimientos
   const cargarMantenimientos = async () => {
     if (!montacargasId) return; // No cargar si no hay ID válido
 
@@ -128,8 +135,9 @@ export default function ProgramasPreventivos({ id }) {
   useEffect(() => {
     cargarMantenimientos();
   }, [montacargasId, anio]);
+  // FIN DEL BLOQUE: Cargar todos los mantenimientos 
 
-  // Filtrar eventos por año
+  // BLOQUE: Funciones de filtrado
   const filtrarPorAnio = (year) => {
     if (!year) {
       setEventos(todosEventos);
@@ -140,15 +148,16 @@ export default function ProgramasPreventivos({ id }) {
       setEventos(eventosFiltrados);
     }
   };
+  // FIN DEL BLOQUE: Funciones de filtrado
 
   // ======================
   // FUNCIONES DE EDICIÓN Y ELIMINACIÓN
   // ======================
 
-  // Abrir modal de edición
+  // BLOQUE: Abrir modal de edición
   const abrirModalEdicion = (evento) => {
     if (!isAdmin) {
-      setError("❌ Solo los administradores pueden editar mantenimientos");
+      setError("Solo los administradores pueden editar mantenimientos");
       return;
     }
 
@@ -187,17 +196,17 @@ export default function ProgramasPreventivos({ id }) {
       console.log("Respuesta actualización:", data);
 
       if (res.ok && data.success) {
-        setSuccess("✅ Mantenimiento actualizado correctamente");
+        setSuccess("Mantenimiento actualizado correctamente");
         cerrarModalEdicion();
         cargarMantenimientos(); // Recargar datos
         
         setTimeout(() => setSuccess(""), 3000);
       } else {
-        setError(data.error || "❌ Error al actualizar mantenimiento");
+        setError(data.error || "Error al actualizar mantenimiento");
       }
     } catch (err) {
       console.error("Error actualizando mantenimiento:", err);
-      setError("❌ Error de conexión con el servidor");
+      setError("Error de conexión con el servidor");
     } finally {
       setLoading(false);
     }
@@ -206,7 +215,7 @@ export default function ProgramasPreventivos({ id }) {
   // Eliminar mantenimiento
   const handleEliminarMantenimiento = async (mantenimientoId) => {
     if (!isAdmin) {
-      setError("❌ Solo los administradores pueden eliminar mantenimientos");
+      setError("Solo los administradores pueden eliminar mantenimientos");
       return;
     }
 
@@ -226,16 +235,16 @@ export default function ProgramasPreventivos({ id }) {
       console.log("Respuesta eliminación:", data);
 
       if (res.ok && data.success) {
-        setSuccess("✅ Mantenimiento eliminado correctamente");
+        setSuccess("Mantenimiento eliminado correctamente");
         cargarMantenimientos(); // Recargar datos
         
         setTimeout(() => setSuccess(""), 3000);
       } else {
-        setError(data.error || "❌ Error al eliminar mantenimiento");
+        setError(data.error || "Error al eliminar mantenimiento");
       }
     } catch (err) {
       console.error("Error eliminando mantenimiento:", err);
-      setError("❌ Error de conexión con el servidor");
+      setError("Error de conexión con el servidor");
     } finally {
       setLoading(false);
     }
@@ -244,7 +253,7 @@ export default function ProgramasPreventivos({ id }) {
   // Eliminar programa completo de un año
   const handleEliminarProgramaAnual = async (anioEliminar) => {
     if (!isAdmin) {
-      setError("❌ Solo los administradores pueden eliminar programas");
+      setError("Solo los administradores pueden eliminar programas");
       return;
     }
 
@@ -270,13 +279,13 @@ export default function ProgramasPreventivos({ id }) {
         });
       }
 
-      setSuccess(`✅ Programa completo del año ${anioEliminar} eliminado correctamente`);
+      setSuccess(`Programa completo del año ${anioEliminar} eliminado correctamente`);
       cargarMantenimientos(); // Recargar datos
       
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       console.error("Error eliminando programa anual:", err);
-      setError("❌ Error al eliminar el programa anual");
+      setError("Error al eliminar el programa anual");
     } finally {
       setLoading(false);
     }
@@ -285,7 +294,7 @@ export default function ProgramasPreventivos({ id }) {
   // Crear programa anual automático - SOLO ADMIN
   const handleCrearPrograma = async () => {
     if (!isAdmin) {
-      setError("❌ Solo los administradores pueden crear programas de mantenimiento");
+      setError("Solo los administradores pueden crear programas de mantenimiento");
       return;
     }
 
@@ -312,20 +321,21 @@ export default function ProgramasPreventivos({ id }) {
       console.log("Respuesta del servidor:", data);
 
       if (res.ok && data.success) {
-        setSuccess(data.message || "✅ Programa creado exitosamente");
+        setSuccess(data.message || "Programa creado exitosamente");
         cargarMantenimientos(); // Recargar datos en lugar de recargar página
       } else {
-        setError(data.error || data.message || "❌ Error al crear programa");
+        setError(data.error || data.message || "Error al crear programa");
       }
     } catch (err) {
       console.error("Error creando programa:", err);
-      setError("❌ Error de conexión con el servidor");
+      setError("Error de conexión con el servidor");
     } finally {
       setLoading(false);
     }
   };
+  // FIN DEL BLOQUE: Funciones de edición y eliminación
 
-  // Obtener años únicos de todos los eventos
+  // BLOQUE: Utilidades de vista calendario
   const añosUnicos = [...new Set(todosEventos.map(evento => evento.start.getFullYear()))].sort((a, b) => b - a);
 
   // Estilos de eventos por tipo
@@ -390,13 +400,14 @@ export default function ProgramasPreventivos({ id }) {
       </div>
     );
   };
+  // FIN DEL BLOQUE: Utilidades de vista calendario
 
-  // Mostrar error si el ID no es válido (esto va al FINAL, después de todos los hooks)
+  // BLOQUE: Validación de ID inválido
   if (!montacargasId) {
     return (
       <div className="p-6">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          ❌ Error: ID de montacargas no válido. Recibido: "{id}"
+           Error: ID de montacargas no válido. Recibido: "{id}"
         </div>
         <p className="mt-4 text-gray-600">
           Por favor, selecciona un montacargas válido desde el menú principal.
@@ -404,7 +415,9 @@ export default function ProgramasPreventivos({ id }) {
       </div>
     );
   }
+  // FIN DEL BLOQUE: Validación de ID inválido
 
+  // BLOQUE: Return UI 
   return (
     <div className="p-6">
       <h2 className="text-2xl font-bold mb-6 text-gray-800">
@@ -799,4 +812,7 @@ export default function ProgramasPreventivos({ id }) {
       </div>
     </div>
   );
+  // FIN DEL BLOQUE: Return UI
+
 }
+// FIN DEL BLOQUE: Componente pricipal

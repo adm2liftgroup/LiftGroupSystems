@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 
 // Panel de Administración
+//Panel exclusivo para usuarios administradores 
+//Se muestan: -Total de usuarios, -Estadísticas (verificados, admins), -Tabla detallada de usuarios
+//Props: -users: lista de usuarios, loaging: estado de carga, error: mensaje de error si falla el fetch
 const AdminPanel = ({ users, loading, error }) => {
   // Función para formatear la fecha
   const formatDate = (dateString) => {
@@ -18,6 +21,8 @@ const AdminPanel = ({ users, loading, error }) => {
     if (!nombre) return "U";
     return nombre.charAt(0).toUpperCase();
   };
+
+  //Renderizado del panel
 
   return (
     <div className="p-4 md:p-8 bg-white rounded-2xl shadow-lg w-full max-w-6xl mx-auto">
@@ -124,31 +129,39 @@ const AdminPanel = ({ users, loading, error }) => {
   );
 };
 
+//FIN DEL BLOQUE AdminPanel
+
+//BLOQUE : Perfil
+//Vista que tiene el usuario de su perfil de usuario
+//Funcionalidades: -Cargar y mostrar datos del usuario logueado, -Controlar sesión, -Renderizar un menú lateral, -Si el usuario es admin, mostrar el AdminPanel
 const Perfil = () => {
-  const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [activeTab, setActiveTab] = useState("perfil");
-  const [redirecting, setRedirecting] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [shouldRedirect, setShouldRedirect] = useState(false);
+  // Estados principales
+  const [userData, setUserData] = useState(null); // Datos del usuario 
+  const [loading, setLoading] = useState(true); // Cargar inicial del perfil
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // Estado de sesión 
+  const [activeTab, setActiveTab] = useState("perfil"); // Pestña activa 
+  const [redirecting, setRedirecting] = useState(false); // Estado al cerrar sesión 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // Menú móvil
+  const [shouldRedirect, setShouldRedirect] = useState(false); // Redirección si no hay login
 
   // Estados para admin
-  const [users, setUsers] = useState([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [errorUsers, setErrorUsers] = useState("");
+  const [users, setUsers] = useState([]); // lista de usuarios (solo admin)
+  const [loadingUsers, setLoadingUsers] = useState(false); // Estado de carga usuarios 
+  const [errorUsers, setErrorUsers] = useState(""); // Error al cargar usuarios
 
+  // Verificación de que el usuario es admin 
   const isAdmin = userData?.rol === "admin";
 
-  // ====================================
-  // Fetch de datos de usuario con token válido
-  // ====================================
+// FIN DEL BLOQUE: Perfil
+
+  // BLOQUE: Fetch de datos de usuario 
+  // Se encarga de: -Validar el token en localStorage, -Hacer peticiones a auth/me, -Guardar datos de usuario si es válido, -Restringir a login si no hay token válido
   const fetchUserData = useCallback(async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
       
-      // Si no hay token, redirigir al login
+      // Validación del token 
       if (!token || token === "null") {
         console.error("❌ No hay token válido en localStorage");
         setIsLoggedIn(false);
@@ -157,6 +170,7 @@ const Perfil = () => {
         return;
       }
 
+      //Petición al backend con el token 
       const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -165,19 +179,22 @@ const Perfil = () => {
       console.log("Datos de /auth/me:", data);
 
       if (response.ok) {
+        // Guardar datos en estado y localStorage 
         setUserData(data);
         setIsLoggedIn(true);
         localStorage.setItem("user", JSON.stringify(data));
         setActiveTab("perfil");
       } else {
-        console.error("❌ Token inválido o expirado");
+        //Token inválido, se limpia la sesión
+        console.error("Token inválido o expirado");
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         setIsLoggedIn(false);
         setShouldRedirect(true);
       }
     } catch (err) {
-      console.error("🔥 Error fetching /auth/me:", err);
+      //Error en conexión
+      console.error("Error fetching /auth/me:", err);
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       setIsLoggedIn(false);
@@ -187,39 +204,42 @@ const Perfil = () => {
     }
   }, []);
 
-  // ====================================
-  // Logout - CORREGIDO para redirigir a la raíz
-  // ====================================
+  // FIN DEL BLOQUE: Fetch de datos de usuario
+
+  // BLOQUE Logout
+  // Función para cerra sesión: -Limpia token y datos de usuario en localStorage, -Cambia estado a "redirecting", -Redirige a la raíz "/" despues de  1.5 segundo
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setRedirecting(true);
     setTimeout(() => {
-      // Redirigir a la raíz donde está tu login
+      // Redirigir a la raíz donde está el login
       window.location.href = "/";
     }, 1500);
   };
 
-  // ====================================
-  // Cargar datos al iniciar el componente
-  // ====================================
+  // FIN DEL BLOQUE Logout 
+
+  // BLOQUE useEffect cargar datos
+  //Se ejecuta al montar el componente, llama a fetchUserData() para obtener datos del usuario logueado
   useEffect(() => {
     fetchUserData();
   }, [fetchUserData]);
+  // FIN DEL BLOQUE useEffect cargar datos 
 
-  // ====================================
-  // Redirección si no está logueado - CORREGIDO para redirigir a la raíz
-  // ====================================
+  // BLOQUE Redirección si no hay login
+  // Si el estado "shouldRedirect" está activo, significa que no hay sesión válida y se redirige al login
   useEffect(() => {
     if (shouldRedirect) {
-      // Redirigir a la raíz donde está tu login
+      // Redirigir a la raíz donde está el login
       window.location.href = "/";
     }
   }, [shouldRedirect]);
+  // FIN DEL BLOQUE Redirección si no hay login
 
-  // ====================================
-  // Fetch de usuarios admin
-  // ====================================
+
+  // BLOQUE: Fetch de usuarios (solo admin)
+  // Solo se ejecuta si el usuario es administrador, y obtiene todos los usuarios desde /auth/users.
   const fetchUsers = useCallback(async () => {
     if (!isAdmin) return;
 
@@ -254,16 +274,19 @@ const Perfil = () => {
     }
   }, [isAdmin]);
 
+// Hook para cargar usuarios cuando admin entra al panel
   useEffect(() => {
     if (activeTab === "admin-panel" && isAdmin) {
       fetchUsers();
     }
   }, [activeTab, isAdmin, fetchUsers]);
 
-  // ====================================
-  // Renderizado
-  // ====================================
+  // FIN DEL BLOQUE: Fetch de usuarios (solo admin)
+
+  // BLOQUE: Renderizado
+  // Se encarga de mostar diferentes vistas según el estado: -Pantalla de carga, -Pantalla de logout/redirección, -Menú responsive (mobile/desktop), -Perfil normal (usuario común), -Panel admin (para rol "amdmin")
   if (loading) {
+    // Vista mientras carga el perfil
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
         <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm text-center">
@@ -275,6 +298,7 @@ const Perfil = () => {
   }
 
   if (redirecting) {
+    // Vista al cerrar sesión
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
         <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm text-center">
@@ -286,6 +310,7 @@ const Perfil = () => {
   }
 
   if (shouldRedirect) {
+    // Vista mientras redirige al login
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
         <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm text-center">
@@ -295,7 +320,9 @@ const Perfil = () => {
       </div>
     );
   }
+  // FIN DEL BLOQUE: Renderizado
 
+  // BLOQUE: Return UI principal
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
       {/* Mobile Menu Button */}

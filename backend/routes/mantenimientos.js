@@ -295,4 +295,51 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+// En tu router de mantenimientos, modifica el endpoint PUT
+router.put("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tipo, fecha, tecnico_id, tecnico_nombre, tecnico_email } = req.body;
+
+    const result = await pool.query(
+      `UPDATE mantenimientos_programados 
+       SET tipo = $1, fecha = $2, tecnico_id = $3, tecnico_nombre = $4, tecnico_email = $5
+       WHERE id = $6 
+       RETURNING id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, tecnico_nombre, tecnico_email, creado_en`,
+      [tipo, fecha, tecnico_id, tecnico_nombre, tecnico_email, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, error: "Mantenimiento no encontrado" });
+    }
+
+    res.json({ success: true, mantenimiento: result.rows[0] });
+  } catch (err) {
+    console.error("Error actualizando mantenimiento:", err);
+    res.status(500).json({ success: false, error: "Error al actualizar mantenimiento" });
+  }
+});
+
+// Nuevo endpoint para obtener mantenimientos del mes actual
+router.get("/mes-actual", async (req, res) => {
+  try {
+    const mesActual = new Date().getMonth() + 1;
+    const anioActual = new Date().getFullYear();
+
+    const result = await pool.query(
+      `SELECT mp.*, m.numero as montacargas_numero, m.marca, m.modelo
+       FROM mantenimientos_programados mp
+       JOIN "Montacargas" m ON mp.montacargas_id = m.numero
+       WHERE mp.mes = $1 AND mp.anio = $2
+       ORDER BY mp.fecha`,
+      [mesActual, anioActual]
+    );
+
+    res.json({ success: true, mantenimientos: result.rows });
+  } catch (err) {
+    console.error("Error obteniendo mantenimientos del mes:", err);
+    res.status(500).json({ success: false, error: "Error al obtener mantenimientos" });
+  }
+});
+
 module.exports = router;

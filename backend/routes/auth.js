@@ -1,4 +1,3 @@
-// routes/auth.js
 const express = require("express");
 const router = express.Router();
 const { body, validationResult } = require("express-validator");
@@ -6,12 +5,11 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
-const pool = require("../db");
+const pool = require("../db"); // conexión a PostgreSQL
 require("dotenv").config();
 
-// ================================
-// Middleware: requireAuth (SOLO HEADER)
-// ================================
+// BLOQUE: Middleware requireAuth
+// Este middleware protege rutas privadas, verifica el tokeb  JWT en el header "Authorization", si es válido, agrega los datos del usuario a req.user, si no, devuelve 401 (no autorizado)
 const requireAuth = (req, res, next) => {
   try {
     console.log("🔍 Headers Authorization:", req.headers.authorization);
@@ -19,33 +17,34 @@ const requireAuth = (req, res, next) => {
     let token = null;
     
     if (req.headers.authorization) {
-      const authHeader = req.headers.authorization;
+      const authHeader = req.headers.authorization; // Soporta formato "Barer token" o solo "token"
       if (authHeader.startsWith('Bearer ')) {
         token = authHeader.substring(7);
       } else {
         token = authHeader;
       }
-      console.log("✅ Token encontrado en Authorization header");
+      console.log("Token encontrado en Authorization header");
     }
     
     if (!token) {
-      console.log("❌ No token found in Authorization header");
+      console.log("No token found in Authorization header");
       return res.status(401).json({ error: "Acceso no autorizado. Token requerido." });
     }
 
+    //Verifica el token y lo decodifica 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    console.log("✅ Token válido, usuario ID:", decoded.id);
+    req.user = decoded; // se guarda la info del usuario para usarla en la ruta
+    console.log(" Token válido, usuario ID:", decoded.id);
     next();
   } catch (error) {
-    console.error("❌ Error en autenticación:", error.message);
+    console.error(" Error en autenticación:", error.message);
     return res.status(401).json({ error: "Token inválido o expirado." });
   }
 };
+// FIN DEL BLOQUE: Middleware requireAuth 
 
-// ================================
-// Helper: enviar email de verificación
-// ================================
+//  BLOQUE: Helper para enviar email de verificación
+// Usando en el registro para mandar un correo con el link de verificación al usuario
 async function sendVerificationEmail(email, token) {
   let transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -64,12 +63,12 @@ async function sendVerificationEmail(email, token) {
            <p><a href="${verifyUrl}">Verificar cuenta</a></p>`,
   });
 
-  console.log("📨 Correo enviado, ID:", info.messageId);
+  console.log("Correo enviado, ID:", info.messageId);
 }
+// FIN DEL BLOQUE: Helper para enviar email de verificación
 
-// ================================
-// Endpoint: datos del usuario autenticado
-// ================================
+// BLOQUE: Endpoint GET /me 
+// Devuelve los datos del usuario autenticado (usando requireAuth para validar el token)
 router.get("/me", requireAuth, async (req, res) => {
   try {
     console.log("📥 GET /me recibido para usuario ID:", req.user.id);
@@ -95,10 +94,10 @@ router.get("/me", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Error del servidor" });
   }
 });
+// FIN DEL BLOQUE: Endpoint GET /me
 
-// ================================
-// Registro
-// ================================
+// BLOQUE: Registro (POST /register)
+// Valida datos del formulario, verifica si el correo ya está registrado, hashea la contraseña con bcrypt, genera un token de verificación temporal, inserta en la BD y envía correo de verificación 
 router.post(
   "/register",
   body("email").isEmail().normalizeEmail(),
@@ -114,22 +113,25 @@ router.post(
     const { nombre, email, password } = req.body;
     console.log("📥 POST /register recibido con body:", req.body);
 
-    try {
+    try { // Verifica si el email ya existe 
       const exists = await pool.query('SELECT id FROM "Usuarios" WHERE email = $1', [email]);
       if (exists.rows.length) {
         return res.status(400).json({ error: "Este correo ya está registrado" });
       }
 
+      // Encriptar contraseña
       const hashed = await bcrypt.hash(password, 10);
       const token = crypto.randomBytes(32).toString("hex");
       const expires = new Date(Date.now() + 24 * 3600 * 1000);
 
+      // Insertar usuario nuevo
       const inserted = await pool.query(
         `INSERT INTO "Usuarios" (nombre, email, password, verification_token, verification_expires)
          VALUES ($1,$2,$3,$4,$5) RETURNING id, email`,
         [nombre, email, hashed, token, expires]
       );
 
+      // Enciar correo de verificación
       await sendVerificationEmail(email, token);
 
       return res.json({
@@ -142,10 +144,10 @@ router.post(
     }
   }
 );
+// FIN DEL BLOQUE: Registro (POST /register)
 
-// ================================
-// Verificación de correo
-// ================================
+// BLOQUE: Verificación de correo (GET /verify)
+// El usuario entra al link enviado por email, si el token existe y no ha expirado activa email_verified, redirige al frontend en una página de éxito
 router.get("/verify", async (req, res) => {
   const { token } = req.query;
   if (!token) return res.status(400).send("Token requerido");
@@ -167,14 +169,14 @@ router.get("/verify", async (req, res) => {
 
     return res.redirect(`${process.env.FRONTEND_URL}/verify-success`);
   } catch (err) {
-    console.error("🔥 Error en /verify:", err);
+    console.error(" Error en /verify:", err);
     res.status(500).send("Error del servidor");
   }
 });
+// FIN DEL BLOQUE: Verificación de correo (GET /verify)
 
-// ================================
-// Login (ACTUALIZADO para devolver token)
-// ================================
+// BLOQUE: Login (POST /login)
+// Verifica email y contraseña, confirma que el email esté verificado, devuelve un token JWT con id, email, nombre y rol, guarda también el token en cookie httpOnly
 router.post(
   "/login",
   body("email").isEmail().normalizeEmail(),
@@ -194,11 +196,11 @@ router.post(
       const ok = await bcrypt.compare(password, user.password);
       if (!ok) return res.status(400).json({ error: "Credenciales inválidas" });
 
-      // ✅ CORRECCIÓN: Agregamos el rol al payload del token
+      // Crear token con datos del usuario
       const payload = { 
         id: user.id, 
         email: user.email, 
-        rol: user.rol, // ¡Este es el campo que faltaba!
+        rol: user.rol, 
         nombre: user.nombre
       };
       
@@ -206,6 +208,7 @@ router.post(
         expiresIn: process.env.JWT_EXPIRES_IN || "1h",
       });
 
+      // Guardar token en cookie segura 
       res.cookie("token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -230,18 +233,17 @@ router.post(
     }
   }
 );
+// FIN DEL BLOQUE: Login (POST /login)
 
-
-// ================================
-// Endpoint: Obtener todos los usuarios (solo admin)
-// ================================
+// BLOQUE: Obtener todos los usuarios (GET /users)
+// Solo accesible para usuarios con rol "admin", devuelve lista de todos los usuarios registrados
 router.get("/users", requireAuth, async (req, res) => {
   try {
-    console.log("📥 GET /users recibido por usuario ID:", req.user.id, "Rol:", req.user.rol);
+    console.log("GET /users recibido por usuario ID:", req.user.id, "Rol:", req.user.rol);
     
     // Verificar que el usuario sea admin (CORREGIDO: tenía 'admin|' en lugar de 'admin')
     if (req.user.rol !== 'admin') {
-      console.log("❌ Acceso denegado. Usuario no es admin.");
+      console.log("Acceso denegado. Usuario no es admin.");
       return res.status(403).json({ error: "Acceso denegado. Solo administradores." });
     }
 
@@ -250,22 +252,22 @@ router.get("/users", requireAuth, async (req, res) => {
       'SELECT id, nombre, email, rol, email_verified, created_at FROM "Usuarios" ORDER BY created_at DESC'
     );
 
-    console.log("✅ Usuarios obtenidos:", q.rows.length);
-    console.log("📋 Usuarios:", q.rows);
+    console.log("Usuarios obtenidos:", q.rows.length);
+    console.log("Usuarios:", q.rows);
 
     res.json({
       success: true,
       users: q.rows
     });
   } catch (err) {
-    console.error("❌ Error en /users:", err);
+    console.error("Error en /users:", err);
     res.status(500).json({ error: "Error del servidor al obtener usuarios" });
   }
 });
+//FIN DEL BLOQUE: Obtener todos los usuarios (GET /users)
 
 // ================================
 // Confirmación de correo
-// ================================
 router.get("/confirm/:token", async (req, res) => {
   try {
     const { token } = req.params;

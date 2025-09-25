@@ -22,7 +22,9 @@ import Perfil from "./views/Perfil";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
+// BLOQUE: Componente principal Inicio
 export default function Inicio() {
+  // Bloque Estados principales
   const [montacargas, setMontacargas] = useState([]);
   const [filteredMontacargas, setFilteredMontacargas] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -43,9 +45,11 @@ export default function Inicio() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // 👉 Lógica para manejar el usuario de forma segura
+  // Usuario autenticado
   const [user, setUser] = useState(null);
+  // FIN DEL BLOQUE: Estados pricipales 
 
+  // BLOQUE: Cargar usuario desde localStorage
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem("user");
@@ -57,8 +61,9 @@ export default function Inicio() {
       setUser(null);
     }
   }, []);
+  // FIN DEL BLOQUE: Cargar usuario desde localStorage 
 
-  // Cargar montacargas al inicio
+  // BLOQUE: Cargar montacargas desde API
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -71,8 +76,9 @@ export default function Inicio() {
     };
     fetchData();
   }, []);
+  // FIN DEL BLOQUE: Cargar montacargas desde API 
 
-  // Filtrar montacargas según término de búsqueda
+  // BLOQUE: Filtado de montacargas 
   useEffect(() => {
     const filtered = montacargas.filter(m =>
       m.numero.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -82,13 +88,16 @@ export default function Inicio() {
     setFilteredMontacargas(filtered);
     setCurrentPage(1); // Resetear a primera página al buscar
   }, [searchTerm, montacargas]);
+  // FIN DEL BLOQUE: Filtado de montacargas
 
-  // Calcular montacargas para la página actual
+  // BLOQUE: Paginación 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredMontacargas.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredMontacargas.length / itemsPerPage);
+  // FIN DEL BLOQUE Paginación 
 
+  // BLOQUE: Manejo de formulario (crear/editar)
   const handleChange = (e) => {
     const name = e.target.name;
     const value = e.target.value;
@@ -100,7 +109,7 @@ export default function Inicio() {
 
     try {
       if (editingNumero) {
-        // actualizar
+        // actualizar montacargas existente 
         const res = await fetch(`${API_URL}/api/montacargas/${encodeURIComponent(editingNumero)}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -123,7 +132,7 @@ export default function Inicio() {
           console.error("Error al actualizar montacargas");
         }
       } else {
-        // crear
+        // Crear nuevo montacargas
         const res = await fetch(`${API_URL}/api/montacargas`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -138,7 +147,7 @@ export default function Inicio() {
         }
       }
 
-      // reset
+      // Resetear formulario
       setFormData({
         numero: "",
         Marca: "",
@@ -152,7 +161,9 @@ export default function Inicio() {
       console.error("Error en petición:", err);
     }
   };
+  // FIN DEL BLOQUE: Manejo de formulario 
 
+  // BLOQUE: Eliminar montacargas
   const handleDelete = async (numero) => {
     if (!window.confirm("¿Seguro que quieres eliminar este Montacargas?")) return;
 
@@ -165,6 +176,7 @@ export default function Inicio() {
         setMontacargas(prev =>
           prev.filter(m => String(m.numero) !== String(numero))
         );
+        // Si el eliminado estaba seleccionado, limpiar selección
         if (selectedMontacargas && String(selectedMontacargas.numero) === String(numero)) {
           setSelectedMontacargas(null);
           setActiveTab(null);
@@ -176,7 +188,9 @@ export default function Inicio() {
       console.error("Error eliminando Montacargas:", err);
     }
   };
+  // FIN DEL BLOQUE: Eliminar montacargas
 
+  // BLOQUE: Preparar edición y paginación 
   const handleEdit = (m) => {
     setFormData({
       numero: m.numero,
@@ -197,13 +211,15 @@ export default function Inicio() {
       setCurrentPage(currentPage + 1);
     }
   };
-
+  
   const prevPage = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
     }
   };
+  // FIN DEL BLOQUE: Preparar edición y paginación 
 
+  // BLOQUE: Return UI principal
   return (
     <div className="flex flex-col md:flex-row">
       {/* Botón de menú móvil */}
@@ -233,7 +249,7 @@ export default function Inicio() {
         
         <h2 className="text-lg font-bold mb-4">Menú</h2>
 
-        {/* 👉 Icono de usuario y nombre */}
+        {/* Icono de usuario y nombre */}
         {user && (
           <div
             className="flex items-center space-x-2 mb-4 p-2 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
@@ -587,4 +603,6 @@ export default function Inicio() {
       )}
     </div>
   );
+  // FIN DEL BLOQUE: Return UI principal
 }
+// FIN DEL BLOQUE: Componente Inicio

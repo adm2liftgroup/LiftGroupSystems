@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 
+// Se obtiene la URL de la API desde variables de entorno
 const API_URL = process.env.REACT_APP_API_URL;
 
 export default function Login() {
@@ -9,31 +10,35 @@ export default function Login() {
     password: ""
   });
 
+  // Hook para redirigir después del login 
   const navigate = useNavigate();
 
-  const handleChange = (e) => {
+  // BLOQUE: Manejo de cambios en inputs
+  const handleChange = (e) => { // Actualiza dinámicamente email o password según el input
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+  // FIN DEL BLOQUE: Manejo de cambios en inputs 
 
+  // BLOQUE: Manejo del envío del formulario (login)
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Evita recargar la página
 
-    try {
+    try { // Se envían credenciales al backend
       const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
-        credentials: "include",
+        credentials: "include", // para cookies/sesiones
       });
 
       const data = await response.json();
 
-      if (response.ok) {
+      if (response.ok) { // login exitoso
         console.log("✅ Login exitoso:", data);
         console.log("👤 Datos del usuario recibidos:", data.user);
-        console.log("🔑 Token recibido:", data.token); // ← DEBUG del token
+        console.log("🔑 Token recibido:", data.token); // DEBUG del token
         
-        // GUARDAR EL TOKEN EN LOCALSTORAGE (esto es lo que faltaba)
+        // GUARDAR EL TOKEN EN LOCALSTORAGE 
         if (data.token) {
           localStorage.setItem("token", data.token);
           console.log("💾 Token guardado en localStorage");
@@ -48,6 +53,7 @@ export default function Login() {
         console.log("💾 Usuario guardado en localStorage:", JSON.parse(storedUser));
         console.log("💾 Token guardado en localStorage:", storedToken);
 
+        // Redirigir a la página principal
         navigate("/inicio");
       } else {
         alert(data.error || "Credenciales incorrectas");
@@ -57,7 +63,9 @@ export default function Login() {
       alert("Error de conexión");
     }
   };
+  // FIN DEL BLOQUE: Manejo del envío del formulario (login)
 
+  // BLOQUE: Renderizado del formulario de login
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <form
@@ -66,6 +74,7 @@ export default function Login() {
       >
         <h2 className="text-2xl font-bold mb-4 text-center">Iniciar Sesión</h2>
 
+        {/* Campo de correo */}
         <input
           type="email"
           name="email"
@@ -74,6 +83,7 @@ export default function Login() {
           onChange={handleChange}
         />
 
+        {/* Campo de contraseña */}
         <input
           type="password"
           name="password"
@@ -82,10 +92,12 @@ export default function Login() {
           onChange={handleChange}
         />
 
+        {/* Botón de enviar */}
         <button className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700 transition">
           Ingresar
         </button>
 
+        {/* Enlace a registro */}
         <p className="text-sm text-center mt-4">
           ¿No tienes una cuenta?{" "}
           <Link to="/register" className="text-blue-600 hover:underline">
@@ -96,3 +108,4 @@ export default function Login() {
     </div>
   );
 }
+  // FIN DEL BLOQUE: Renderizado del formulario de login

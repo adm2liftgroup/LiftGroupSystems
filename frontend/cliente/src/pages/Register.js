@@ -1,25 +1,27 @@
-// src/pages/Register.js
 import { useState } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 
-// fallback si no tienes REACT_APP_API_URL en .env
+// URL de la API: Primero toma el .env, si no existe usa la API local como fallback 
 const API_URL = process.env.REACT_APP_API_URL || "http://192.168.0.193:4000";
 
+// BLOQUE: Componente principal Register
 export default function Register() {
+  // Estados para manejar formulario, carga y mensajes 
   const [form, setForm] = useState({ nombre: "", email: "", password: "", confirmPassword: "" });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // Hook para navegación 
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value }); // Acualiza valores del formulario
 
-  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); // Valida que el email tenga un formato correcto
 
+  // BLOQUE: Envío del formulario de registro
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validaciones cliente
+    // Validaciones en el cliente antes de enviar 
     if (!form.nombre.trim()) {
       setMessage({ type: "error", text: "Nombre requerido" });
       window.scrollTo(0, 0);
@@ -45,26 +47,25 @@ export default function Register() {
       setLoading(true);
       setMessage({ type: "", text: "" });
 
-      const res = await axios.post(
+      const res = await axios.post( // Peticiones POST al backend para registrar
         `${API_URL}/auth/register`,
         { nombre: form.nombre, email: form.email, password: form.password },
         { headers: { "Content-Type": "application/json" }, timeout: 10000 }
       );
 
-      if (res.data?.success) {
+      if (res.data?.success) { // Registro exitoso
         setMessage({ type: "success", text: res.data.message || "Registro exitoso. Revisa tu correo." });
         window.scrollTo(0, 0);
 
-        // redirigir a la ruta de login que ya tienes ("/")
+        // redirigir a la ruta después de 2 segundos
         setTimeout(() => {
-          navigate("/"); // <- si tu Login está en "/", mantenlo así
-          // si prefieres usar /login en App.js, cámbialo por navigate("/login")
+          navigate("/"); 
         }, 2000);
-      } else {
+      } else { // Error desde el backend
         setMessage({ type: "error", text: res.data?.error || "Error inesperado al registrar." });
         window.scrollTo(0, 0);
       }
-    } catch (err) {
+    } catch (err) { //Error de conexión o validaciones del servidor
       console.error("Register error:", err);
       const msg =
         err.response?.data?.error ||
@@ -76,12 +77,15 @@ export default function Register() {
       setLoading(false);
     }
   };
+  // FIN DEL BLOQUE: Envío del formulario de registro
 
+  // BLOQUE: Renderizado del formulario de registro
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
       <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
         <h2 className="text-2xl font-bold mb-4">Registro</h2>
 
+        {/* Mensaje de error o éxito */}
         {message.text && (
           <div
             className={`mb-4 p-2 rounded text-center ${
@@ -89,7 +93,7 @@ export default function Register() {
             }`}
           >
             {message.text}
-            {/* Si es success mostramos link inmediato al Login */}
+            {/* Si es success se muestra el link inmediato al Login */}
             {message.type === "success" && (
               <div className="mt-3">
                 <button
@@ -104,6 +108,7 @@ export default function Register() {
           </div>
         )}
 
+        {/* Campos de entrada */}
         <input
           name="nombre"
           placeholder="Nombre"
@@ -144,6 +149,7 @@ export default function Register() {
           disabled={loading}
         />
 
+        {/* Botones de acción */}
         <div className="flex gap-2">
           <button
             type="submit"
@@ -161,3 +167,4 @@ export default function Register() {
     </div>
   );
 }
+// FIN DEL BLOQUE: Renderizado del formulario de registro
