@@ -263,52 +263,89 @@ router.delete("/:id", async (req, res) => {
 });
 // FIN DEL BLOQUE 5: Eliminar mantenimiento
 
-// BLOQUE 6: Actualizar mantenimiento
+// BLOQUE 6: Actualizar mantenimiento - CORREGIDO
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { tipo, fecha, tecnico_id } = req.body;
 
-    const result = await pool.query(
-      `UPDATE mantenimientos_programados 
-       SET tipo = $1, fecha = $2, tecnico_id = $3 
-       WHERE id = $4 
-       RETURNING id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, creado_en`,
-      [tipo, fecha, tecnico_id, id]
-    );
+    console.log("Datos recibidos para actualizar:", { id, tipo, fecha, tecnico_id });
 
-    if (result.rowCount === 0) {
-      return res.status(404).json({ success: false, error: "Mantenimiento no encontrado" });
+    // 🔥 VALIDACIÓN CRÍTICA: Convertir tecnico_id correctamente
+    let tecnicoIdValido = null;
+    if (tecnico_id !== undefined && tecnico_id !== null && tecnico_id !== "") {
+      const tecnicoIdParsed = parseInt(tecnico_id);
+      if (!isNaN(tecnicoIdParsed)) {
+        tecnicoIdValido = tecnicoIdParsed;
+      } else {
+        return res.status(400).json({ 
+          success: false, 
+          error: "El ID del técnico debe ser un número válido" 
+        });
+      }
     }
 
-    res.json({ success: true, mantenimiento: result.rows[0] });
-  } catch (err) {
-    console.error("Error actualizando mantenimiento:", err);
-    res.status(500).json({ success: false, error: "Error al actualizar mantenimiento" });
-  }
-});
+    // Validar campos requeridos
+    if (!tipo || !fecha) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Tipo y fecha son campos requeridos" 
+      });
+    }
 
-router.put("/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { tipo, fecha, tecnico_id, tecnico_nombre, tecnico_email } = req.body;
+    // Validar formato de fecha
+    const fechaValida = new Date(fecha);
+    if (isNaN(fechaValida.getTime())) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Formato de fecha inválido" 
+      });
+    }
+
+    // Extraer mes y año de la fecha para actualizar también estos campos
+    const mes = fechaValida.getMonth() + 1;
+    const anio = fechaValida.getFullYear();
+
+    console.log("Datos validados para actualizar:", { 
+      tipo, fecha, mes, anio, tecnico_id: tecnicoIdValido, id 
+    });
 
     const result = await pool.query(
       `UPDATE mantenimientos_programados 
-       SET tipo = $1, fecha = $2, tecnico_id = $3, tecnico_nombre = $4, tecnico_email = $5
+       SET tipo = $1, fecha = $2, mes = $3, anio = $4, tecnico_id = $5 
        WHERE id = $6 
-       RETURNING id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, tecnico_nombre, tecnico_email, creado_en`,
-      [tipo, fecha, tecnico_id, tecnico_nombre, tecnico_email, id]
+       RETURNING id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, creado_en`,
+      [tipo, fecha, mes, anio, tecnicoIdValido, id]
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ success: false, error: "Mantenimiento no encontrado" });
+      return res.status(404).json({ 
+        success: false, 
+        error: "Mantenimiento no encontrado" 
+      });
     }
 
-    res.json({ success: true, mantenimiento: result.rows[0] });
+    res.json({ 
+      success: true, 
+      mantenimiento: result.rows[0],
+      message: "Mantenimiento actualizado correctamente"
+    });
+
   } catch (err) {
     console.error("Error actualizando mantenimiento:", err);
-    res.status(500).json({ success: false, error: "Error al actualizar mantenimiento" });
+    
+    // Manejar error específico de tipo de dato
+    if (err.code === '22P02') {
+      return res.status(400).json({ 
+        success: false,
+        error: "Error de tipo de datos: Verifica que el ID del técnico sea un número válido" 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: "Error interno del servidor al actualizar mantenimiento" 
+    });
   }
 });
 // FIN DEL BLOQUE 6: Actualizar mantenimiento

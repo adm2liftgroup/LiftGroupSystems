@@ -1,4 +1,3 @@
-// FALTA TERMINARLO DE DOCUMENTAR PORQUE YA ME CONFUNDÍ
 import React, { useState, useEffect } from "react";
 import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
@@ -64,7 +63,7 @@ export default function ProgramasPreventivos({ id }) {
 
   // BLOQUE 5: Cargar info del montacargas
   useEffect(() => {
-    if (!montacargasId) return; // No cargar si no hay ID válido
+    if (!montacargasId) return;
 
     const fetchMontacargasInfo = async () => {
       try {
@@ -86,7 +85,7 @@ export default function ProgramasPreventivos({ id }) {
 
   // BLOQUE 6: Cargar todos los mantenimientos
   const cargarMantenimientos = async () => {
-    if (!montacargasId) return; // No cargar si no hay ID válido
+    if (!montacargasId) return;
 
     try {
       setError("");
@@ -119,7 +118,6 @@ export default function ProgramasPreventivos({ id }) {
         }));
         setTodosEventos(todosLosEventos);
         
-        // Filtrar por año actual por defecto
         const eventosAnioActual = todosLosEventos.filter(evento => 
           evento.start.getFullYear() === anio
         );
@@ -175,29 +173,38 @@ export default function ProgramasPreventivos({ id }) {
     setMantenimientoEditando(null);
     setFormEdicion({ tipo: "", fecha: "", tecnico_id: "" });
   };
-// FIN DEL BLOQUE 9: Cerrar modal de edición
+  // FIN DEL BLOQUE 9: Cerrar modal de edición
 
-  // BLOQUE 10: Actualizar mantenimiento
+  // BLOQUE 10: Actualizar mantenimiento 
   const handleActualizarMantenimiento = async () => {
     try {
       setLoading(true);
       setError("");
+
+      const datosEnvio = {
+        tipo: formEdicion.tipo,
+        fecha: formEdicion.fecha,
+        tecnico_id: formEdicion.tecnico_id && formEdicion.tecnico_id.trim() !== "" ? 
+                    formEdicion.tecnico_id : null
+      };
+
+      console.log("Enviando datos al backend:", datosEnvio);
 
       const res = await fetch(`${API_URL}/api/mantenimientos/${mantenimientoEditando.id}`, {
         method: "PUT",
         headers: { 
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formEdicion),
+        body: JSON.stringify(datosEnvio),
       });
       
       const data = await res.json();
-      console.log("Respuesta actualización:", data);
+      console.log("Respuesta del backend:", data);
 
       if (res.ok && data.success) {
-        setSuccess("Mantenimiento actualizado correctamente");
+        setSuccess(data.message || "Mantenimiento actualizado correctamente");
         cerrarModalEdicion();
-        cargarMantenimientos(); // Recargar datos
+        cargarMantenimientos();
         
         setTimeout(() => setSuccess(""), 3000);
       } else {
@@ -236,7 +243,7 @@ export default function ProgramasPreventivos({ id }) {
 
       if (res.ok && data.success) {
         setSuccess("Mantenimiento eliminado correctamente");
-        cargarMantenimientos(); // Recargar datos
+        cargarMantenimientos();
         
         setTimeout(() => setSuccess(""), 3000);
       } else {
@@ -249,9 +256,9 @@ export default function ProgramasPreventivos({ id }) {
       setLoading(false);
     }
   };
-  // BLOQUE 12: Eliminar mantenimiento
+  // FIN DEL BLOQUE 11: Eliminar mantenimiento
 
-  // BLOQUE 13: Eliminar programa completo de un año
+  // BLOQUE 12: Eliminar programa completo de un año
   const handleEliminarProgramaAnual = async (anioEliminar) => {
     if (!isAdmin) {
       setError("Solo los administradores pueden eliminar programas");
@@ -273,7 +280,6 @@ export default function ProgramasPreventivos({ id }) {
       setLoading(true);
       setError("");
 
-      // Eliminar cada mantenimiento del año
       for (const mantenimiento of mantenimientosDelAnio) {
         await fetch(`${API_URL}/api/mantenimientos/${mantenimiento.id}`, {
           method: "DELETE",
@@ -281,7 +287,7 @@ export default function ProgramasPreventivos({ id }) {
       }
 
       setSuccess(`Programa completo del año ${anioEliminar} eliminado correctamente`);
-      cargarMantenimientos(); // Recargar datos
+      cargarMantenimientos();
       
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
@@ -291,9 +297,9 @@ export default function ProgramasPreventivos({ id }) {
       setLoading(false);
     }
   };
-// BLOQUE 13: Eliminar programa completo de un año
+  // FIN DEL BLOQUE 12: Eliminar programa completo de un año
 
-// BLOQUE 14: Crear programa anual automático - SOLO ADMIN
+  // BLOQUE 13: Crear programa anual automático - SOLO ADMIN
   const handleCrearPrograma = async () => {
     if (!isAdmin) {
       setError("Solo los administradores pueden crear programas de mantenimiento");
@@ -324,7 +330,7 @@ export default function ProgramasPreventivos({ id }) {
 
       if (res.ok && data.success) {
         setSuccess(data.message || "Programa creado exitosamente");
-        cargarMantenimientos(); // Recargar datos en lugar de recargar página
+        cargarMantenimientos();
       } else {
         setError(data.error || data.message || "Error al crear programa");
       }
@@ -335,14 +341,13 @@ export default function ProgramasPreventivos({ id }) {
       setLoading(false);
     }
   };
-  // FIN DEL BLOQUE: Funciones de edición y eliminación
+  // FIN DEL BLOQUE 13: Crear programa anual automático
 
-  // BLOQUE 15: Utilidades de vista calendario
+  // BLOQUE 14: Utilidades de vista calendario
   const añosUnicos = [...new Set(todosEventos.map(evento => evento.start.getFullYear()))].sort((a, b) => b - a);
 
-  // Estilos de eventos por tipo
   const eventStyleGetter = (event) => {
-    let backgroundColor = "#3174ad"; // Default - Preventivo
+    let backgroundColor = "#3174ad";
     if (event.tipo === "Básico") backgroundColor = "#28a745";
     if (event.tipo === "Intermedio") backgroundColor = "#ffc107";
     if (event.tipo === "Avanzado") backgroundColor = "#dc3545";
@@ -360,7 +365,6 @@ export default function ProgramasPreventivos({ id }) {
     };
   };
 
-  // Formateador personalizado para el calendario
   const formats = {
     monthHeaderFormat: (date) => moment(date).format('MMMM YYYY'),
     dayRangeHeaderFormat: ({ start, end }) => 
@@ -368,20 +372,18 @@ export default function ProgramasPreventivos({ id }) {
     dayHeaderFormat: (date) => moment(date).format('dddd, MMM D'),
   };
 
-  // Función para navegar entre meses y años
   const onNavigate = (newDate) => {
     setFechaActual(newDate);
   };
 
-  // Manejar clic en evento del calendario
   const handleSelectEvent = (event) => {
     if (isAdmin) {
       abrirModalEdicion(event);
     }
   };
-// FIN DEL BLOQUE 15: Utilidades de vista calendario
+  // FIN DEL BLOQUE 14: Utilidades de vista calendario
 
-  // Botones de navegación personalizados
+  // BLOQUE 15: Componente CustomToolbar
   const CustomToolbar = ({ label, onNavigate, onView }) => {
     return (
       <div className="rbc-toolbar flex flex-wrap items-center justify-between mb-4">
@@ -403,7 +405,7 @@ export default function ProgramasPreventivos({ id }) {
       </div>
     );
   };
-  // FIN DEL BLOQUE 15: Utilidades de vista calendario
+  // FIN DEL BLOQUE 15: Componente CustomToolbar
 
   // BLOQUE 16: Validación de ID inválido
   if (!montacargasId) {
@@ -718,12 +720,21 @@ export default function ProgramasPreventivos({ id }) {
                   ID del Técnico (Opcional)
                 </label>
                 <input
-                  type="text"
-                  value={formEdicion.tecnico_id}
+                  type="number"
+                  value={formEdicion.tecnico_id || ""}
                   onChange={(e) => setFormEdicion({...formEdicion, tecnico_id: e.target.value})}
-                  placeholder="ID del técnico asignado"
+                  placeholder="Solo números - dejar vacío si no aplica"
                   className="w-full p-2 border border-gray-300 rounded"
+                  min="1"
+                  onBlur={(e) => {
+                    if (e.target.value === "" || isNaN(parseInt(e.target.value))) {
+                      setFormEdicion({...formEdicion, tecnico_id: ""});
+                    }
+                  }}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Dejar vacío si no hay técnico asignado
+                </p>
               </div>
             </div>
             
@@ -816,6 +827,5 @@ export default function ProgramasPreventivos({ id }) {
     </div>
   );
   // FIN DEL BLOQUE 17: Return UI
-
 }
-// FIN DEL BLOQUE 1: Componente pricipal
+// FIN DEL BLOQUE 2: Componente principal
