@@ -9,6 +9,8 @@ export default function InformacionEquipo({ montacargas }) {
       <p><strong>Serie:</strong> {montacargas["Serie"]}</p>
       <p><strong>Sistema:</strong> {montacargas["Sistema"]}</p>
       <p><strong>Capacidad:</strong> {montacargas["Capacidad"]} lbs</p>
+      <p><strong>Ubicación:</strong> {montacargas["Ubicacion"]}</p>
+      <p><strong>Planta:</strong> {montacargas["Planta"]}</p>
 
     </div>
   );

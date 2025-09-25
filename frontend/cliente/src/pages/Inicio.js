@@ -35,7 +35,9 @@ export default function Inicio() {
     Modelo: "",
     Serie: "",
     Sistema: "",
-    Capacidad: ""
+    Capacidad: "",
+    Ubicacion: "",
+    Planta: ""
   });
   const [isOpen, setIsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -77,7 +79,7 @@ export default function Inicio() {
   }, []);
   // FIN DEL BLOQUE 3: Cargar montacargas desde API 
 
-  // BLOQUE 4: Filtado de montacargas 
+  // BLOQUE 4: Filtrado de montacargas 
   useEffect(() => {
     const filtered = montacargas.filter(m =>
       m.numero.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -85,9 +87,13 @@ export default function Inicio() {
       m.Modelo.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredMontacargas(filtered);
-    setCurrentPage(1); // Resetear a primera página al buscar
+    
+    // Solo resetear a primera página cuando el searchTerm cambie explícitamente
+    if (searchTerm) {
+      setCurrentPage(1);
+    }
   }, [searchTerm, montacargas]);
-  // FIN DEL BLOQUE 4: Filtado de montacargas
+  // FIN DEL BLOQUE 4: Filtrado de montacargas
 
   // BLOQUE 5: Paginación 
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -96,15 +102,35 @@ export default function Inicio() {
   const totalPages = Math.ceil(filteredMontacargas.length / itemsPerPage);
   // FIN DEL BLOQUE 5: Paginación 
 
-  // BLOQUE 6: Manejo de formulario (crear/editar)
+  // 🔥 BLOQUE 6: Funciones de manejo de formulario y eventos
   const handleChange = (e) => {
     const name = e.target.name;
     const value = e.target.value;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  const prevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const nextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  // BLOQUE 7: Manejo de formulario (crear/editar)
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Guardar el estado actual antes de la actualización
+    const currentSelected = selectedMontacargas;
+    const currentActiveTab = activeTab;
+    const currentPageBeforeEdit = currentPage;
 
     try {
       if (editingNumero) {
@@ -117,7 +143,9 @@ export default function Inicio() {
             Modelo: formData.Modelo,
             Serie: formData.Serie,
             Sistema: formData.Sistema,
-            Capacidad: formData.Capacidad
+            Capacidad: formData.Capacidad,
+            Ubicacion: formData.Ubicacion,
+            Planta: formData.Planta
           })
         });
 
@@ -126,9 +154,28 @@ export default function Inicio() {
           setMontacargas(prev =>
             prev.map(m => (String(m.numero) === String(editingNumero) ? updated : m))
           );
+          
+          // MANTENER LA SELECCIÓN ACTUAL después de editar
+          if (currentSelected && String(currentSelected.numero) === String(editingNumero)) {
+            setSelectedMontacargas(updated);
+            setActiveTab(currentActiveTab);
+            setCurrentPage(currentPageBeforeEdit);
+          }
+          
           setEditingNumero(null);
-        } else {
-          console.error("Error al actualizar montacargas");
+          setShowForm(false);
+          
+          // LIMPIAR FORMULARIO después de editar exitosamente
+          setFormData({
+            numero: "",
+            Marca: "",
+            Modelo: "",
+            Serie: "",
+            Sistema: "",
+            Capacidad: "",
+            Ubicacion: "",
+            Planta: ""
+          });
         }
       } else {
         // Crear nuevo montacargas
@@ -141,28 +188,33 @@ export default function Inicio() {
         if (res.ok) {
           const created = await res.json();
           setMontacargas(prev => [...prev, created]);
-        } else {
-          console.error("Error al crear montacargas");
+          setShowForm(false);
+          
+          // LIMPIAR FORMULARIO después de crear exitosamente
+          setFormData({
+            numero: "",
+            Marca: "",
+            Modelo: "",
+            Serie: "",
+            Sistema: "",
+            Capacidad: "",
+            Ubicacion: "",
+            Planta: ""
+          });
         }
       }
-
-      // Resetear formulario
-      setFormData({
-        numero: "",
-        Marca: "",
-        Modelo: "",
-        Serie: "",
-        Sistema: "",
-        Capacidad: ""
-      });
-      setShowForm(false);
     } catch (err) {
       console.error("Error en petición:", err);
+      
+      // En caso de error, mantener la selección
+      setSelectedMontacargas(currentSelected);
+      setActiveTab(currentActiveTab);
+      setCurrentPage(currentPageBeforeEdit);
     }
   };
-  // FIN DEL BLOQUE 6: Manejo de formulario 
+  // FIN DEL BLOQUE 7: Manejo de formulario 
 
-  // BLOQUE 7: Eliminar montacargas
+  // BLOQUE 8: Eliminar montacargas
   const handleDelete = async (numero) => {
     if (!window.confirm("¿Seguro que quieres eliminar este Montacargas?")) return;
 
@@ -187,9 +239,9 @@ export default function Inicio() {
       console.error("Error eliminando Montacargas:", err);
     }
   };
-  // FIN DEL BLOQUE 7: Eliminar montacargas
+  // FIN DEL BLOQUE 8: Eliminar montacargas
 
-  // BLOQUE 8: Preparar edición y paginación 
+  // BLOQUE 9: Preparar edición y funciones de formulario
   const handleEdit = (m) => {
     setFormData({
       numero: m.numero,
@@ -197,28 +249,51 @@ export default function Inicio() {
       Modelo: m.Modelo,
       Serie: m.Serie,
       Sistema: m.Sistema,
-      Capacidad: m.Capacidad
+      Capacidad: m.Capacidad,
+      Ubicacion: m.Ubicacion || "",
+      Planta: m.Planta || ""
     });
     setEditingNumero(m.numero);
     setShowForm(true);
   };
 
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
-  const nextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
+  // FUNCIÓN: Preparar formulario para NUEVO montacargas
+  const handleNewMontacargas = () => {
+    setFormData({
+      numero: "",
+      Marca: "",
+      Modelo: "",
+      Serie: "",
+      Sistema: "",
+      Capacidad: "",
+      Ubicacion: "",
+      Planta: ""
+    });
+    setEditingNumero(null);
+    setShowForm(true);
   };
-  
-  const prevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-  // FIN DEL BLOQUE 8: Preparar edición y paginación 
 
-  // BLOQUE 9: Return UI principal
+  // FUNCIÓN MEJORADA: Cancelar formulario
+  const handleCancelForm = () => {
+    setShowForm(false);
+    // Limpiar el formulario después de cerrar el modal
+    setTimeout(() => {
+      setFormData({
+        numero: "",
+        Marca: "",
+        Modelo: "",
+        Serie: "",
+        Sistema: "",
+        Capacidad: "",
+        Ubicacion: "",
+        Planta: ""
+      });
+      setEditingNumero(null);
+    }, 300);
+  };
+  // FIN DEL BLOQUE 9: Preparar edición y funciones de formulario
+
+  // BLOQUE 10: Return UI principal
   return (
     <div className="flex flex-col md:flex-row">
       {/* Botón de menú móvil */}
@@ -254,7 +329,7 @@ export default function Inicio() {
             className="flex items-center space-x-2 mb-4 p-2 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
             onClick={() => {
               setActiveTab("Perfil");
-              setSelectedMontacargas(null); // 🔑 Limpia montacargas para que no interfiera
+              setSelectedMontacargas(null);
               setIsMobileMenuOpen(false);
             }}
           >
@@ -312,10 +387,7 @@ export default function Inicio() {
             <div>
               {user?.rol === "admin" && (
                 <button
-                  onClick={() => {
-                    setEditingNumero(null);
-                    setShowForm(true);
-                  }}
+                  onClick={handleNewMontacargas}
                   className="flex items-center text-sm text-purple-400 hover:text-purple-600 mb-2 ml-6"
                 >
                   <FaPlus className="mr-1" /> Agregar Montacargas
@@ -502,10 +574,6 @@ export default function Inicio() {
                   Selecciona una pestaña para ver la información
                 </div>
               )}
-              
-              {!activeTab && !selectedMontacargas && activeTab === "Perfil" && (
-                <Perfil />
-              )}
             </div>
           </div>
         )}
@@ -577,6 +645,26 @@ export default function Inicio() {
                 value={formData.Capacidad}
                 onChange={handleChange}
                 placeholder="Capacidad"
+                className="w-full border p-2 mb-2 rounded"
+                required
+              />
+
+              <input
+                type="text"
+                name="Ubicacion"
+                value={formData.Ubicacion}
+                onChange={handleChange}
+                placeholder="Ubicación"
+                className="w-full border p-2 mb-2 rounded"
+                required
+              />
+
+              <input
+                type="text"
+                name="Planta"
+                value={formData.Planta}
+                onChange={handleChange}
+                placeholder="Planta"
                 className="w-full border p-2 mb-4 rounded"
                 required
               />
@@ -584,7 +672,7 @@ export default function Inicio() {
               <div className="flex justify-end">
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
+                  onClick={handleCancelForm}
                   className="mr-2 bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
                 >
                   Cancelar
@@ -602,6 +690,6 @@ export default function Inicio() {
       )}
     </div>
   );
-  // FIN DEL BLOQUE 9: Return UI principal
+  // FIN DEL BLOQUE 10: Return UI principal
 }
 // FIN DEL BLOQUE 1: Componente Inicio

@@ -6,7 +6,7 @@ const pool = require("../db");
 router.get("/", async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad" FROM "Montacargas" ORDER BY numero ASC'
+      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta" FROM "Montacargas" ORDER BY numero ASC'
     );
     res.json(result.rows);
   } catch (err) {
@@ -21,7 +21,7 @@ router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad" FROM "Montacargas" WHERE numero = $1',
+      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta" FROM "Montacargas" WHERE numero = $1',
       [id]
     );
 
@@ -40,11 +40,11 @@ router.get("/:id", async (req, res) => {
 // BLOQUE 3: Crear montacargas
 router.post("/", async (req, res) => {
   try {
-    const { numero, Marca, Modelo, Serie, Sistema, Capacidad } = req.body;
+    const { numero, Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta } = req.body;
 
     const result = await pool.query(
-      'INSERT INTO "Montacargas" (numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad") VALUES ($1, $2, $3, $4, $5, $6) RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad"',
-      [numero, Marca, Modelo, Serie, Sistema, Capacidad]
+      'INSERT INTO "Montacargas" (numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta") VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta"',
+      [numero, Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta]
     );
 
     res.status(201).json(result.rows[0]);
@@ -59,11 +59,11 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { Marca, Modelo, Serie, Sistema, Capacidad } = req.body;
+    const { Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta } = req.body;
 
     const result = await pool.query(
-      'UPDATE "Montacargas" SET "Marca"=$1, "Modelo"=$2, "Serie"=$3, "Sistema"=$4, "Capacidad"=$5 WHERE numero=$6 RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad"',
-      [Marca, Modelo, Serie, Sistema, Capacidad, id]
+      'UPDATE "Montacargas" SET "Marca"=$1, "Modelo"=$2, "Serie"=$3, "Sistema"=$4, "Capacidad"=$5, "Ubicacion"=$6, "Planta"=$7 WHERE numero=$8 RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta"',
+      [Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta, id]
     );
 
     if (result.rowCount === 0) {
