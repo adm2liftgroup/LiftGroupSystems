@@ -229,7 +229,7 @@ router.post(
       });
       
     } catch (err) {
-      console.error("🔥 Error en /login:", err);
+      console.error("Error en /login:", err);
       res.status(500).json({ error: "Error del servidor" });
     }
   }
@@ -285,5 +285,62 @@ router.get("/confirm/:token", async (req, res) => {
   }
 });
 // FIN DEL BLOQUE 8: Confirmación de correo
+
+// BLOQUE 9: Obtener mantenimientos del mes actual (GET /mantenimientos-mes-actual)
+router.get("/mantenimientos-mes-actual", requireAuth, async (req, res) => {
+  try {
+    console.log("GET /mantenimientos-mes-actual recibido por usuario ID:", req.user.id, "Rol:", req.user.rol);
+    
+    // Verificar que el usuario sea admin
+    if (req.user.rol !== 'admin') {
+      console.log("Acceso denegado. Usuario no es admin.");
+      return res.status(403).json({ error: "Acceso denegado. Solo administradores." });
+    }
+
+    // Obtener mes y año actual
+    const ahora = new Date();
+    const mesActual = ahora.getMonth() + 1; // 1-12
+    const anioActual = ahora.getFullYear();
+
+    console.log(`Buscando mantenimientos del mes ${mesActual} del año ${anioActual}`);
+
+    // Consulta para obtener mantenimientos del mes actual con información del montacargas
+    const q = await pool.query(
+      `SELECT 
+        mp.id,
+        mp.mes,
+        mp.anio,
+        mp.tipo,
+        mp.fecha,
+        mp.tecnico_id,
+        mp.creado_en,
+        m.numero as montacargas_numero,
+        m."Marca" as montacargas_marca,
+        m."Modelo" as montacargas_modelo,
+        m."Serie" as montacargas_serie,
+        m."Ubicacion" as montacargas_ubicacion,
+        m."Planta" as montacargas_planta
+       FROM mantenimientos_programados mp
+       JOIN "Montacargas" m ON mp.montacargas_id = m.numero
+       WHERE mp.mes = $1 AND mp.anio = $2
+       ORDER BY mp.fecha, m.numero`,
+      [mesActual, anioActual]
+    );
+
+    console.log(`Encontrados ${q.rows.length} mantenimientos para el mes actual`);
+
+    res.json({
+      success: true,
+      mes: mesActual,
+      anio: anioActual,
+      total: q.rows.length,
+      mantenimientos: q.rows
+    });
+  } catch (err) {
+    console.error("Error en /mantenimientos-mes-actual:", err);
+    res.status(500).json({ error: "Error del servidor al obtener mantenimientos del mes" });
+  }
+});
+// FIN DEL BLOQUE 9: Obtener mantenimientos del mes actual
 
 module.exports = router;

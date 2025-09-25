@@ -128,6 +128,140 @@ const AdminPanel = ({ users, loading, error }) => {
 };
 // FIN DEL BLOQUE 1: Panel de Administración
 
+// BLOQUE 1.5: Panel de Mantenimientos del Mes
+// Muestra todos los mantenimientos programados para el mes actual
+// Props: mantenimientos - lista de mantenimientos, loading - estado de carga, error - mensaje de error
+const MantenimientosMesPanel = ({ mantenimientos, loading, error, mes, anio }) => {
+  // Función para obtener el nombre del mes
+  const getNombreMes = (mesNum) => {
+    const meses = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+    return meses[mesNum - 1] || "Mes desconocido";
+  };
+
+  // Función para formatear la fecha
+  const formatDate = (dateString) => {
+    if (!dateString) return "No programado";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  // Función para obtener el color según el tipo de mantenimiento
+  const getTipoColor = (tipo) => {
+    switch (tipo) {
+      case "Básico": return "bg-green-100 text-green-800";
+      case "Intermedio": return "bg-yellow-100 text-yellow-800";
+      case "Avanzado": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  return (
+    <div className="p-4 md:p-8 bg-white rounded-2xl shadow-lg w-full max-w-6xl mx-auto">
+      <h2 className="text-2xl font-bold mb-2 text-gray-800">
+        Mantenimientos del Mes - {getNombreMes(mes)} {anio}
+      </h2>
+      <p className="text-gray-600 mb-6">Total de mantenimientos programados: {mantenimientos.length}</p>
+      
+      {loading ? (
+        <div className="text-center py-8">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="mt-2 text-gray-600">Cargando mantenimientos...</p>
+        </div>
+      ) : error ? (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      ) : (
+        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+          {mantenimientos.length > 0 ? (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    MONTACARGAS
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    INFORMACIÓN
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    TIPO
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    FECHA PROGRAMADA
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    UBICACIÓN
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    TÉCNICO
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {mantenimientos.map((mantenimiento) => (
+                  <tr key={mantenimiento.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold mr-3">
+                          #{mantenimiento.montacargas_numero}
+                        </div>
+                        <div>
+                          <strong>#{mantenimiento.montacargas_numero}</strong>
+                          <div className="text-sm text-gray-600">
+                            {mantenimiento.montacargas_marca} {mantenimiento.montacargas_modelo}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <div>
+                        <strong>Serie:</strong> {mantenimiento.montacargas_serie}
+                      </div>
+                      <div>
+                        <strong>Planta:</strong> {mantenimiento.montacargas_planta || "N/A"}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getTipoColor(mantenimiento.tipo)}`}>
+                        {mantenimiento.tipo}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {formatDate(mantenimiento.fecha)}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {mantenimiento.montacargas_ubicacion || "N/A"}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {mantenimiento.tecnico_id || "Por asignar"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="text-center py-8">
+              <div className="text-gray-500 text-lg mb-2">📅</div>
+              <p className="text-gray-600">No hay mantenimientos programados para este mes.</p>
+              <p className="text-sm text-gray-500 mt-1">
+                Los mantenimientos se crearán automáticamente cuando se generen los programas anuales.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+// FIN DEL BLOQUE 1.5: Panel de Mantenimientos del Mes
+
 // BLOQUE 2: Perfil
 //Vista que tiene el usuario de su perfil de usuario
 //Funcionalidades: -Cargar y mostrar datos del usuario logueado, -Controlar sesión, -Renderizar un menú lateral, -Si el usuario es admin, mostrar el AdminPanel
@@ -140,6 +274,13 @@ const Perfil = () => {
   const [redirecting, setRedirecting] = useState(false); // Estado al cerrar sesión 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // Menú móvil
   const [shouldRedirect, setShouldRedirect] = useState(false); // Redirección si no hay login
+
+  // Estados para mantenimientos del mes
+  const [mantenimientosMes, setMantenimientosMes] = useState([]);
+  const [loadingMantenimientos, setLoadingMantenimientos] = useState(false);
+  const [errorMantenimientos, setErrorMantenimientos] = useState("");
+  const [mesActual, setMesActual] = useState(new Date().getMonth() + 1);
+  const [anioActual, setAnioActual] = useState(new Date().getFullYear());
 
   // Estados para admin
   const [users, setUsers] = useState([]); // lista de usuarios (solo admin)
@@ -277,6 +418,51 @@ const Perfil = () => {
   }, [activeTab, isAdmin, fetchUsers]);
   // FIN DEL BLOQUE 7: Fetch de usuarios (solo admin)
 
+  // BLOQUE 7.5: Fetch de mantenimientos del mes (solo admin)
+const fetchMantenimientosMes = useCallback(async () => {
+  if (!isAdmin) return;
+
+  setLoadingMantenimientos(true);
+  setErrorMantenimientos("");
+
+  try {
+    const token = localStorage.getItem("token");
+    if (!token || token === "null") {
+      setErrorMantenimientos("No hay token válido");
+      setLoadingMantenimientos(false);
+      return;
+    }
+
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/mantenimientos-mes-actual`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await response.json();
+    console.log("Datos de /auth/mantenimientos-mes-actual:", data);
+    
+    if (response.ok && data.success) {
+      setMantenimientosMes(data.mantenimientos || []);
+      setMesActual(data.mes);
+      setAnioActual(data.anio);
+    } else {
+      setErrorMantenimientos(data.error || "Error al cargar mantenimientos del mes");
+    }
+  } catch (err) {
+    console.error("Error fetching mantenimientos del mes:", err);
+    setErrorMantenimientos("Error de conexión al cargar mantenimientos");
+  } finally {
+    setLoadingMantenimientos(false);
+  }
+}, [isAdmin]);
+
+// Hook para cargar mantenimientos cuando admin entra al panel
+useEffect(() => {
+  if (activeTab === "mantenimientos-mes" && isAdmin) {
+    fetchMantenimientosMes();
+  }
+}, [activeTab, isAdmin, fetchMantenimientosMes]);
+// FIN DEL BLOQUE 7.5: Fetch de mantenimientos del mes
+
   // BLOQUE 8: Renderizado
   // Se encarga de mostar diferentes vistas según el estado: -Pantalla de carga, -Pantalla de logout/redirección, -Menú responsive (mobile/desktop),
   // -Perfil normal (usuario común), -Panel admin (para rol "amdmin")
@@ -318,43 +504,44 @@ const Perfil = () => {
   // FIN DEL BLOQUE 8: Renderizado
 
   // BLOQUE 9: Return UI principal
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
-      {/* Mobile Menu Button */}
-      <div className="md:hidden bg-slate-900 text-white p-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-xl font-bold">Panel de Usuario</h1>
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-md text-white"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {mobileMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
-        </div>
+return (
+  <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
+    {/* Mobile Menu Button */}
+    <div className="md:hidden bg-slate-900 text-white p-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-xl font-bold">Panel de Usuario</h1>
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="p-2 rounded-md text-white"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {mobileMenuOpen ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            )}
+          </svg>
+        </button>
       </div>
+    </div>
 
-      {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden bg-slate-800 text-white p-4">
-          <nav className="space-y-2">
-            <button
-              onClick={() => {
-                setActiveTab("perfil");
-                setMobileMenuOpen(false);
-              }}
-              className={`w-full text-left flex items-center space-x-3 p-3 rounded-xl font-medium transition-colors duration-200 ${
-                activeTab === "perfil" ? "bg-slate-700 text-white" : "text-gray-300 hover:bg-slate-700"
-              }`}
-            >
-              <span>Mi Perfil</span>
-            </button>
-            {isAdmin && (
+    {/* Mobile Menu */}
+    {mobileMenuOpen && (
+      <div className="md:hidden bg-slate-800 text-white p-4">
+        <nav className="space-y-2">
+          <button
+            onClick={() => {
+              setActiveTab("perfil");
+              setMobileMenuOpen(false);
+            }}
+            className={`w-full text-left flex items-center space-x-3 p-3 rounded-xl font-medium transition-colors duration-200 ${
+              activeTab === "perfil" ? "bg-slate-700 text-white" : "text-gray-300 hover:bg-slate-700"
+            }`}
+          >
+            <span>Mi Perfil</span>
+          </button>
+          {isAdmin && (
+            <>
               <button
                 onClick={() => {
                   setActiveTab("admin-panel");
@@ -364,107 +551,141 @@ const Perfil = () => {
                   activeTab === "admin-panel" ? "bg-slate-700 text-white" : "text-gray-300 hover:bg-slate-700"
                 }`}
               >
-                <span>Panel de Administración</span>
+                <span>Gestión de Usuarios</span>
               </button>
-            )}
-          </nav>
-        </div>
-      )}
+              <button
+                onClick={() => {
+                  setActiveTab("mantenimientos-mes");
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full text-left flex items-center space-x-3 p-3 rounded-xl font-medium transition-colors duration-200 ${
+                  activeTab === "mantenimientos-mes" ? "bg-slate-700 text-white" : "text-gray-300 hover:bg-slate-700"
+                }`}
+              >
+                <span>Mantenimientos del Mes</span>
+              </button>
+            </>
+          )}
+        </nav>
+      </div>
+    )}
 
-      {/* Sidebar Desktop */}
-      <div className="hidden md:flex flex-col bg-slate-900 text-white w-64 p-6 shadow-xl">
-        <h1 className="text-xl font-bold mb-8">Panel de Usuario</h1>
-        <nav className="flex-1 space-y-4">
-          <button
-            onClick={() => setActiveTab("perfil")}
-            className={`w-full text-left flex items-center space-x-3 p-3 rounded-xl font-medium transition-colors duration-200 ${
-              activeTab === "perfil" ? "bg-slate-700 text-white" : "text-gray-300 hover:bg-slate-800"
-            }`}
-          >
-            <span>Mi Perfil</span>
-          </button>
-          {isAdmin && (
+    {/* Sidebar Desktop */}
+    <div className="hidden md:flex flex-col bg-slate-900 text-white w-64 p-6 shadow-xl">
+      <h1 className="text-xl font-bold mb-8">Panel de Usuario</h1>
+      <nav className="flex-1 space-y-4">
+        <button
+          onClick={() => setActiveTab("perfil")}
+          className={`w-full text-left flex items-center space-x-3 p-3 rounded-xl font-medium transition-colors duration-200 ${
+            activeTab === "perfil" ? "bg-slate-700 text-white" : "text-gray-300 hover:bg-slate-800"
+          }`}
+        >
+          <span>Mi Perfil</span>
+        </button>
+        {isAdmin && (
+          <>
             <button
               onClick={() => setActiveTab("admin-panel")}
               className={`w-full text-left flex items-center space-x-3 p-3 rounded-xl font-medium transition-colors duration-200 ${
                 activeTab === "admin-panel" ? "bg-slate-700 text-white" : "text-gray-300 hover:bg-slate-800"
               }`}
             >
-              <span>Panel de Administración</span>
+              <span>Gestión de Usuarios</span>
             </button>
-          )}
-        </nav>
-      </div>
-
-      {/* Contenido Principal */}
-      <main className="flex-1 p-4 md:p-6">
-        {!isAdmin ? (
-          // Perfil para usuarios normales
-          <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 w-full max-w-md text-center">
-              <h1 className="text-2xl font-bold text-gray-800 mb-6">Mi Perfil</h1>
-              
-              <div className="w-20 h-20 md:w-24 md:h-24 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl md:text-3xl font-bold mx-auto mb-4">
-                {userData?.nombre ? userData.nombre.charAt(0).toUpperCase() : "U"}
-              </div>
-              
-              <h2 className="text-xl font-bold text-gray-800 mb-2">{userData?.nombre || "Usuario"}</h2>
-              <p className="text-gray-600 mb-4">{userData?.email}</p>
-              
-              <div className="mb-6">
-                <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                  Usuario
-                </span>
-              </div>
-
-              <button 
-                onClick={handleLogout}
-                className="w-full bg-red-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-red-700 transition-colors"
-              >
-                Cerrar Sesión
-              </button>
-            </div>
-          </div>
-        ) : (
-          // Para administradores
-          <>
-            {activeTab === "perfil" ? (
-              <div className="flex flex-col items-center justify-center min-h-[60vh]">
-                <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 w-full max-w-md text-center">
-                  <h1 className="text-2xl font-bold text-gray-800 mb-6">Mi Perfil</h1>
-                  
-                  <div className="w-20 h-20 md:w-24 md:h-24 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl md:text-3xl font-bold mx-auto mb-4">
-                    {userData?.nombre ? userData.nombre.charAt(0).toUpperCase() : "U"}
-                  </div>
-                  
-                  <h2 className="text-xl font-bold text-gray-800 mb-2">{userData?.nombre || "Usuario"}</h2>
-                  <p className="text-gray-600 mb-4">{userData?.email}</p>
-                  
-                  <div className="mb-6">
-                    <span className="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                      Administrador
-                    </span>
-                  </div>
-
-                  <button 
-                    onClick={handleLogout}
-                    className="w-full bg-red-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-red-700 transition-colors"
-                  >
-                    Cerrar Sesión
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800 mb-4">Panel de Administración</h1>
-                <AdminPanel users={users} loading={loadingUsers} error={errorUsers} />
-              </div>
-            )}
+            <button
+              onClick={() => setActiveTab("mantenimientos-mes")}
+              className={`w-full text-left flex items-center space-x-3 p-3 rounded-xl font-medium transition-colors duration-200 ${
+                activeTab === "mantenimientos-mes" ? "bg-slate-700 text-white" : "text-gray-300 hover:bg-slate-800"
+              }`}
+            >
+              <span>Mantenimientos del Mes</span>
+            </button>
           </>
         )}
-      </main>
+      </nav>
     </div>
-  );
+
+    {/* Contenido Principal */}
+    <main className="flex-1 p-4 md:p-6">
+      {!isAdmin ? (
+        // Perfil para usuarios normales
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+          <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 w-full max-w-md text-center">
+            <h1 className="text-2xl font-bold text-gray-800 mb-6">Mi Perfil</h1>
+            
+            <div className="w-20 h-20 md:w-24 md:h-24 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl md:text-3xl font-bold mx-auto mb-4">
+              {userData?.nombre ? userData.nombre.charAt(0).toUpperCase() : "U"}
+            </div>
+            
+            <h2 className="text-xl font-bold text-gray-800 mb-2">{userData?.nombre || "Usuario"}</h2>
+            <p className="text-gray-600 mb-4">{userData?.email}</p>
+            
+            <div className="mb-6">
+              <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                Usuario
+              </span>
+            </div>
+
+            <button 
+              onClick={handleLogout}
+              className="w-full bg-red-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-red-700 transition-colors"
+            >
+              Cerrar Sesión
+            </button>
+          </div>
+        </div>
+      ) : (
+        // Para administradores
+        <>
+          {activeTab === "perfil" ? (
+            <div className="flex flex-col items-center justify-center min-h-[60vh]">
+              <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 w-full max-w-md text-center">
+                <h1 className="text-2xl font-bold text-gray-800 mb-6">Mi Perfil</h1>
+                
+                <div className="w-20 h-20 md:w-24 md:h-24 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl md:text-3xl font-bold mx-auto mb-4">
+                  {userData?.nombre ? userData.nombre.charAt(0).toUpperCase() : "U"}
+                </div>
+                
+                <h2 className="text-xl font-bold text-gray-800 mb-2">{userData?.nombre || "Usuario"}</h2>
+                <p className="text-gray-600 mb-4">{userData?.email}</p>
+                
+                <div className="mb-6">
+                  <span className="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                    Administrador
+                  </span>
+                </div>
+
+                <button 
+                  onClick={handleLogout}
+                  className="w-full bg-red-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-red-700 transition-colors"
+                >
+                  Cerrar Sesión
+                </button>
+              </div>
+            </div>
+          ) : activeTab === "admin-panel" ? (
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800 mb-4">Panel de Administración</h1>
+              <AdminPanel users={users} loading={loadingUsers} error={errorUsers} />
+            </div>
+          ) : activeTab === "mantenimientos-mes" ? (
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800 mb-4">Mantenimientos del Mes</h1>
+              <MantenimientosMesPanel 
+                mantenimientos={mantenimientosMes} 
+                loading={loadingMantenimientos} 
+                error={errorMantenimientos}
+                mes={mesActual}
+                anio={anioActual}
+              />
+            </div>
+          ) : null}
+        </>
+      )}
+    </main>
+  </div>
+);
+
 };
 // FIN DEL BLOQUE 9: Return UI principal
 export default Perfil;
