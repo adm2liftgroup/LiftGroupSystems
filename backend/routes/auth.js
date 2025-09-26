@@ -286,25 +286,16 @@ router.get("/confirm/:token", async (req, res) => {
 });
 // FIN DEL BLOQUE 8: Confirmación de correo
 
-// BLOQUE 9: Obtener mantenimientos del mes actual (GET /mantenimientos-mes-actual)
+// BLOQUE 9: Obtener mantenimientos del mes actual (GET /mantenimientos-mes-actual) - ACTUALIZADO
 router.get("/mantenimientos-mes-actual", requireAuth, async (req, res) => {
   try {
-    console.log("GET /mantenimientos-mes-actual recibido por usuario ID:", req.user.id, "Rol:", req.user.rol);
-    
-    // Verificar que el usuario sea admin
     if (req.user.rol !== 'admin') {
-      console.log("Acceso denegado. Usuario no es admin.");
       return res.status(403).json({ error: "Acceso denegado. Solo administradores." });
     }
 
-    // Obtener mes y año actual
-    const ahora = new Date();
-    const mesActual = ahora.getMonth() + 1; // 1-12
-    const anioActual = ahora.getFullYear();
+    const mesActual = new Date().getMonth() + 1;
+    const anioActual = new Date().getFullYear();
 
-    console.log(`Buscando mantenimientos del mes ${mesActual} del año ${anioActual}`);
-
-    // Consulta para obtener mantenimientos del mes actual con información del montacargas
     const q = await pool.query(
       `SELECT 
         mp.id,
@@ -319,15 +310,15 @@ router.get("/mantenimientos-mes-actual", requireAuth, async (req, res) => {
         m."Modelo" as montacargas_modelo,
         m."Serie" as montacargas_serie,
         m."Ubicacion" as montacargas_ubicacion,
-        m."Planta" as montacargas_planta
+        m."Planta" as montacargas_planta,
+        u.nombre as tecnico_nombre
        FROM mantenimientos_programados mp
        JOIN "Montacargas" m ON mp.montacargas_id = m.numero
+       LEFT JOIN "Usuarios" u ON mp.tecnico_id = u.id
        WHERE mp.mes = $1 AND mp.anio = $2
        ORDER BY mp.fecha, m.numero`,
       [mesActual, anioActual]
     );
-
-    console.log(`Encontrados ${q.rows.length} mantenimientos para el mes actual`);
 
     res.json({
       success: true,
@@ -342,5 +333,217 @@ router.get("/mantenimientos-mes-actual", requireAuth, async (req, res) => {
   }
 });
 // FIN DEL BLOQUE 9: Obtener mantenimientos del mes actual
+
+// BLOQUE 10: Obtener lista de técnicos (GET /tecnicos) - USANDO TABLA USUARIOS
+router.get("/tecnicos", requireAuth, async (req, res) => {
+  try {
+    if (req.user.rol !== 'admin') {
+      return res.status(403).json({ error: "Acceso denegado. Solo administradores." });
+    }
+
+    // Obtenemos todos los usuarios con rol 'user' como técnicos
+    const q = await pool.query(
+      'SELECT id, nombre, email, rol, email_verified, created_at FROM "Usuarios" WHERE rol = $1 AND email_verified = true ORDER BY nombre',
+      ['user']  // Los técnicos son usuarios con rol 'user'
+    );
+
+    res.json({
+      success: true,
+      tecnicos: q.rows
+    });
+  } catch (err) {
+    console.error("Error en /tecnicos:", err);
+    res.status(500).json({ error: "Error del servidor al obtener técnicos" });
+  }
+});
+
+// BLOQUE 11: Asignar técnico a mantenimiento (PUT /asignar-tecnico)
+router.put("/asignar-tecnico", requireAuth, async (req, res) => {
+  try {
+    if (req.user.rol !== 'admin') {
+      return res.status(403).json({ error: "Acceso denegado. Solo administradores." });
+    }
+
+    const { mantenimientoId, tecnicoId } = req.body;
+    console.log("📋 Asignando técnico:", { mantenimientoId, tecnicoId });
+
+    if (!mantenimientoId || !tecnicoId) {
+      return res.status(400).json({ error: "ID de mantenimiento y técnico son requeridos" });
+    }
+
+    // Verificar que el mantenimiento existe
+    const mantenimientoCheck = await pool.query(
+      `SELECT mp.*, m."Marca", m."Modelo", m.numero 
+       FROM mantenimientos_programados mp 
+       JOIN "Montacargas" m ON mp.montacargas_id = m.numero 
+       WHERE mp.id = $1`,
+      [mantenimientoId]
+    );
+
+    if (mantenimientoCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Mantenimiento no encontrado" });
+    }
+
+    // Verificar que el técnico (usuario) existe y está verificado
+    const tecnicoCheck = await pool.query(
+      'SELECT id, nombre, email FROM "Usuarios" WHERE id = $1 AND rol = $2 AND email_verified = true',
+      [tecnicoId, 'user']
+    );
+
+    if (tecnicoCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Técnico no encontrado o no verificado" });
+    }
+
+    const mantenimiento = mantenimientoCheck.rows[0];
+    const tecnico = tecnicoCheck.rows[0];
+    
+    console.log("🔧 Mantenimiento encontrado:", mantenimiento.numero);
+    console.log("👤 Técnico encontrado:", tecnico.nombre, tecnico.email);
+
+    // Actualizar el mantenimiento con el técnico asignado
+    const updateResult = await pool.query(
+      'UPDATE mantenimientos_programados SET tecnico_id = $1 WHERE id = $2 RETURNING *',
+      [tecnicoId, mantenimientoId]
+    );
+
+    console.log("✅ Mantenimiento actualizado en BD");
+
+    // Enviar correo de notificación al técnico
+    const emailEnviado = await enviarNotificacionTecnico(tecnico, mantenimiento);
+    
+    if (emailEnviado) {
+      console.log("✅ Notificación por correo enviada exitosamente");
+      res.json({
+        success: true,
+        message: "Técnico asignado correctamente y notificación enviada",
+        mantenimiento: updateResult.rows[0]
+      });
+    } else {
+      console.log("⚠️ Técnico asignado pero falló el envío de correo");
+      res.json({
+        success: true,
+        message: "Técnico asignado correctamente, pero hubo un problema al enviar la notificación por correo",
+        mantenimiento: updateResult.rows[0]
+      });
+    }
+
+  } catch (err) {
+    console.error("❌ Error en /asignar-tecnico:", err);
+    res.status(500).json({ error: "Error del servidor al asignar técnico" });
+  }
+});
+
+// BLOQUE 12: Función para enviar notificación al técnico
+async function enviarNotificacionTecnico(tecnico, mantenimiento) {
+  try {
+    console.log("📧 Intentando enviar correo de notificación a:", tecnico.email);
+    
+    // USAR EXACTAMENTE LA MISMA CONFIGURACIÓN que sendVerificationEmail
+    let transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: false,
+      auth: { 
+        user: process.env.SMTP_USER, 
+        pass: process.env.SMTP_PASS 
+      },
+    });
+
+    const fechaFormateada = new Date(mantenimiento.fecha).toLocaleDateString('es-ES', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    // Usar el MISMO formato de "from" que en sendVerificationEmail
+    const mailOptions = {
+      from: `"LiftGroup" <adm2liftgroup@gmail.com>`, // ← IGUAL que en verificación
+      to: tecnico.email,
+      subject: `Nueva asignación de mantenimiento - Montacargas #${mantenimiento.numero}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Nueva Asignación de Mantenimiento</h2>
+          <p>Hola <strong>${tecnico.nombre}</strong>,</p>
+          
+          <p>Se te ha asignado un nuevo mantenimiento:</p>
+          
+          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
+            <h3>Detalles del Mantenimiento</h3>
+            <p><strong>Montacargas:</strong> #${mantenimiento.numero}</p>
+            <p><strong>Marca/Modelo:</strong> ${mantenimiento.Marca} ${mantenimiento.Modelo}</p>
+            <p><strong>Tipo:</strong> ${mantenimiento.tipo}</p>
+            <p><strong>Fecha:</strong> ${fechaFormateada}</p>
+          </div>
+          
+          <p>Por favor, inicia sesión en el sistema para confirmar.</p>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("✅ Correo de notificación enviado al técnico:", tecnico.email);
+    console.log("📨 ID del mensaje:", info.messageId);
+    return true;
+    
+  } catch (error) {
+    console.error("❌ Error enviando correo al técnico:", error);
+    
+    // Log detallado del error
+    if (error.response) {
+      console.error("Código de error SMTP:", error.responseCode);
+      console.error("Respuesta SMTP:", error.response);
+    }
+    
+    return false;
+  }
+}
+// BLOQUE 13: Obtener mantenimientos asignados a un técnico (GET /mis-mantenimientos)
+router.get("/mis-mantenimientos", requireAuth, async (req, res) => {
+  try {
+    // Verificar que el usuario es un técnico (rol 'user')
+    if (req.user.rol !== 'user') {
+      return res.status(403).json({ error: "No tienes asignaciones de mantenimiento" });
+    }
+
+    const tecnicoId = req.user.id;
+    const mesActual = new Date().getMonth() + 1;
+    const anioActual = new Date().getFullYear();
+
+    const q = await pool.query(
+      `SELECT 
+        mp.id,
+        mp.mes,
+        mp.anio,
+        mp.tipo,
+        mp.fecha,
+        mp.creado_en,
+        m.numero as montacargas_numero,
+        m."Marca" as montacargas_marca,
+        m."Modelo" as montacargas_modelo,
+        m."Serie" as montacargas_serie,
+        m."Ubicacion" as montacargas_ubicacion,
+        m."Planta" as montacargas_planta,
+        u.nombre as tecnico_nombre
+       FROM mantenimientos_programados mp
+       JOIN "Montacargas" m ON mp.montacargas_id = m.numero
+       JOIN "Usuarios" u ON mp.tecnico_id = u.id
+       WHERE mp.tecnico_id = $1 AND mp.mes = $2 AND mp.anio = $3
+       ORDER BY mp.fecha`,
+      [tecnicoId, mesActual, anioActual]
+    );
+
+    res.json({
+      success: true,
+      tecnico: { id: tecnicoId, nombre: req.user.nombre },
+      total: q.rows.length,
+      mantenimientos: q.rows
+    });
+
+  } catch (err) {
+    console.error("Error en /mis-mantenimientos:", err);
+    res.status(500).json({ error: "Error del servidor al obtener mantenimientos asignados" });
+  }
+});
 
 module.exports = router;
