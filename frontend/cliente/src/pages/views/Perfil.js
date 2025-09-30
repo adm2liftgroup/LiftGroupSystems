@@ -1229,7 +1229,7 @@ return (
             <h2 className="text-xl font-bold text-gray-800 mb-2">{userData?.nombre || "Usuario"}</h2>
             <p className="text-gray-600 mb-4">{userData?.email}</p>
             
-            <div className="mb-6">
+            <div className="mb-6"> 
               <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
                 Usuario
               </span>
@@ -1245,7 +1245,7 @@ return (
         </div>
       )}
     </main>
-  </div>
+  </div> 
 );
 };
 

@@ -1,12 +1,46 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configurar multer para almacenamiento de archivos
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = 'uploads/montacargas';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'montacargas-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB límite
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt'];
+    const fileExt = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes.includes(fileExt)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos PDF, Word y texto'));
+    }
+  }
+});
 
 // BLOQUE 1: Obtener todos los montacargas
 router.get("/", async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta" FROM "Montacargas" ORDER BY numero ASC'
+      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional" FROM "Montacargas" ORDER BY numero ASC'
     );
     res.json(result.rows);
   } catch (err) {
@@ -14,14 +48,13 @@ router.get("/", async (req, res) => {
     res.status(500).json({ error: "Error al obtener Montacargas" });
   }
 });
-// FIN DEL BLOQUE 1: Obtener todos los montacargas
 
 // BLOQUE 2: Obtener un montacargas específico por ID
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta" FROM "Montacargas" WHERE numero = $1',
+      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional" FROM "Montacargas" WHERE numero = $1',
       [id]
     );
 
@@ -35,16 +68,21 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Error al obtener Montacargas" });
   }
 });
-// FIN DEL BLOQUE 2: Obtener un montacargas específico por ID
 
 // BLOQUE 3: Crear montacargas
-router.post("/", async (req, res) => {
+router.post("/", upload.fields([
+  { name: 'documento_pedimento', maxCount: 1 },
+  { name: 'documento_adicional', maxCount: 1 }
+]), async (req, res) => {
   try {
     const { numero, Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta } = req.body;
+    
+    const documentoPedimento = req.files?.documento_pedimento?.[0]?.filename || null;
+    const documentoAdicional = req.files?.documento_adicional?.[0]?.filename || null;
 
     const result = await pool.query(
-      'INSERT INTO "Montacargas" (numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta") VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta"',
-      [numero, Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta]
+      'INSERT INTO "Montacargas" (numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional"',
+      [numero, Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta, documentoPedimento, documentoAdicional]
     );
 
     res.status(201).json(result.rows[0]);
@@ -53,35 +91,103 @@ router.post("/", async (req, res) => {
     res.status(500).json({ error: "Error al crear Montacargas" });
   }
 });
-// FIN DEL BLOQUE 3: Crear montacargas
 
-// BLOQUE 4: Actualizar montacargas
-router.put("/:id", async (req, res) => {
+// BLOQUE 4: Actualizar montacargas - CORREGIDO
+router.put("/:id", upload.fields([
+  { name: 'documento_pedimento', maxCount: 1 },
+  { name: 'documento_adicional', maxCount: 1 }
+]), async (req, res) => {
   try {
+    console.log('=== INICIANDO ACTUALIZACIÓN ===');
+    console.log('Params:', req.params);
+    console.log('Body fields:', req.body);
+    console.log('Files received:', req.files);
+
     const { id } = req.params;
     const { Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta } = req.body;
+    
+    // Primero obtener el montacargas actual
+    const currentResult = await pool.query(
+      'SELECT "documento_pedimento", "documento_adicional" FROM "Montacargas" WHERE numero=$1',
+      [id]
+    );
+
+    if (currentResult.rows.length === 0) {
+      return res.status(404).json({ error: "Montacargas no encontrado" });
+    }
+
+    let documentoPedimento = currentResult.rows[0].documento_pedimento;
+    let documentoAdicional = currentResult.rows[0].documento_adicional;
+
+    console.log('Documentos actuales - pedimento:', documentoPedimento, 'adicional:', documentoAdicional);
+
+    // Actualizar si se suben nuevos archivos
+    if (req.files?.documento_pedimento) {
+      // Eliminar archivo anterior si existe
+      if (documentoPedimento) {
+        const oldFilePath = path.join(__dirname, '../uploads/montacargas', documentoPedimento);
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+          console.log('Archivo anterior de pedimento eliminado:', documentoPedimento);
+        }
+      }
+      documentoPedimento = req.files.documento_pedimento[0].filename;
+      console.log('Nuevo archivo de pedimento:', documentoPedimento);
+    }
+    
+    if (req.files?.documento_adicional) {
+      // Eliminar archivo anterior si existe
+      if (documentoAdicional) {
+        const oldFilePath = path.join(__dirname, '../uploads/montacargas', documentoAdicional);
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+          console.log('Archivo anterior adicional eliminado:', documentoAdicional);
+        }
+      }
+      documentoAdicional = req.files.documento_adicional[0].filename;
+      console.log('Nuevo archivo adicional:', documentoAdicional);
+    }
+
+    console.log('Valores finales - pedimento:', documentoPedimento, 'adicional:', documentoAdicional);
 
     const result = await pool.query(
-      'UPDATE "Montacargas" SET "Marca"=$1, "Modelo"=$2, "Serie"=$3, "Sistema"=$4, "Capacidad"=$5, "Ubicacion"=$6, "Planta"=$7 WHERE numero=$8 RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta"',
-      [Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta, id]
+      'UPDATE "Montacargas" SET "Marca"=$1, "Modelo"=$2, "Serie"=$3, "Sistema"=$4, "Capacidad"=$5, "Ubicacion"=$6, "Planta"=$7, "documento_pedimento"=$8, "documento_adicional"=$9 WHERE numero=$10 RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional"',
+      [Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta, documentoPedimento, documentoAdicional, id]
     );
+
+    console.log('Resultado de la consulta UPDATE:', result.rows[0]);
 
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Montacargas no encontrado" });
     }
 
-    res.json(result.rows[0]);
+    console.log('=== ACTUALIZACIÓN EXITOSA ===');
+    res.json({
+      success: true,
+      ...result.rows[0]
+    });
+
   } catch (err) {
     console.error("PUT /api/montacargas/:id error:", err);
-    res.status(500).json({ error: "Error al actualizar Montacargas" });
+    console.error("Error detallado:", err.message);
+    console.error("Stack trace:", err.stack);
+    res.status(500).json({ 
+      error: "Error al actualizar Montacargas",
+      details: err.message 
+    });
   }
 });
-// FIN DEL BLOQUE 4: Actualizar montacargas
 
 // BLOQUE 5: Eliminar montacargas
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Obtener información de archivos antes de eliminar
+    const currentMontacargas = await pool.query(
+      'SELECT "documento_pedimento", "documento_adicional" FROM "Montacargas" WHERE numero=$1',
+      [id]
+    );
 
     const result = await pool.query(
       'DELETE FROM "Montacargas" WHERE numero=$1 RETURNING numero',
@@ -92,12 +198,115 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ error: "Montacargas no encontrado" });
     }
 
-    res.json({ message: "Montacargas eliminado correctamente", numero: result.rows[0].numero });
+    // Eliminar archivos físicos si existen
+    if (currentMontacargas.rows[0]?.documento_pedimento) {
+      const filePath = path.join(__dirname, '../uploads/montacargas', currentMontacargas.rows[0].documento_pedimento);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    if (currentMontacargas.rows[0]?.documento_adicional) {
+      const filePath = path.join(__dirname, '../uploads/montacargas', currentMontacargas.rows[0].documento_adicional);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    res.json({ 
+      success: true,
+      message: "Montacargas eliminado correctamente", 
+      numero: result.rows[0].numero 
+    });
   } catch (err) {
     console.error("DELETE /api/montacargas/:id error:", err);
     res.status(500).json({ error: "Error al eliminar Montacargas" });
   }
 });
-// FIN DEL BLOQUE 5: Eliminar montacargas
+
+// BLOQUE 6: Descargar documento
+router.get("/documento/:filename", (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filePath = path.join(__dirname, '../uploads/montacargas', filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "Archivo no encontrado" });
+    }
+
+    res.download(filePath);
+  } catch (err) {
+    console.error("GET /api/montacargas/documento/:filename error:", err);
+    res.status(500).json({ error: "Error al descargar archivo" });
+  }
+});
+
+// BLOQUE 7: Eliminar documento - CORREGIDO
+router.delete("/documento/:id/:tipo", async (req, res) => {
+  try {
+    console.log('=== INICIANDO ELIMINACIÓN DE DOCUMENTO ===');
+    console.log('ID:', req.params.id, 'Tipo:', req.params.tipo);
+
+    const { id, tipo } = req.params;
+    
+    let updateField = '';
+    
+    if (tipo === 'pedimento') {
+      updateField = 'documento_pedimento';
+    } else if (tipo === 'adicional') {
+      updateField = 'documento_adicional';
+    } else {
+      return res.status(400).json({ error: "Tipo de documento inválido" });
+    }
+
+    // Obtener el nombre del archivo antes de eliminarlo
+    const current = await pool.query(
+      `SELECT "${updateField}" FROM "Montacargas" WHERE numero=$1`,
+      [id]
+    );
+
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: "Montacargas no encontrado" });
+    }
+
+    const filename = current.rows[0][updateField];
+    console.log('Archivo a eliminar:', filename);
+
+    if (filename) {
+      const filePath = path.join(__dirname, '../uploads/montacargas', filename);
+      // Eliminar archivo físico
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log('Archivo físico eliminado:', filePath);
+      } else {
+        console.log('Archivo físico no encontrado, pero continuando...');
+      }
+    }
+
+    // Actualizar base de datos
+    const result = await pool.query(
+      `UPDATE "Montacargas" SET "${updateField}"=NULL WHERE numero=$1 RETURNING numero, "${updateField}"`,
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Montacargas no encontrado" });
+    }
+
+    console.log('=== ELIMINACIÓN EXITOSA ===');
+    res.json({ 
+      success: true,
+      message: "Documento eliminado correctamente" 
+    });
+
+  } catch (err) {
+    console.error("DELETE /api/montacargas/documento/:id/:tipo error:", err);
+    console.error("Error detallado:", err.message);
+    res.status(500).json({ 
+      error: "Error al eliminar documento",
+      details: err.message 
+    });
+  }
+});
 
 module.exports = router;

@@ -4,6 +4,7 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const path = require("path");
 require("dotenv").config();
 
 // Inicialización
@@ -14,6 +15,7 @@ app.use(helmet());
 
 // Body parser + cookies
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // ← AÑADIR ESTO
 app.use(cookieParser());
 
 // CORS permite PC y celular
@@ -32,6 +34,9 @@ app.use(cors({
   },
   credentials: true, // permite cookies
 }));
+
+// SERVIR ARCHIVOS ESTÁTICOS - AÑADIR ESTO ↓
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Rate limiting
 const limiter = rateLimit({ 
