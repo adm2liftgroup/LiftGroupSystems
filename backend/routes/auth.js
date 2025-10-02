@@ -517,6 +517,7 @@ router.get("/mis-mantenimientos", requireAuth, async (req, res) => {
         mp.anio,
         mp.tipo,
         mp.fecha,
+        mp.status, 
         mp.creado_en,
         m.numero as montacargas_numero,
         m."Marca" as montacargas_marca,
