@@ -560,7 +560,9 @@ export default function Inicio() {
               {activeTab === "Información del equipo" && (
                 <InformacionEquipo montacargas={selectedMontacargas} />
               )}
-              {activeTab === "Servicios Preventivos Historial" && <ServiciosHistorial />}
+              {activeTab === "Servicios Preventivos Historial" && (
+                <ServiciosHistorial montacargas={selectedMontacargas} />
+              )}
               {activeTab === "Inversión Inicial" && <InversionInicial />}
               {activeTab === "Inversión Habilitar" && <InversionHabilitar />}
               {activeTab === "Refacciones con Cargo" && <RefaccionesCargo />}
