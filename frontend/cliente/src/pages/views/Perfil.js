@@ -319,7 +319,16 @@ const AsignacionTecnicosPanel = ({
   );
 };
 // BLOQUE 1.7: Panel de Técnico (ACTUALIZADO con descarga de checklist)
-const PanelTecnico = ({ mantenimientos, loading, error, tecnico, onDescargarChecklist }) => {
+const PanelTecnico = ({ 
+  mantenimientos, 
+  loading, 
+  error, 
+  tecnico, 
+  onDescargarChecklist,
+  onMarcarCompletado 
+}) => {
+  const [completando, setCompletando] = useState(null);
+
   const getNombreMes = (mesNum) => {
     const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     return meses[mesNum - 1] || "Mes desconocido";
@@ -336,6 +345,15 @@ const PanelTecnico = ({ mantenimientos, loading, error, tecnico, onDescargarChec
 
   const mesActual = new Date().getMonth() + 1;
   const anioActual = new Date().getFullYear();
+
+  const handleMarcarCompletado = async (mantenimientoId) => {
+    setCompletando(mantenimientoId);
+    try {
+      await onMarcarCompletado(mantenimientoId);
+    } finally {
+      setCompletando(null);
+    }
+  };
 
   return (
     <div className="p-4 md:p-8 bg-white rounded-2xl shadow-lg w-full max-w-6xl mx-auto">
@@ -370,6 +388,17 @@ const PanelTecnico = ({ mantenimientos, loading, error, tecnico, onDescargarChec
                   <p><strong>Ubicación:</strong> {mantenimiento.montacargas_ubicacion || "N/A"}</p>
                   <p><strong>Planta:</strong> {mantenimiento.montacargas_planta || "N/A"}</p>
                   <p><strong>Fecha:</strong> {new Date(mantenimiento.fecha).toLocaleDateString('es-ES')}</p>
+                  <p><strong>Estado:</strong> 
+                    <span className={`ml-1 px-2 py-1 text-xs font-semibold rounded-full ${
+                      mantenimiento.status === 'completado' 
+                        ? 'bg-green-100 text-green-800' 
+                        : mantenimiento.status === 'pendiente'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {mantenimiento.status || 'pendiente'}
+                    </span>
+                  </p>
                 </div>
                 
                 <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
@@ -382,9 +411,42 @@ const PanelTecnico = ({ mantenimientos, loading, error, tecnico, onDescargarChec
                     </svg>
                     Descargar Checklist
                   </button>
-                  <button className="w-full bg-blue-600 text-white py-2 px-4 rounded text-sm font-medium hover:bg-blue-700">
-                    Marcar como completado
-                  </button>
+                  
+                  {mantenimiento.status !== 'completado' ? (
+                    <button 
+                      onClick={() => handleMarcarCompletado(mantenimiento.id)}
+                      disabled={completando === mantenimiento.id}
+                      className={`w-full py-2 px-4 rounded text-sm font-medium flex items-center justify-center ${
+                        completando === mantenimiento.id
+                          ? 'bg-gray-400 text-white cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                    >
+                      {completando === mantenimiento.id ? (
+                        <>
+                          <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Procesando...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Marcar como completado
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button 
+                      disabled
+                      className="w-full bg-green-600 text-white py-2 px-4 rounded text-sm font-medium flex items-center justify-center cursor-not-allowed"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Completado
+                    </button>
+                  )}
                 </div>
               </div>
             ))
@@ -747,6 +809,46 @@ const Perfil = () => {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+};
+// BLOQUE 2.1: Función para marcar mantenimiento como completado
+const marcarComoCompletado = async (mantenimientoId) => {
+  try {
+    const token = localStorage.getItem("token");
+    
+    // CORRECCIÓN: Usar la ruta correcta del backend
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/mantenimientos/${mantenimientoId}/estado`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        status: 'completado',
+        tecnico_id: userData?.id,
+        tecnico_nombre: userData?.nombre,
+        observaciones: 'Mantenimiento completado exitosamente'
+      })
+    });
+
+    // Si la respuesta no es OK, lanzar error
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Error del servidor' }));
+      throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    if (data.success) {
+      setSuccess('Mantenimiento marcado como completado correctamente');
+      // Recargar la lista de mantenimientos
+      fetchMisMantenimientos();
+    } else {
+      setErrorMisMantenimientos(data.error || 'Error al completar el mantenimiento');
+    }
+  } catch (err) {
+    console.error('Error marcando mantenimiento como completado:', err);
+    setErrorMisMantenimientos(err.message || 'Error de conexión al completar mantenimiento');
+  }
 };
   // BLOQUE 3: Fetch de datos de usuario
   const fetchUserData = useCallback(async () => {
@@ -1136,6 +1238,7 @@ return (
               error={errorMisMantenimientos}
               tecnico={userData}
               onDescargarChecklist={generarChecklistWord} 
+              onMarcarCompletado={marcarComoCompletado}
             />
           </div>
         ) : (

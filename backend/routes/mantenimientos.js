@@ -11,14 +11,14 @@ function getTipoMantenimiento(mes) {
   return "Básico";
 }
 
-// BLOQUE 1: Obtener mantenimientos por año
+// BLOQUE 1: Obtener mantenimientos por año - MODIFICADO
 router.get("/", async (req, res) => {
   try {
     console.log("GET /api/mantenimientos - Query params:", req.query);
     
     const { anio, montacargasId } = req.query;
 
-    if (!anio || !montacargasId) { // Validaciones iniciales
+    if (!anio || !montacargasId) {
       return res.status(400).json({ success: false, error: "anio y montacargasId son requeridos" });
     }
 
@@ -32,8 +32,10 @@ router.get("/", async (req, res) => {
       });
     }
 
-    const result = await pool.query( // Consulta con la BD 
-      `SELECT id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, creado_en 
+    // MODIFICACIÓN: Incluir campos de status, tecnico_nombre, observaciones, completado_en
+    const result = await pool.query(
+      `SELECT id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, tecnico_nombre, 
+              status, creado_en, completado_en, observaciones
        FROM mantenimientos_programados 
        WHERE montacargas_id = $1 AND anio = $2 
        ORDER BY mes`,
@@ -48,7 +50,7 @@ router.get("/", async (req, res) => {
 });
 // FIN BLOQUE 1: Obtener mantenimientos por año
 
-// BLOQUE 2: Obtener todos los mantenimientos de un montacargas
+// BLOQUE 2: Obtener todos los mantenimientos de un montacargas - MODIFICADO
 router.get("/todos", async (req, res) => {
   try {
     console.log("GET /api/mantenimientos/todos - Query params:", req.query);
@@ -68,8 +70,10 @@ router.get("/todos", async (req, res) => {
       });
     }
 
-    const result = await pool.query( // Consulta todos los registros del montacargas
-      `SELECT id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, creado_en 
+    // MODIFICACIÓN: Incluir campos de status y observaciones
+    const result = await pool.query(
+      `SELECT id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, tecnico_nombre,
+              status, creado_en, completado_en, observaciones
        FROM mantenimientos_programados 
        WHERE montacargas_id = $1 
        ORDER BY anio DESC, mes ASC`,
@@ -85,7 +89,7 @@ router.get("/todos", async (req, res) => {
 });
 // FIN DEL BLOQUE 2: Obtener todos los mantenimientos de un montacargas
 
-// BLOQUE 3: Crear mantenimientos anuales automáticos 
+// BLOQUE 3: Crear mantenimientos anuales automáticos - SIN CAMBIOS
 router.post("/", async (req, res) => {
   try {
     console.log("POST /api/mantenimientos - Body:", req.body);
@@ -140,7 +144,7 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const mantenimientos = []; // Inserción de los 12 meses
+    const mantenimientos = [];
     
     for (let mes = 1; mes <= 12; mes++) {
       const fecha = new Date(anioNum, mes - 1, diaNum);
@@ -151,7 +155,7 @@ router.post("/", async (req, res) => {
           `INSERT INTO mantenimientos_programados 
            (montacargas_id, mes, anio, tipo, fecha) 
            VALUES ($1, $2, $3, $4, $5) 
-           RETURNING id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, creado_en`,
+           RETURNING id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, creado_en, status`,
           [montacargasIdNum, mes, anioNum, tipo, fecha]
         );
         mantenimientos.push(result.rows[0]);
@@ -180,7 +184,7 @@ router.post("/", async (req, res) => {
 });
 // FIN DEL BLOQUE 3: Crear mantenimientos anuales automáticos 
 
-// BLOQUE 4: Crear mantenimiento manual para un mes específico
+// BLOQUE 4: Crear mantenimiento manual para un mes específico - SIN CAMBIOS
 router.post("/manual", async (req, res) => {
   try {
     console.log("POST /api/mantenimientos/manual - Body:", req.body);
@@ -221,11 +225,11 @@ router.post("/manual", async (req, res) => {
       });
     }
 
-    const result = await pool.query( // Insertar el mantenimiento manual
+    const result = await pool.query(
       `INSERT INTO mantenimientos_programados 
        (montacargas_id, mes, anio, tipo, fecha) 
        VALUES ($1, $2, $3, $4, $5) 
-       RETURNING id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, creado_en`,
+       RETURNING id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, creado_en, status`,
       [montacargasIdNum, mesNum, anioNum, tipo, fecha]
     );
 
@@ -241,7 +245,7 @@ router.post("/manual", async (req, res) => {
 });
 // FIN DEL BLOQUE 4: Crear mantenimiento manual para un mes específico
 
-// BLOQUE 5: Eliminar mantenimiento
+// BLOQUE 5: Eliminar mantenimiento - SIN CAMBIOS
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -263,27 +267,13 @@ router.delete("/:id", async (req, res) => {
 });
 // FIN DEL BLOQUE 5: Eliminar mantenimiento
 
-// BLOQUE 6: Actualizar mantenimiento - CORREGIDO
+// BLOQUE 6: Actualizar mantenimiento - MODIFICADO
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { tipo, fecha, tecnico_id } = req.body;
+    const { tipo, fecha, tecnico_id, tecnico_nombre, observaciones } = req.body;
 
-    console.log("Datos recibidos para actualizar:", { id, tipo, fecha, tecnico_id });
-
-    // 🔥 VALIDACIÓN CRÍTICA: Convertir tecnico_id correctamente
-    let tecnicoIdValido = null;
-    if (tecnico_id !== undefined && tecnico_id !== null && tecnico_id !== "") {
-      const tecnicoIdParsed = parseInt(tecnico_id);
-      if (!isNaN(tecnicoIdParsed)) {
-        tecnicoIdValido = tecnicoIdParsed;
-      } else {
-        return res.status(400).json({ 
-          success: false, 
-          error: "El ID del técnico debe ser un número válido" 
-        });
-      }
-    }
+    console.log("Datos recibidos para actualizar:", { id, tipo, fecha, tecnico_id, tecnico_nombre, observaciones });
 
     // Validar campos requeridos
     if (!tipo || !fecha) {
@@ -302,20 +292,36 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // Extraer mes y año de la fecha para actualizar también estos campos
+    // Extraer mes y año de la fecha
     const mes = fechaValida.getMonth() + 1;
     const anio = fechaValida.getFullYear();
 
+    // Procesar tecnico_id
+    let tecnicoIdValido = null;
+    if (tecnico_id !== undefined && tecnico_id !== null && tecnico_id !== "") {
+      const tecnicoIdParsed = parseInt(tecnico_id);
+      if (!isNaN(tecnicoIdParsed)) {
+        tecnicoIdValido = tecnicoIdParsed;
+      } else {
+        return res.status(400).json({ 
+          success: false, 
+          error: "El ID del técnico debe ser un número válido" 
+        });
+      }
+    }
+
     console.log("Datos validados para actualizar:", { 
-      tipo, fecha, mes, anio, tecnico_id: tecnicoIdValido, id 
+      tipo, fecha, mes, anio, tecnico_id: tecnicoIdValido, tecnico_nombre, observaciones, id 
     });
 
     const result = await pool.query(
       `UPDATE mantenimientos_programados 
-       SET tipo = $1, fecha = $2, mes = $3, anio = $4, tecnico_id = $5 
-       WHERE id = $6 
-       RETURNING id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, creado_en`,
-      [tipo, fecha, mes, anio, tecnicoIdValido, id]
+       SET tipo = $1, fecha = $2, mes = $3, anio = $4, tecnico_id = $5, 
+           tecnico_nombre = $6, observaciones = $7
+       WHERE id = $8 
+       RETURNING id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, 
+                 tecnico_nombre, status, creado_en, completado_en, observaciones`,
+      [tipo, fecha, mes, anio, tecnicoIdValido, tecnico_nombre, observaciones, id]
     );
 
     if (result.rowCount === 0) {
@@ -334,7 +340,6 @@ router.put("/:id", async (req, res) => {
   } catch (err) {
     console.error("Error actualizando mantenimiento:", err);
     
-    // Manejar error específico de tipo de dato
     if (err.code === '22P02') {
       return res.status(400).json({ 
         success: false,
@@ -350,7 +355,7 @@ router.put("/:id", async (req, res) => {
 });
 // FIN DEL BLOQUE 6: Actualizar mantenimiento
 
-// BLOQUE 7: Obtener mantenimientos del mes actual
+// BLOQUE 7: Obtener mantenimientos del mes actual - MODIFICADO
 router.get("/mes-actual", async (req, res) => {
   try {
     const mesActual = new Date().getMonth() + 1;
@@ -372,5 +377,140 @@ router.get("/mes-actual", async (req, res) => {
   }
 });
 // FIN DEL BLOQUE 7: Obtener mantenimientos del mes actual
+
+// NUEVO BLOQUE 8: Actualizar estado del mantenimiento
+router.patch("/:id/estado", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, tecnico_id, tecnico_nombre, observaciones } = req.body;
+
+    console.log("Actualizando estado del mantenimiento:", { id, status, tecnico_id, tecnico_nombre, observaciones });
+
+    // Validar que el estado sea válido
+    const estadosValidos = ['pendiente', 'completado', 'cancelado'];
+    if (!status || !estadosValidos.includes(status)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Estado inválido. Debe ser uno de: ${estadosValidos.join(', ')}` 
+      });
+    }
+
+    // Procesar tecnico_id
+    let tecnicoIdValido = null;
+    if (tecnico_id !== undefined && tecnico_id !== null && tecnico_id !== "") {
+      const tecnicoIdParsed = parseInt(tecnico_id);
+      if (!isNaN(tecnicoIdParsed)) {
+        tecnicoIdValido = tecnicoIdParsed;
+      } else {
+        return res.status(400).json({ 
+          success: false, 
+          error: "El ID del técnico debe ser un número válido" 
+        });
+      }
+    }
+
+    // Preparar campos para actualización
+    let query = `UPDATE mantenimientos_programados 
+                 SET status = $1, tecnico_id = $2, tecnico_nombre = $3, observaciones = $4`;
+    let params = [status, tecnicoIdValido, tecnico_nombre, observaciones];
+
+    // Si se marca como completado, agregar fecha de completado
+    if (status === 'completado') {
+      query += `, completado_en = NOW()`;
+    } else if (status === 'pendiente') {
+      query += `, completado_en = NULL`;
+    }
+
+    query += ` WHERE id = $${params.length + 1} 
+              RETURNING id, montacargas_id, mes, anio, tipo, fecha, tecnico_id, 
+                        tecnico_nombre, status, creado_en, completado_en, observaciones`;
+    
+    params.push(id);
+
+    const result = await pool.query(query, params);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "Mantenimiento no encontrado" 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      mantenimiento: result.rows[0],
+      message: `Mantenimiento ${status} correctamente`
+    });
+
+  } catch (err) {
+    console.error("Error actualizando estado del mantenimiento:", err);
+    
+    if (err.code === '22P02') {
+      return res.status(400).json({ 
+        success: false,
+        error: "Error de tipo de datos: Verifica que el ID del técnico sea un número válido" 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: "Error interno del servidor al actualizar estado" 
+    });
+  }
+});
+// FIN NUEVO BLOQUE 8: Actualizar estado del mantenimiento
+
+// NUEVO BLOQUE 9: Obtener mantenimientos por estado
+router.get("/estado/:status", async (req, res) => {
+  try {
+    const { status } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+
+    // Validar estado
+    const estadosValidos = ['pendiente', 'completado', 'cancelado'];
+    if (!estadosValidos.includes(status)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Estado inválido. Debe ser uno de: ${estadosValidos.join(', ')}` 
+      });
+    }
+
+    const offset = (page - 1) * limit;
+
+    const result = await pool.query(
+      `SELECT mp.*, m.numero as montacargas_numero, m.marca, m.modelo
+       FROM mantenimientos_programados mp
+       JOIN "Montacargas" m ON mp.montacargas_id = m.numero
+       WHERE mp.status = $1
+       ORDER BY mp.fecha DESC
+       LIMIT $2 OFFSET $3`,
+      [status, limit, offset]
+    );
+
+    // Obtener total count para paginación
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM mantenimientos_programados WHERE status = $1`,
+      [status]
+    );
+
+    const total = parseInt(countResult.rows[0].count);
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({ 
+      success: true, 
+      mantenimientos: result.rows,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages
+      }
+    });
+  } catch (err) {
+    console.error("Error obteniendo mantenimientos por estado:", err);
+    res.status(500).json({ success: false, error: "Error al obtener mantenimientos" });
+  }
+});
+// FIN NUEVO BLOQUE 9: Obtener mantenimientos por estado
 
 module.exports = router;
