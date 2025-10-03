@@ -49,11 +49,13 @@ app.use(limiter);
 const authRoutes = require("./routes/auth");
 const montacargasRoutes = require("./routes/montacargas");
 const mantenimientosRoutes = require("./routes/mantenimientos");
+const refaccionesRoutes = require('./routes/refacciones');
+
 
 app.use("/auth", authRoutes);
 app.use("/api/montacargas", montacargasRoutes);
 app.use("/api/mantenimientos", mantenimientosRoutes);
-
+app.use('/api/refacciones', refaccionesRoutes);
 // Arrancar servidor
 app.listen(process.env.PORT || 4000, "0.0.0.0", () =>
   console.log(`Servidor en http://0.0.0.0:${process.env.PORT || 4000}`)

@@ -565,7 +565,9 @@ export default function Inicio() {
               )}
               {activeTab === "Inversión Inicial" && <InversionInicial />}
               {activeTab === "Inversión Habilitar" && <InversionHabilitar />}
-              {activeTab === "Refacciones con Cargo" && <RefaccionesCargo />}
+              {activeTab === "Refacciones con Cargo" && (
+                <RefaccionesCargo montacargas={selectedMontacargas}/>
+              )}
               {activeTab === "Programas Preventivos" && (
                 <ProgramasPreventivos id={selectedMontacargas.numero} />
               )}
