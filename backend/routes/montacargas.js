@@ -106,6 +106,17 @@ router.put("/:id", upload.fields([
     const { id } = req.params;
     const { Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta } = req.body;
     
+    // VALIDACIÓN: Asegurar que Capacidad sea un número válido
+    let capacidadNum = 0;
+    if (Capacidad !== undefined && Capacidad !== null && Capacidad !== '') {
+      capacidadNum = parseInt(Capacidad);
+      if (isNaN(capacidadNum)) {
+        return res.status(400).json({ 
+          error: "La capacidad debe ser un número válido" 
+        });
+      }
+    }
+
     // Primero obtener el montacargas actual
     const currentResult = await pool.query(
       'SELECT "documento_pedimento", "documento_adicional" FROM "Montacargas" WHERE numero=$1',
@@ -149,10 +160,11 @@ router.put("/:id", upload.fields([
     }
 
     console.log('Valores finales - pedimento:', documentoPedimento, 'adicional:', documentoAdicional);
+    console.log('Capacidad procesada:', capacidadNum);
 
     const result = await pool.query(
       'UPDATE "Montacargas" SET "Marca"=$1, "Modelo"=$2, "Serie"=$3, "Sistema"=$4, "Capacidad"=$5, "Ubicacion"=$6, "Planta"=$7, "documento_pedimento"=$8, "documento_adicional"=$9 WHERE numero=$10 RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional"',
-      [Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta, documentoPedimento, documentoAdicional, id]
+      [Marca, Modelo, Serie, Sistema, capacidadNum, Ubicacion, Planta, documentoPedimento, documentoAdicional, id]
     );
 
     console.log('Resultado de la consulta UPDATE:', result.rows[0]);

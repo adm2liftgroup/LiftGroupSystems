@@ -35,13 +35,29 @@ export default function InformacionEquipo({ montacargas }) {
     try {
       const formData = new FormData();
       formData.append('documento_' + tipo, file);
+      
+      // Asegurarse de que los valores numéricos se envíen correctamente
       formData.append('Marca', montacargasLocal.Marca || '');
       formData.append('Modelo', montacargasLocal.Modelo || '');
       formData.append('Serie', montacargasLocal.Serie || '');
       formData.append('Sistema', montacargasLocal.Sistema || '');
-      formData.append('Capacidad', montacargasLocal.Capacidad || '');
+      
+      // CORRECCIÓN: Convertir Capacidad a número, usar 0 si está vacío
+      const capacidad = montacargasLocal.Capacidad ? parseInt(montacargasLocal.Capacidad) : 0;
+      formData.append('Capacidad', capacidad.toString());
+      
       formData.append('Ubicacion', montacargasLocal.Ubicacion || '');
       formData.append('Planta', montacargasLocal.Planta || '');
+
+      console.log('Enviando datos:', {
+        Marca: montacargasLocal.Marca,
+        Modelo: montacargasLocal.Modelo,
+        Serie: montacargasLocal.Serie,
+        Sistema: montacargasLocal.Sistema,
+        Capacidad: capacidad,
+        Ubicacion: montacargasLocal.Ubicacion,
+        Planta: montacargasLocal.Planta
+      });
 
       const response = await fetch(`http://localhost:4000/api/montacargas/${montacargasLocal.numero}`, {
         method: 'PUT',
@@ -51,7 +67,7 @@ export default function InformacionEquipo({ montacargas }) {
       const responseData = await response.json();
 
       if (response.ok) {
-        // Actualizar el estado local en lugar de llamar a onUpdate
+        // Actualizar el estado local
         setMontacargasLocal(responseData);
         alert('✅ Documento cargado correctamente');
       } else {
@@ -105,7 +121,7 @@ export default function InformacionEquipo({ montacargas }) {
       const result = await response.json();
 
       if (response.ok) {
-        // Actualizar el estado local en lugar de llamar a onUpdate
+        // Actualizar el estado local
         setMontacargasLocal(prev => ({
           ...prev,
           [`documento_${tipo}`]: null
