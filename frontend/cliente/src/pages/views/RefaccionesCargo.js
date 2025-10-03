@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 export default function RefaccionesCargo({ montacargas }) {
   const [mantenimientos, setMantenimientos] = useState([]);
+  const [mantenimientosFiltrados, setMantenimientosFiltrados] = useState([]);
   const [mantenimientoSeleccionado, setMantenimientoSeleccionado] = useState(null);
   const [observaciones, setObservaciones] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -12,6 +13,14 @@ export default function RefaccionesCargo({ montacargas }) {
     cargo_a: 'empresa'
   });
   const [editandoObservacion, setEditandoObservacion] = useState(null);
+  
+  // Estados para los filtros
+  const [filtros, setFiltros] = useState({
+    anio: new Date().getFullYear(),
+    mes: '',
+    tipo: '',
+    status: ''
+  });
 
   // Obtener mantenimientos cuando el montacargas cambia
   useEffect(() => {
@@ -19,9 +28,15 @@ export default function RefaccionesCargo({ montacargas }) {
       fetchMantenimientos(montacargas.numero);
     } else {
       setMantenimientos([]);
+      setMantenimientosFiltrados([]);
       setMantenimientoSeleccionado(null);
     }
   }, [montacargas]);
+
+  // Aplicar filtros cuando cambien los filtros o los mantenimientos
+  useEffect(() => {
+    aplicarFiltros();
+  }, [filtros, mantenimientos]);
 
   // Obtener observaciones cuando se selecciona un mantenimiento
   useEffect(() => {
@@ -76,10 +91,59 @@ export default function RefaccionesCargo({ montacargas }) {
       console.error('Error en fetchMantenimientos:', err);
       setError(err.message);
       setMantenimientos([]);
+      setMantenimientosFiltrados([]);
       setMantenimientoSeleccionado(null);
     } finally {
       setLoading(false);
     }
+  };
+
+  const aplicarFiltros = () => {
+    let filtrados = [...mantenimientos];
+
+    // Filtrar por año
+    if (filtros.anio) {
+      filtrados = filtrados.filter(m => m.anio === parseInt(filtros.anio));
+    }
+
+    // Filtrar por mes
+    if (filtros.mes) {
+      filtrados = filtrados.filter(m => m.mes === parseInt(filtros.mes));
+    }
+
+    // Filtrar por tipo
+    if (filtros.tipo) {
+      filtrados = filtrados.filter(m => m.tipo === filtros.tipo);
+    }
+
+    // Filtrar por status
+    if (filtros.status) {
+      filtrados = filtrados.filter(m => m.status === filtros.status);
+    }
+
+    setMantenimientosFiltrados(filtrados);
+
+    // Si el mantenimiento seleccionado no está en los filtrados, deseleccionar
+    if (mantenimientoSeleccionado && !filtrados.find(m => m.id === mantenimientoSeleccionado.id)) {
+      setMantenimientoSeleccionado(filtrados.length > 0 ? filtrados[0] : null);
+    }
+  };
+
+  const handleFiltroChange = (e) => {
+    const { name, value } = e.target;
+    setFiltros(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const limpiarFiltros = () => {
+    setFiltros({
+      anio: new Date().getFullYear(),
+      mes: '',
+      tipo: '',
+      status: ''
+    });
   };
 
   const fetchObservaciones = async (mantenimientoId) => {
@@ -266,6 +330,8 @@ export default function RefaccionesCargo({ montacargas }) {
 
     try {
       const token = localStorage.getItem("token");
+      const observacion = observaciones.find(o => o.id === observacionId);
+      
       const response = await fetch(
         `${process.env.REACT_APP_API_URL}/api/refacciones/${observacionId}`,
         {
@@ -275,9 +341,9 @@ export default function RefaccionesCargo({ montacargas }) {
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
-            estado_resolucion: 'resuelto',
-            descripcion: observaciones.find(o => o.id === observacionId)?.descripcion || '',
-            cargo_a: observaciones.find(o => o.id === observacionId)?.cargo_a || 'empresa'
+            descripcion: observacion.descripcion,
+            cargo_a: observacion.cargo_a,
+            estado_resolucion: 'resuelto'
           })
         }
       );
@@ -339,7 +405,8 @@ export default function RefaccionesCargo({ montacargas }) {
   const getEstadoColor = (estado) => {
     switch (estado) {
       case "pendiente": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "resuelto": return "bg-green-100 text-green-800 border-green-200";
+      case "completado": return "bg-green-100 text-green-800 border-green-200";
+      case "cancelado": return "bg-red-100 text-red-800 border-red-200";
       default: return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
@@ -374,6 +441,23 @@ export default function RefaccionesCargo({ montacargas }) {
     } catch {
       return 'Fecha inválida';
     }
+  };
+
+  // Obtener años únicos para el filtro
+  const obtenerAniosUnicos = () => {
+    const anios = [...new Set(mantenimientos.map(m => m.anio))];
+    return anios.sort((a, b) => b - a);
+  };
+
+  // Obtener meses únicos para el filtro
+  const obtenerMesesUnicos = () => {
+    const meses = [...new Set(mantenimientos.map(m => m.mes))];
+    return meses.sort((a, b) => a - b);
+  };
+
+  const nombresMeses = {
+    1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio',
+    7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
   };
 
   if (!montacargas) {
@@ -431,16 +515,111 @@ export default function RefaccionesCargo({ montacargas }) {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Columna 1: Selección de mantenimiento */}
+        {/* Columna 1: Filtros y Selección de mantenimiento */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          {/* Panel de Filtros */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Mantenimientos del Montacargas
+              Filtros de Búsqueda
             </h3>
             
-            {mantenimientos.length > 0 ? (
+            <div className="space-y-4">
+              {/* Filtro por Año */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Año
+                </label>
+                <select
+                  name="anio"
+                  value={filtros.anio}
+                  onChange={handleFiltroChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Todos los años</option>
+                  {obtenerAniosUnicos().map(anio => (
+                    <option key={anio} value={anio}>{anio}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro por Mes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mes
+                </label>
+                <select
+                  name="mes"
+                  value={filtros.mes}
+                  onChange={handleFiltroChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Todos los meses</option>
+                  {obtenerMesesUnicos().map(mes => (
+                    <option key={mes} value={mes}>{nombresMeses[mes]}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro por Tipo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tipo de Mantenimiento
+                </label>
+                <select
+                  name="tipo"
+                  value={filtros.tipo}
+                  onChange={handleFiltroChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Todos los tipos</option>
+                  <option value="Básico">Básico</option>
+                  <option value="Intermedio">Intermedio</option>
+                  <option value="Avanzado">Avanzado</option>
+                </select>
+              </div>
+
+              {/* Filtro por Estado */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Estado
+                </label>
+                <select
+                  name="status"
+                  value={filtros.status}
+                  onChange={handleFiltroChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Todos los estados</option>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="completado">Completado</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+              </div>
+
+              {/* Botón Limpiar Filtros */}
+              <button
+                onClick={limpiarFiltros}
+                className="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+              >
+                Limpiar Filtros
+              </button>
+            </div>
+          </div>
+
+          {/* Lista de Mantenimientos Filtrados */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Mantenimientos
+              </h3>
+              <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                {mantenimientosFiltrados.length} de {mantenimientos.length}
+              </span>
+            </div>
+            
+            {mantenimientosFiltrados.length > 0 ? (
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {mantenimientos.map((mantenimiento) => (
+                {mantenimientosFiltrados.map((mantenimiento) => (
                   <div
                     key={mantenimiento.id}
                     className={`p-4 border rounded-lg cursor-pointer transition-all ${
@@ -456,18 +635,12 @@ export default function RefaccionesCargo({ montacargas }) {
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getTipoColor(mantenimiento.tipo)}`}>
                             {mantenimiento.tipo}
                           </span>
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${
-                            mantenimiento.status === 'completado' 
-                              ? 'bg-green-100 text-green-800 border-green-200'
-                              : mantenimiento.status === 'cancelado'
-                              ? 'bg-red-100 text-red-800 border-red-200'
-                              : 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                          }`}>
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getEstadoColor(mantenimiento.status)}`}>
                             {mantenimiento.status}
                           </span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">
-                          {mantenimiento.mes}/{mantenimiento.anio}
+                          {nombresMeses[mantenimiento.mes]} {mantenimiento.anio}
                         </p>
                         <p className="text-sm text-gray-600">
                           {new Date(mantenimiento.fecha).toLocaleDateString('es-ES')}
@@ -489,7 +662,7 @@ export default function RefaccionesCargo({ montacargas }) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                   </svg>
                   <p className="text-gray-500">
-                    No hay mantenimientos registrados para este montacargas.
+                    No hay mantenimientos que coincidan con los filtros.
                   </p>
                 </div>
               )
@@ -497,6 +670,7 @@ export default function RefaccionesCargo({ montacargas }) {
           </div>
         </div>
 
+        {/* Resto del código permanece igual (Columnas 2 y 3) */}
         {/* Columna 2: Formulario para agregar observación */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
