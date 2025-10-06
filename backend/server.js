@@ -22,7 +22,7 @@ const allowedOrigins = process.env.NODE_ENV === 'production'
   ? [
       "http://localhost:3000",
       "http://192.168.0.193:3000",
-      "https://tu-frontend.onrender.com"
+      "https://liftgroup-frontend.onrender.com"
     ]
   : [
       "http://localhost:3000",             
@@ -31,7 +31,7 @@ const allowedOrigins = process.env.NODE_ENV === 'production'
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (process.env.NODE_ENV === 'production') {
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       if (!origin || allowedOrigins.includes(origin)) {
