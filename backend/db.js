@@ -1,6 +1,12 @@
 const { Pool } = require("pg");
 require("dotenv").config();
 
+// DEBUG: Ver qué variables de entorno se están usando
+console.log('🔍 Variables de entorno:');
+console.log('- NODE_ENV:', process.env.NODE_ENV);
+console.log('- DATABASE_URL:', process.env.DATABASE_URL ? '✅ Presente' : '❌ Ausente');
+console.log('- DB_HOST:', process.env.DB_HOST);
+
 // Configuración para desarrollo vs producción
 const config = process.env.DATABASE_URL 
   ? {
@@ -18,6 +24,8 @@ const config = process.env.DATABASE_URL
       database: process.env.DB_NAME,
       port: process.env.DB_PORT,
     };
+
+console.log('🔧 Configuración de BD:', config.connectionString ? 'Render' : 'Local');
 
 const pool = new Pool(config);
 
