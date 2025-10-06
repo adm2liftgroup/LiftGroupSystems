@@ -310,7 +310,7 @@ export default function InformacionEquipo({ montacargas }) {
           alignItems: 'center',
           gap: '10px'
         }}>
-          📎 Documento Adicional
+          📋 Factura
         </h4>
         
         {montacargasLocal.documento_adicional ? (

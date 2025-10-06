@@ -318,7 +318,8 @@ const AsignacionTecnicosPanel = ({
     </div>
   );
 };
-// BLOQUE 1.7: Panel de Técnico (ACTUALIZADO con descarga de checklist)
+
+// BLOQUE 1.7: Panel de Técnico (ACTUALIZADO con manejo mejorado de estado)
 const PanelTecnico = ({ 
   mantenimientos, 
   loading, 
@@ -328,6 +329,21 @@ const PanelTecnico = ({
   onMarcarCompletado 
 }) => {
   const [completando, setCompletando] = useState(null);
+  const [touchStart, setTouchStart] = useState(null);
+  const [localMantenimientos, setLocalMantenimientos] = useState(mantenimientos);
+
+  // Sincronizar con los mantenimientos prop
+  useEffect(() => {
+    setLocalMantenimientos(mantenimientos);
+  }, [mantenimientos]);
+
+  // Efecto para limpiar estado al desmontar
+  useEffect(() => {
+    return () => {
+      setCompletando(null);
+      setTouchStart(null);
+    };
+  }, []);
 
   const getNombreMes = (mesNum) => {
     const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -346,12 +362,71 @@ const PanelTecnico = ({
   const mesActual = new Date().getMonth() + 1;
   const anioActual = new Date().getFullYear();
 
+  // Manejo mejorado de eventos táctiles
+  const handleTouchStart = (e) => {
+    setTouchStart(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e, callback, ...args) => {
+    if (!touchStart) return;
+    
+    const touchEnd = e.changedTouches[0].clientX;
+    const diff = touchStart - touchEnd;
+
+    // Solo ejecutar si no fue un deslizamiento significativo
+    if (Math.abs(diff) < 10) {
+      callback(...args);
+    }
+    
+    setTouchStart(null);
+  };
+
+  // Función mejorada para marcar completado
   const handleMarcarCompletado = async (mantenimientoId) => {
+    if (completando) return;
+    
     setCompletando(mantenimientoId);
+    
     try {
+      // Actualización optimista del estado local
+      setLocalMantenimientos(prev => 
+        prev.map(m => 
+          m.id === mantenimientoId 
+            ? { 
+                ...m, 
+                status: 'completado',
+                completado_en: new Date().toISOString()
+              }
+            : m
+        )
+      );
+
+      // Pequeño delay para permitir que la UI se actualice
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Llamar a la función principal
       await onMarcarCompletado(mantenimientoId);
+      
+    } catch (error) {
+      console.error('Error en handleMarcarCompletado:', error);
+      
+      // Revertir la actualización optimista en caso de error
+      setLocalMantenimientos(prev => 
+        prev.map(m => 
+          m.id === mantenimientoId 
+            ? { 
+                ...m, 
+                status: 'pendiente',
+                completado_en: null
+              }
+            : m
+        )
+      );
     } finally {
-      setCompletando(null);
+      // Delay más largo para evitar conflictos de renderizado
+      setTimeout(() => {
+        setCompletando(null);
+      }, 1000);
     }
   };
 
@@ -369,9 +444,16 @@ const PanelTecnico = ({
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {mantenimientos.length > 0 ? (
-            mantenimientos.map((mantenimiento) => (
-              <div key={mantenimiento.id} className="border border-gray-200 rounded-lg p-4">
+          {localMantenimientos.length > 0 ? (
+            localMantenimientos.map((mantenimiento) => (
+              <div 
+                key={`mantenimiento-${mantenimiento.id}-${mantenimiento.status}-${completando}`}
+                className="border border-gray-200 rounded-lg p-4 transition-all duration-300"
+                style={{
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation'
+                }}
+              >
                 <div className="flex justify-between items-start mb-3">
                   <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getTipoColor(mantenimiento.tipo)}`}>
                     {mantenimiento.tipo}
@@ -404,7 +486,11 @@ const PanelTecnico = ({
                 <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
                   <button 
                     onClick={() => onDescargarChecklist(mantenimiento)}
-                    className="w-full bg-green-600 text-white py-2 px-4 rounded text-sm font-medium hover:bg-green-700 flex items-center justify-center"
+                    className="w-full bg-green-600 text-white py-3 px-4 rounded text-sm font-medium hover:bg-green-700 flex items-center justify-center transition-colors"
+                    style={{ 
+                      minHeight: '44px',
+                      touchAction: 'manipulation'
+                    }}
                   >
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -412,34 +498,43 @@ const PanelTecnico = ({
                     Descargar Checklist
                   </button>
                   
-                  {mantenimiento.status !== 'completado' ? (
+                  {/* BOTÓN MEJORADO PARA MÓVILES */}
+                  {completando === mantenimiento.id ? (
                     <button 
-                      onClick={() => handleMarcarCompletado(mantenimiento.id)}
-                      disabled={completando === mantenimiento.id}
-                      className={`w-full py-2 px-4 rounded text-sm font-medium flex items-center justify-center ${
-                        completando === mantenimiento.id
-                          ? 'bg-gray-400 text-white cursor-not-allowed'
-                          : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }`}
+                      disabled
+                      className="w-full bg-gray-400 text-white py-3 px-4 rounded text-sm font-medium flex items-center justify-center cursor-not-allowed"
+                      style={{ minHeight: '44px' }}
                     >
-                      {completando === mantenimiento.id ? (
-                        <>
-                          <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Procesando...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          Marcar como completado
-                        </>
-                      )}
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Procesando...
+                    </button>
+                  ) : mantenimiento.status !== 'completado' ? (
+                    <button 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleMarcarCompletado(mantenimiento.id);
+                      }}
+                      onTouchStart={handleTouchStart}
+                      onTouchEnd={(e) => handleTouchEnd(e, handleMarcarCompletado, mantenimiento.id)}
+                      disabled={completando}
+                      className="w-full bg-blue-600 text-white py-3 px-4 rounded text-sm font-medium flex items-center justify-center hover:bg-blue-700 transition-colors active:bg-blue-800"
+                      style={{ 
+                        minHeight: '44px',
+                        WebkitTapHighlightColor: 'transparent',
+                        touchAction: 'manipulation'
+                      }}
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Marcar como completado
                     </button>
                   ) : (
                     <button 
                       disabled
-                      className="w-full bg-green-600 text-white py-2 px-4 rounded text-sm font-medium flex items-center justify-center cursor-not-allowed"
+                      className="w-full bg-green-600 text-white py-3 px-4 rounded text-sm font-medium flex items-center justify-center cursor-not-allowed"
+                      style={{ minHeight: '44px' }}
                     >
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -497,8 +592,31 @@ const Perfil = () => {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [errorUsers, setErrorUsers] = useState("");
 
+  // NUEVO: Estado para manejo seguro de UI
+  const [uiState, setUiState] = useState({
+    loading: false,
+    error: '',
+    success: '',
+    updatingId: null,
+    isMounted: true
+  });
+
   const isAdmin = userData?.rol === "admin";
   const isTecnico = userData?.rol === "user";
+
+  // NUEVO: Effect para manejar desmontaje seguro
+  useEffect(() => {
+    return () => {
+      setUiState(prev => ({ ...prev, isMounted: false }));
+    };
+  }, []);
+
+  // NUEVO: Función para actualizaciones seguras de estado
+  const setSafeState = (setter, newState) => {
+    if (uiState.isMounted) {
+      setter(newState);
+    }
+  };
 
   // === AGREGAR ESTAS DOS FUNCIONES DENTRO DEL COMPONENTE PERFIL ===
 
@@ -810,12 +928,22 @@ const Perfil = () => {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 };
-// BLOQUE 2.1: Función para marcar mantenimiento como completado
+
+// BLOQUE 2.1: Función mejorada para marcar mantenimiento como completado
 const marcarComoCompletado = async (mantenimientoId) => {
   try {
     const token = localStorage.getItem("token");
     
-    // CORRECCIÓN: Usar la ruta correcta del backend
+    if (!token) {
+      throw new Error('No hay sesión activa');
+    }
+
+    console.log('Marcando mantenimiento como completado:', mantenimientoId);
+
+    // Usar AbortController para evitar llamadas duplicadas
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     const response = await fetch(`${process.env.REACT_APP_API_URL}/api/mantenimientos/${mantenimientoId}/estado`, {
       method: 'PATCH',
       headers: {
@@ -827,29 +955,36 @@ const marcarComoCompletado = async (mantenimientoId) => {
         tecnico_id: userData?.id,
         tecnico_nombre: userData?.nombre,
         observaciones: 'Mantenimiento completado exitosamente'
-      })
+      }),
+      signal: controller.signal
     });
 
-    // Si la respuesta no es OK, lanzar error
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Error del servidor' }));
-      throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`);
+      let errorMessage = `Error ${response.status}: ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch (parseError) {
+        console.error('Error parsing error response:', parseError);
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
     
     if (data.success) {
-      setSuccess('Mantenimiento marcado como completado correctamente');
-      // Recargar la lista de mantenimientos
-      fetchMisMantenimientos();
+      return { success: true, data };
     } else {
-      setErrorMisMantenimientos(data.error || 'Error al completar el mantenimiento');
+      throw new Error(data.error || 'Error al completar el mantenimiento');
     }
   } catch (err) {
     console.error('Error marcando mantenimiento como completado:', err);
-    setErrorMisMantenimientos(err.message || 'Error de conexión al completar mantenimiento');
+    throw err;
   }
 };
+
   // BLOQUE 3: Fetch de datos de usuario
   const fetchUserData = useCallback(async () => {
     setLoading(true);
@@ -1233,13 +1368,40 @@ return (
           <div>
             <h1 className="text-2xl font-bold text-gray-800 mb-4">Mis Mantenimientos Asignados</h1>
             <PanelTecnico 
-              mantenimientos={misMantenimientos}
-              loading={loadingMisMantenimientos}
-              error={errorMisMantenimientos}
-              tecnico={userData}
-              onDescargarChecklist={generarChecklistWord} 
-              onMarcarCompletado={marcarComoCompletado}
-            />
+  mantenimientos={misMantenimientos}
+  loading={loadingMisMantenimientos}
+  error={errorMisMantenimientos}
+  tecnico={userData}
+  onDescargarChecklist={generarChecklistWord} 
+  onMarcarCompletado={async (mantenimientoId) => {
+    try {
+      await marcarComoCompletado(mantenimientoId);
+      
+      // Actualizar el estado global después del éxito
+      setMisMantenimientos(prev => 
+        prev.map(m => 
+          m.id === mantenimientoId 
+            ? { 
+                ...m, 
+                status: 'completado', 
+                completado_en: new Date().toISOString(),
+                tecnico_id: userData?.id,
+                tecnico_nombre: userData?.nombre
+              }
+            : m
+        )
+      );
+      
+      setSuccess('Mantenimiento marcado como completado correctamente');
+      setTimeout(() => setSuccess(''), 3000);
+      
+    } catch (err) {
+      console.error('Error en onMarcarCompletado:', err);
+      setErrorMisMantenimientos(err.message || 'Error al completar mantenimiento');
+      setTimeout(() => setErrorMisMantenimientos(''), 5000);
+    }
+  }}
+/>
           </div>
         ) : (
           // Perfil normal del técnico
