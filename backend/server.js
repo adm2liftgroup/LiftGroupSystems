@@ -34,12 +34,8 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        console.log('CORS bloqueado para origen:', origin);
-        callback(new Error("No permitido por CORS"));
-      }
+      console.log('CORS bloqueado para origen:', origin);
+      callback(new Error("No permitido por CORS"));
     }
   },
   credentials: true,
