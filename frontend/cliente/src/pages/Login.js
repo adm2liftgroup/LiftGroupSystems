@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 
 // Se obtiene la URL de la API desde variables de entorno
-const API_URL = process.env.REACT_APP_API_URL;
+const API_URL = 'https://liftgroupsystems.onrender.com';
 
 // DEBUG: Verificar que la variable se carga
 console.log('🔍 REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
