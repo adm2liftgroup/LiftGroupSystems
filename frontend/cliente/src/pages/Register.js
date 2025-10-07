@@ -3,7 +3,7 @@ import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 
 // URL de la API: Primero toma el .env, si no existe usa la API local como fallback 
-const API_URL = process.env.REACT_APP_API_URL || "https://liftgroupsystems.onrender.com";
+const API_URL = process.env.REACT_APP_API_URL || "http://192.168.0.193:4000";
 
 // Componente principal Register
 export default function Register() {

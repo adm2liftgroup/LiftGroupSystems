@@ -61,12 +61,15 @@ async function sendVerificationEmail(email, token) {
     };
 
     console.log('📧 Enviando email de verificación a:', email);
+    console.log('🔑 Token generado:', token);
+    console.log('⏰ Expira en:', new Date(Date.now() + 24 * 3600 * 1000));
+    
     await emailService.enviarVerificacionEmail(usuario, token);
     console.log('✅ Email de verificación enviado exitosamente');
     
   } catch (error) {
     console.error('❌ Error enviando email de verificación:', error.message);
-    throw error; // Propagar el error para manejarlo en el registro
+    throw error;
   }
 }
 // FIN DEL BLOQUE 2: Helper para enviar email de verificación
@@ -155,27 +158,63 @@ router.post(
 // El usuario entra al link enviado por email, si el token existe y no ha expirado activa email_verified, redirige al frontend en una página de éxito
 router.get("/verify", async (req, res) => {
   const { token } = req.query;
-  if (!token) return res.status(400).send("Token requerido");
+  console.log("🔍 Verificando token:", token);
+  
+  if (!token) {
+    console.log("❌ Token no proporcionado");
+    return res.status(400).send("Token requerido");
+  }
 
   try {
     const q = await pool.query(
-      'SELECT id, verification_expires FROM "Usuarios" WHERE verification_token = $1',
+      'SELECT id, verification_expires, email FROM "Usuarios" WHERE verification_token = $1',
       [token]
     );
-    if (!q.rows.length) return res.status(400).send("Token inválido");
+    
+    if (!q.rows.length) {
+      console.log("❌ Token no encontrado en BD:", token);
+      return res.status(400).send("Token inválido");
+    }
 
     const user = q.rows[0];
-    if (user.verification_expires < new Date()) return res.status(400).send("Token expirado");
+    const now = new Date();
+    const expires = new Date(user.verification_expires);
+    
+    console.log("📅 Fecha actual:", now);
+    console.log("⏰ Fecha expiración:", expires);
+    console.log("⏱️ Tiempo restante:", expires - now, "ms");
 
+    // Verificar si el token ha expirado
+    if (expires < now) {
+      console.log("❌ Token expirado para usuario:", user.email);
+      
+      // Opcional: Reenviar token de verificación automáticamente
+      const newToken = crypto.randomBytes(32).toString("hex");
+      const newExpires = new Date(Date.now() + 24 * 3600 * 1000); // 24 horas
+      
+      await pool.query(
+        'UPDATE "Usuarios" SET verification_token = $1, verification_expires = $2 WHERE id = $3',
+        [newToken, newExpires, user.id]
+      );
+      
+      // Reenviar email con nuevo token
+      await sendVerificationEmail(user.email, newToken);
+      
+      return res.redirect(`${process.env.FRONTEND_URL}/verify-error?reason=expired&email=${encodeURIComponent(user.email)}`);
+    }
+
+    // Token válido - verificar cuenta
     await pool.query(
       'UPDATE "Usuarios" SET email_verified = true, verification_token = NULL, verification_expires = NULL WHERE id = $1',
       [user.id]
     );
 
+    console.log("✅ Cuenta verificada exitosamente para:", user.email);
     return res.redirect(`${process.env.FRONTEND_URL}/verify-success`);
+    
   } catch (err) {
-    console.error(" Error en /verify:", err);
-    res.status(500).send("Error del servidor");
+    console.error("🔥 Error en /verify:", err);
+    res.status(500).send("Error del servidor durante la verificación");
   }
 });
 // FIN DEL BLOQUE 5: Verificación de correo (GET /verify)
