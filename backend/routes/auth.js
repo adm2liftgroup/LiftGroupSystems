@@ -46,24 +46,28 @@ const requireAuth = (req, res, next) => {
 //  BLOQUE 2: Helper para enviar email de verificación
 // Usando en el registro para mandar un correo con el link de verificación al usuario
 async function sendVerificationEmail(email, token) {
-  let transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: false,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  });
+  try {
+    const emailService = require('../services/emailService');
+    
+    // Buscar el usuario para obtener su nombre
+    const userResult = await pool.query(
+      'SELECT nombre FROM "Usuarios" WHERE email = $1', 
+      [email]
+    );
+    
+    const usuario = {
+      email: email,
+      nombre: userResult.rows[0]?.nombre || 'Usuario'
+    };
 
-  const verifyUrl = `${process.env.BACKEND_URL}/auth/verify?token=${token}`;
-
-  const info = await transporter.sendMail({
-    from: `"LiftGroup" <adm2liftgroup@gmail.com>`,
-    to: email,
-    subject: "Verifica tu correo - LiftGroup",
-    html: `<p>Hola, para verificar tu cuenta haz clic en el enlace:</p>
-           <p><a href="${verifyUrl}">Verificar cuenta</a></p>`,
-  });
-
-  console.log("Correo enviado, ID:", info.messageId);
+    console.log('📧 Enviando email de verificación a:', email);
+    await emailService.enviarVerificacionEmail(usuario, token);
+    console.log('✅ Email de verificación enviado exitosamente');
+    
+  } catch (error) {
+    console.error('❌ Error enviando email de verificación:', error.message);
+    throw error; // Propagar el error para manejarlo en el registro
+  }
 }
 // FIN DEL BLOQUE 2: Helper para enviar email de verificación
 
