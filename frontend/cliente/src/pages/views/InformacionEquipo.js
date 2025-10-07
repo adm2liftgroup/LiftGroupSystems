@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 
+// URL base para API - usa variable de entorno en producción
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+
 export default function InformacionEquipo({ montacargas }) {
   const [uploading, setUploading] = useState({});
   const [deleting, setDeleting] = useState({});
@@ -49,7 +52,8 @@ export default function InformacionEquipo({ montacargas }) {
       formData.append('Ubicacion', montacargasLocal.Ubicacion || '');
       formData.append('Planta', montacargasLocal.Planta || '');
 
-      console.log('Enviando datos:', {
+      console.log('Enviando datos a:', `${API_URL}/api/montacargas/${montacargasLocal.numero}`);
+      console.log('Datos:', {
         Marca: montacargasLocal.Marca,
         Modelo: montacargasLocal.Modelo,
         Serie: montacargasLocal.Serie,
@@ -59,7 +63,7 @@ export default function InformacionEquipo({ montacargas }) {
         Planta: montacargasLocal.Planta
       });
 
-      const response = await fetch(`http://localhost:4000/api/montacargas/${montacargasLocal.numero}`, {
+      const response = await fetch(`${API_URL}/api/montacargas/${montacargasLocal.numero}`, {
         method: 'PUT',
         body: formData,
       });
@@ -84,7 +88,8 @@ export default function InformacionEquipo({ montacargas }) {
 
   const handleDownload = async (filename) => {
     try {
-      const response = await fetch(`http://localhost:4000/api/montacargas/documento/${filename}`);
+      console.log('Descargando desde:', `${API_URL}/api/montacargas/documento/${filename}`);
+      const response = await fetch(`${API_URL}/api/montacargas/documento/${filename}`);
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -114,7 +119,8 @@ export default function InformacionEquipo({ montacargas }) {
     setDeleting(prev => ({ ...prev, [tipo]: true }));
 
     try {
-      const response = await fetch(`http://localhost:4000/api/montacargas/documento/${montacargasLocal.numero}/${tipo}`, {
+      console.log('Eliminando documento desde:', `${API_URL}/api/montacargas/documento/${montacargasLocal.numero}/${tipo}`);
+      const response = await fetch(`${API_URL}/api/montacargas/documento/${montacargasLocal.numero}/${tipo}`, {
         method: 'DELETE',
       });
 
@@ -138,6 +144,7 @@ export default function InformacionEquipo({ montacargas }) {
     }
   };
 
+  // ... (el resto del código permanece igual)
   // Función para obtener icono según tipo de archivo
   const getFileIcon = (filename) => {
     if (!filename) return '📄';
