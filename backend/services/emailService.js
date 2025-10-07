@@ -10,7 +10,7 @@ class EmailService {
   try {
     console.log('📧 Preparando email de verificación para:', usuario.email);
     
-    const verifyUrl = `${process.env.FRONTEND_URL}/verify-success?token=${tokenVerificacion}`;
+    const verifyUrl = `https://liftgroup-frontend.onrender.com/verify-success?token=${tokenVerificacion}`;
 
     const htmlContent = `
       <!DOCTYPE html>
