@@ -24,9 +24,11 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "postbuild": "cp build/index.html build/404.html",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
+  "homepage": "https://liftgroup-frontend.onrender.com",
   "eslintConfig": {
     "extends": [
       "react-app",
