@@ -438,66 +438,18 @@ async function enviarNotificacionTecnico(tecnico, mantenimiento) {
   try {
     console.log("📧 Intentando enviar correo de notificación a:", tecnico.email);
     
-    // USAR EXACTAMENTE LA MISMA CONFIGURACIÓN que sendVerificationEmail
-    let transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: false,
-      auth: { 
-        user: process.env.SMTP_USER, 
-        pass: process.env.SMTP_PASS 
-      },
-    });
-
-    const fechaFormateada = new Date(mantenimiento.fecha).toLocaleDateString('es-ES', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    // Usar el MISMO formato de "from" que en sendVerificationEmail
-    const mailOptions = {
-      from: `"LiftGroup" <adm2liftgroup@gmail.com>`, // ← IGUAL que en verificación
-      to: tecnico.email,
-      subject: `Nueva asignación de mantenimiento - Montacargas #${mantenimiento.numero}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Nueva Asignación de Mantenimiento</h2>
-          <p>Hola <strong>${tecnico.nombre}</strong>,</p>
-          
-          <p>Se te ha asignado un nuevo mantenimiento:</p>
-          
-          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
-            <h3>Detalles del Mantenimiento</h3>
-            <p><strong>Montacargas:</strong> #${mantenimiento.numero}</p>
-            <p><strong>Marca/Modelo:</strong> ${mantenimiento.Marca} ${mantenimiento.Modelo}</p>
-            <p><strong>Tipo:</strong> ${mantenimiento.tipo}</p>
-            <p><strong>Fecha:</strong> ${fechaFormateada}</p>
-          </div>
-          
-          <p>Por favor, inicia sesión en el sistema para confirmar.</p>
-        </div>
-      `,
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    console.log("✅ Correo de notificación enviado al técnico:", tecnico.email);
-    console.log("📨 ID del mensaje:", info.messageId);
+    const emailService = require('../services/emailService');
+    await emailService.enviarAsignacionTecnico(tecnico, mantenimiento);
+    
+    console.log("✅ Correo de notificación enviado exitosamente");
     return true;
     
   } catch (error) {
-    console.error("❌ Error enviando correo al técnico:", error);
-    
-    // Log detallado del error
-    if (error.response) {
-      console.error("Código de error SMTP:", error.responseCode);
-      console.error("Respuesta SMTP:", error.response);
-    }
-    
+    console.error("❌ Error enviando correo al técnico:", error.message);
     return false;
   }
 }
+
 // BLOQUE 13: Obtener mantenimientos asignados a un técnico (GET /mis-mantenimientos)
 router.get("/mis-mantenimientos", requireAuth, async (req, res) => {
   try {
