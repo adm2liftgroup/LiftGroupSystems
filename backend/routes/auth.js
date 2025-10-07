@@ -162,7 +162,10 @@ router.get("/verify", async (req, res) => {
   
   if (!token) {
     console.log("❌ Token no proporcionado");
-    return res.status(400).send("Token requerido");
+    return res.status(400).json({ 
+      success: false, 
+      error: "Token requerido" 
+    });
   }
 
   try {
@@ -173,7 +176,10 @@ router.get("/verify", async (req, res) => {
     
     if (!q.rows.length) {
       console.log("❌ Token no encontrado en BD:", token);
-      return res.status(400).send("Token inválido");
+      return res.status(400).json({ 
+        success: false, 
+        error: "Token inválido" 
+      });
     }
 
     const user = q.rows[0];
@@ -182,25 +188,15 @@ router.get("/verify", async (req, res) => {
     
     console.log("📅 Fecha actual:", now);
     console.log("⏰ Fecha expiración:", expires);
-    console.log("⏱️ Tiempo restante:", expires - now, "ms");
 
     // Verificar si el token ha expirado
     if (expires < now) {
       console.log("❌ Token expirado para usuario:", user.email);
-      
-      // Opcional: Reenviar token de verificación automáticamente
-      const newToken = crypto.randomBytes(32).toString("hex");
-      const newExpires = new Date(Date.now() + 24 * 3600 * 1000); // 24 horas
-      
-      await pool.query(
-        'UPDATE "Usuarios" SET verification_token = $1, verification_expires = $2 WHERE id = $3',
-        [newToken, newExpires, user.id]
-      );
-      
-      // Reenviar email con nuevo token
-      await sendVerificationEmail(user.email, newToken);
-      
-      return res.redirect(`${process.env.FRONTEND_URL}/verify-error?reason=expired&email=${encodeURIComponent(user.email)}`);
+      return res.status(400).json({ 
+        success: false, 
+        error: "Token expirado",
+        email: user.email 
+      });
     }
 
     // Token válido - verificar cuenta
@@ -210,13 +206,22 @@ router.get("/verify", async (req, res) => {
     );
 
     console.log("✅ Cuenta verificada exitosamente para:", user.email);
-    return res.redirect(`${process.env.FRONTEND_URL}/verify-success`);
+    
+    return res.json({ 
+      success: true,
+      message: "Cuenta verificada exitosamente",
+      email: user.email
+    });
     
   } catch (err) {
     console.error("🔥 Error en /verify:", err);
-    res.status(500).send("Error del servidor durante la verificación");
+    return res.status(500).json({ 
+      success: false,
+      error: "Error del servidor durante la verificación" 
+    });
   }
 });
+
 // FIN DEL BLOQUE 5: Verificación de correo (GET /verify)
 
 // BLOQUE 6: Login (POST /login)
