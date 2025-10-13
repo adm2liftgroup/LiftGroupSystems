@@ -20,27 +20,29 @@ export default function InversionInicial() {
 
   // DEBUG: Verificar el ID
   useEffect(() => {
-    console.log('ID del montacargas:', id);
-    console.log('Tipo de ID:', typeof id);
-  }, [id]);
+    console.log('ID del montacargas recibido:', montacargasId);
+    console.log('Tipo de ID:', typeof montacargasId);
+  }, [montacargasId]);
 
   // Cargar refacciones al montar el componente
   useEffect(() => {
-    if (id) {
+    if (montacargasId) {
+      console.log('Cargando refacciones para ID:', montacargasId);
       cargarRefacciones();
     }
-  }, [id]);
+  }, [montacargasId]);
 
   const cargarRefacciones = async () => {
     try {
       setLoading(true);
-      console.log('Cargando refacciones para montacargas ID:', id);
+      console.log('Solicitando refacciones para:', montacargasId);
       
-      const response = await axios.get(`${API_URL}/api/montacargas/${id}/refacciones`);
+      const response = await axios.get(`${API_URL}/api/montacargas/${montacargasId}/refacciones`);
       
       if (response.data.success) {
         setRefacciones(response.data.refacciones);
         setTotales(response.data.totales);
+        console.log('Refacciones cargadas:', response.data.refacciones);
       }
     } catch (error) {
       console.error('Error cargando refacciones:', error);
@@ -103,12 +105,11 @@ export default function InversionInicial() {
   };
 
   // Si no hay ID, mostrar mensaje de error
-  if (!id || id === 'undefined') {
+  if (!montacargasId) {
     return (
       <div className="p-6">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          <h2 className="font-bold">Error</h2>
-          <p>No se pudo identificar el montacargas. Verifica la URL.</p>
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+          <p>Selecciona un montacargas para ver sus refacciones.</p>
         </div>
       </div>
     );
@@ -117,7 +118,7 @@ export default function InversionInicial() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">
-        Control de Refacciones - Montacargas #{id}
+        Control de Refacciones - Montacargas #{montacargasId}
       </h1>
 
       {/* Resumen de Totales */}
