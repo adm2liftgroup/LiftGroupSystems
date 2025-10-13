@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+
 import {
   FaFolder,
   FaPlus,
@@ -564,8 +565,8 @@ export default function Inicio() {
                 <ServiciosHistorial montacargas={selectedMontacargas} />
               )}
               {activeTab === "Inversión Inicial" && (
-                <Navigate to={`/montacargas/${selectedMontacargas.numero}/inversion`} />
-              )}
+                <InversionInicial montacargasId={selectedMontacargas?.numero} />
+            )}
               {activeTab === "Inversión Habilitar" && <InversionHabilitar />}
               {activeTab === "Refacciones con Cargo" && (
                 <RefaccionesCargo montacargas={selectedMontacargas}/>
