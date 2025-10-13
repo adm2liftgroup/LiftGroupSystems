@@ -564,7 +564,7 @@ export default function Inicio() {
                 <ServiciosHistorial montacargas={selectedMontacargas} />
               )}
               {activeTab === "Inversión Inicial" && (
-                <InversionInicial montacargas={selectedMontacargas} />
+                <Navigate to={`/montacargas/${selectedMontacargas.numero}/inversion`} />
               )}
               {activeTab === "Inversión Habilitar" && <InversionHabilitar />}
               {activeTab === "Refacciones con Cargo" && (

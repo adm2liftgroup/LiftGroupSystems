@@ -18,14 +18,24 @@ export default function InversionInicial() {
     costo_unitario: ''
   });
 
+  // DEBUG: Verificar el ID
+  useEffect(() => {
+    console.log('ID del montacargas:', id);
+    console.log('Tipo de ID:', typeof id);
+  }, [id]);
+
   // Cargar refacciones al montar el componente
   useEffect(() => {
-    cargarRefacciones();
+    if (id) {
+      cargarRefacciones();
+    }
   }, [id]);
 
   const cargarRefacciones = async () => {
     try {
       setLoading(true);
+      console.log('Cargando refacciones para montacargas ID:', id);
+      
       const response = await axios.get(`${API_URL}/api/montacargas/${id}/refacciones`);
       
       if (response.data.success) {
@@ -43,6 +53,15 @@ export default function InversionInicial() {
   const agregarRefaccion = async (e) => {
     e.preventDefault();
     try {
+      // Validar que tenemos un ID válido
+      if (!id || id === 'undefined') {
+        alert('Error: No se pudo identificar el montacargas');
+        return;
+      }
+
+      console.log('Agregando refacción para montacargas ID:', id);
+      console.log('Datos a enviar:', formData);
+
       const response = await axios.post(
         `${API_URL}/api/montacargas/${id}/refacciones`,
         formData
@@ -50,14 +69,20 @@ export default function InversionInicial() {
 
       if (response.data.success) {
         setRefacciones([response.data.refaccion, ...refacciones]);
-        setFormData({ descripcion: '', numero_parte: '', cantidad: 1, costo_unitario: '' });
+        setFormData({ 
+          descripcion: '', 
+          numero_parte: '', 
+          cantidad: 1, 
+          costo_unitario: '' 
+        });
         setShowForm(false);
         cargarRefacciones(); // Recargar para actualizar totales
         alert('Refacción agregada correctamente');
       }
     } catch (error) {
       console.error('Error agregando refacción:', error);
-      alert('Error al agregar la refacción');
+      console.error('Detalles del error:', error.response?.data);
+      alert('Error al agregar la refacción: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -76,6 +101,18 @@ export default function InversionInicial() {
       alert('Error al eliminar la refacción');
     }
   };
+
+  // Si no hay ID, mostrar mensaje de error
+  if (!id || id === 'undefined') {
+    return (
+      <div className="p-6">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          <h2 className="font-bold">Error</h2>
+          <p>No se pudo identificar el montacargas. Verifica la URL.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -109,47 +146,70 @@ export default function InversionInicial() {
           <h2 className="text-xl font-bold mb-4">Nueva Refacción</h2>
           <form onSubmit={agregarRefaccion}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <input
-                type="text"
-                placeholder="Descripción *"
-                value={formData.descripcion}
-                onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
-                className="border p-2 rounded"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Número de Parte"
-                value={formData.numero_parte}
-                onChange={(e) => setFormData({...formData, numero_parte: e.target.value})}
-                className="border p-2 rounded"
-              />
-              <input
-                type="number"
-                placeholder="Cantidad"
-                value={formData.cantidad}
-                onChange={(e) => setFormData({...formData, cantidad: parseInt(e.target.value) || 1})}
-                className="border p-2 rounded"
-                min="1"
-              />
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Costo Unitario *"
-                value={formData.costo_unitario}
-                onChange={(e) => setFormData({...formData, costo_unitario: parseFloat(e.target.value)})}
-                className="border p-2 rounded"
-                required
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Descripción *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Filtro de aceite, Batería, etc."
+                  value={formData.descripcion}
+                  onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
+                  className="border p-2 rounded w-full"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Número de Parte
+                </label>
+                <input
+                  type="text"
+                  placeholder="Opcional"
+                  value={formData.numero_parte}
+                  onChange={(e) => setFormData({...formData, numero_parte: e.target.value})}
+                  className="border p-2 rounded w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cantidad
+                </label>
+                <input
+                  type="number"
+                  placeholder="Cantidad"
+                  value={formData.cantidad}
+                  onChange={(e) => setFormData({...formData, cantidad: parseInt(e.target.value) || 1})}
+                  className="border p-2 rounded w-full"
+                  min="1"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Costo Unitario *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.costo_unitario}
+                  onChange={(e) => setFormData({...formData, costo_unitario: e.target.value})}
+                  className="border p-2 rounded w-full"
+                  required
+                />
+              </div>
             </div>
             <div className="flex gap-2">
-              <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded">
+              <button 
+                type="submit" 
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+              >
                 Guardar
               </button>
               <button 
                 type="button" 
                 onClick={() => setShowForm(false)}
-                className="bg-gray-500 text-white px-4 py-2 rounded"
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
               >
                 Cancelar
               </button>
@@ -184,9 +244,9 @@ export default function InversionInicial() {
                   <td className="p-3">{refaccion.descripcion}</td>
                   <td className="p-3">{refaccion.numero_parte || 'N/A'}</td>
                   <td className="p-3">{refaccion.cantidad}</td>
-                  <td className="p-3">${refaccion.costo_unitario.toLocaleString()}</td>
+                  <td className="p-3">${parseFloat(refaccion.costo_unitario).toLocaleString()}</td>
                   <td className="p-3 font-semibold">
-                    ${(refaccion.cantidad * refaccion.costo_unitario).toLocaleString()}
+                    ${(refaccion.cantidad * parseFloat(refaccion.costo_unitario)).toLocaleString()}
                   </td>
                   <td className="p-3">
                     <button

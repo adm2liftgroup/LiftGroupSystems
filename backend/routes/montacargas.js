@@ -321,22 +321,31 @@ router.delete("/documento/:id/:tipo", async (req, res) => {
   }
 });
 
-//BLOQUE NUEVO 
 // GET - Obtener todas las refacciones de un montacargas
 router.get("/:id/refacciones", async (req, res) => {
   try {
     const { id } = req.params;
     
+    // VALIDACIÓN CRÍTICA: Verificar que el ID sea un número válido
+    const montacargasId = parseInt(id);
+    if (isNaN(montacargasId)) {
+      return res.status(400).json({ 
+        error: "ID de montacargas inválido" 
+      });
+    }
+
+    console.log('Buscando refacciones para montacargas ID:', montacargasId);
+    
     const result = await pool.query(
       `SELECT * FROM refacciones_montacargas 
        WHERE montacargas_id = $1 
        ORDER BY creado_en DESC`,
-      [id]
+      [montacargasId]
     );
 
     // Calcular totales
     const totalRefacciones = result.rows.reduce((sum, item) => sum + item.cantidad, 0);
-    const costoTotal = result.rows.reduce((sum, item) => sum + (item.costo_unitario * item.cantidad), 0);
+    const costoTotal = result.rows.reduce((sum, item) => sum + (parseFloat(item.costo_unitario) * item.cantidad), 0);
 
     res.json({
       success: true,
@@ -352,23 +361,40 @@ router.get("/:id/refacciones", async (req, res) => {
   }
 });
 
-// POST - Agregar nueva refacción
+// POST - Agregar nueva refacción (SOLO UNA VEZ)
 router.post("/:id/refacciones", async (req, res) => {
   try {
     const { id } = req.params;
     const { descripcion, numero_parte, cantidad, costo_unitario } = req.body;
 
-    // Validaciones
+    // VALIDACIÓN CRÍTICA: Verificar que el ID sea un número válido
+    const montacargasId = parseInt(id);
+    if (isNaN(montacargasId)) {
+      return res.status(400).json({ 
+        error: "ID de montacargas inválido" 
+      });
+    }
+
+    // Validaciones de campos requeridos
     if (!descripcion || !costo_unitario) {
       return res.status(400).json({ error: "Descripción y costo son requeridos" });
     }
+
+    // Validar que el costo sea un número
+    const costo = parseFloat(costo_unitario);
+    if (isNaN(costo)) {
+      return res.status(400).json({ error: "El costo debe ser un número válido" });
+    }
+
+    console.log('Agregando refacción para montacargas ID:', montacargasId);
+    console.log('Datos recibidos:', { descripcion, numero_parte, cantidad, costo_unitario: costo });
 
     const result = await pool.query(
       `INSERT INTO refacciones_montacargas 
        (montacargas_id, descripcion, numero_parte, cantidad, costo_unitario) 
        VALUES ($1, $2, $3, $4, $5) 
        RETURNING *`,
-      [id, descripcion, numero_parte || null, cantidad || 1, costo_unitario]
+      [montacargasId, descripcion, numero_parte || null, cantidad || 1, costo]
     );
 
     res.json({
@@ -378,7 +404,11 @@ router.post("/:id/refacciones", async (req, res) => {
     });
   } catch (error) {
     console.error("Error agregando refacción:", error);
-    res.status(500).json({ error: "Error del servidor" });
+    console.error("Detalles del error:", error.message);
+    res.status(500).json({ 
+      error: "Error del servidor",
+      details: error.message 
+    });
   }
 });
 
