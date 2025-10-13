@@ -10,6 +10,7 @@ export default function InversionInicial() {
   const [totales, setTotales] = useState({ totalRefacciones: 0, costoTotal: 0 });
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [refaccionAEliminar, setRefaccionAEliminar] = useState(null);
   const [formData, setFormData] = useState({
     descripcion: '',
     numero_parte: '',
@@ -61,14 +62,13 @@ export default function InversionInicial() {
   };
 
   const eliminarRefaccion = async (refaccionId) => {
-    if (!confirm('¿Estás seguro de eliminar esta refacción?')) return;
-
     try {
       const response = await axios.delete(`${API_URL}/api/montacargas/refacciones/${refaccionId}`);
       
       if (response.data.success) {
         setRefacciones(refacciones.filter(ref => ref.id !== refaccionId));
         cargarRefacciones(); // Recargar para actualizar totales
+        setRefaccionAEliminar(null); // Cerrar modal
         alert('Refacción eliminada correctamente');
       }
     } catch (error) {
@@ -160,40 +160,72 @@ export default function InversionInicial() {
 
       {/* Tabla de refacciones */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="p-3 text-left">Descripción</th>
-              <th className="p-3 text-left">N° Parte</th>
-              <th className="p-3 text-left">Cantidad</th>
-              <th className="p-3 text-left">Costo Unitario</th>
-              <th className="p-3 text-left">Subtotal</th>
-              <th className="p-3 text-left">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {refacciones.map((refaccion) => (
-              <tr key={refaccion.id} className="border-b hover:bg-gray-50">
-                <td className="p-3">{refaccion.descripcion}</td>
-                <td className="p-3">{refaccion.numero_parte || 'N/A'}</td>
-                <td className="p-3">{refaccion.cantidad}</td>
-                <td className="p-3">${refaccion.costo_unitario.toLocaleString()}</td>
-                <td className="p-3 font-semibold">
-                  ${(refaccion.cantidad * refaccion.costo_unitario).toLocaleString()}
-                </td>
-                <td className="p-3">
-                  <button
-                    onClick={() => eliminarRefaccion(refaccion.id)}
-                    className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
-                  >
-                    Eliminar
-                  </button>
-                </td>
+        {loading ? (
+          <div className="p-4 text-center">Cargando refacciones...</div>
+        ) : refacciones.length === 0 ? (
+          <div className="p-4 text-center text-gray-500">
+            No hay refacciones registradas para este montacargas
+          </div>
+        ) : (
+          <table className="min-w-full">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="p-3 text-left">Descripción</th>
+                <th className="p-3 text-left">N° Parte</th>
+                <th className="p-3 text-left">Cantidad</th>
+                <th className="p-3 text-left">Costo Unitario</th>
+                <th className="p-3 text-left">Subtotal</th>
+                <th className="p-3 text-left">Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {refacciones.map((refaccion) => (
+                <tr key={refaccion.id} className="border-b hover:bg-gray-50">
+                  <td className="p-3">{refaccion.descripcion}</td>
+                  <td className="p-3">{refaccion.numero_parte || 'N/A'}</td>
+                  <td className="p-3">{refaccion.cantidad}</td>
+                  <td className="p-3">${refaccion.costo_unitario.toLocaleString()}</td>
+                  <td className="p-3 font-semibold">
+                    ${(refaccion.cantidad * refaccion.costo_unitario).toLocaleString()}
+                  </td>
+                  <td className="p-3">
+                    <button
+                      onClick={() => setRefaccionAEliminar(refaccion.id)}
+                      className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                    >
+                      Eliminar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
+
+      {/* Modal de Confirmación */}
+      {refaccionAEliminar && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-bold mb-4">Confirmar Eliminación</h3>
+            <p className="mb-6">¿Estás seguro de eliminar esta refacción?</p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setRefaccionAEliminar(null)}
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => eliminarRefaccion(refaccionAEliminar)}
+                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
