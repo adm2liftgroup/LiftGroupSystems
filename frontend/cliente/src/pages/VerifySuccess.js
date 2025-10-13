@@ -24,13 +24,13 @@ export default function VerifySuccess() {
     const verifyAccount = async () => {
       try {
         setIsLoading(true);
-        console.log("🔍 Verificando token:", token);
+        console.log("Verificando token:", token);
         
         const response = await axios.get(`${API_URL}/auth/verify?token=${token}`);
-        console.log("✅ Respuesta del backend:", response.data);
+        console.log("Respuesta del backend:", response.data);
         
         if (response.data.success) {
-          setMessage("✅ ¡Cuenta verificada exitosamente!");
+          setMessage("¡Cuenta verificada exitosamente!");
           setIsSuccess(true);
           
           // Redirigir al login después de 3 segundos
@@ -38,23 +38,23 @@ export default function VerifySuccess() {
             navigate("/");
           }, 3000);
         } else {
-          setMessage(`❌ ${response.data.error || "Error al verificar la cuenta"}`);
+          setMessage(`${response.data.error || "Error al verificar la cuenta"}`);
           setIsSuccess(false);
         }
       } catch (error) {
-        console.error("❌ Error verificando cuenta:", error);
+        console.error("Error verificando cuenta:", error);
         
         // Manejo específico de diferentes tipos de error
         if (error.response) {
           // El servidor respondió con un status code fuera del rango 2xx
           const errorMsg = error.response.data?.error || error.response.data?.message;
-          setMessage(`❌ ${errorMsg || "Error del servidor"}`);
+          setMessage(`${errorMsg || "Error del servidor"}`);
         } else if (error.request) {
           // La petición fue hecha pero no se recibió respuesta
-          setMessage("❌ Error de conexión. Por favor intenta nuevamente.");
+          setMessage("Error de conexión. Por favor intenta nuevamente.");
         } else {
           // Algo pasó al configurar la petición
-          setMessage("❌ Error inesperado. Por favor intenta nuevamente.");
+          setMessage("Error inesperado. Por favor intenta nuevamente.");
         }
         
         setIsSuccess(false);
@@ -82,7 +82,7 @@ export default function VerifySuccess() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
       <div className="bg-white shadow-lg rounded-2xl p-8 max-w-md text-center">
         <h1 className={`text-2xl font-bold mb-4 ${isSuccess ? 'text-green-600' : 'text-red-600'}`}>
-          {isSuccess ? '✅ ¡Cuenta Verificada!' : '❌ Error de Verificación'}
+          {isSuccess ? '¡Cuenta Verificada!' : 'Error de Verificación'}
         </h1>
         <p className="text-gray-700 mb-6">{message}</p>
         

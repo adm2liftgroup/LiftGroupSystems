@@ -5,8 +5,8 @@ import { useNavigate, Link } from "react-router-dom";
 const API_URL = 'https://liftgroupsystems.onrender.com';
 
 // DEBUG: Verificar que la variable se carga
-console.log('🔍 REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
-console.log('🔍 URL completa login:', `${process.env.REACT_APP_API_URL}/auth/login`);
+console.log('REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
+console.log('URL completa login:', `${process.env.REACT_APP_API_URL}/auth/login`);
 
 export default function Login() {
   const [formData, setFormData] = useState({

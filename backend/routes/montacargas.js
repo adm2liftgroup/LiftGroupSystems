@@ -321,4 +321,119 @@ router.delete("/documento/:id/:tipo", async (req, res) => {
   }
 });
 
+//BLOQUE NUEVO 
+// GET - Obtener todas las refacciones de un montacargas
+router.get("/:id/refacciones", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      `SELECT * FROM refacciones_montacargas 
+       WHERE montacargas_id = $1 
+       ORDER BY creado_en DESC`,
+      [id]
+    );
+
+    // Calcular totales
+    const totalRefacciones = result.rows.reduce((sum, item) => sum + item.cantidad, 0);
+    const costoTotal = result.rows.reduce((sum, item) => sum + (item.costo_unitario * item.cantidad), 0);
+
+    res.json({
+      success: true,
+      refacciones: result.rows,
+      totales: {
+        totalRefacciones,
+        costoTotal: parseFloat(costoTotal.toFixed(2))
+      }
+    });
+  } catch (error) {
+    console.error("Error obteniendo refacciones:", error);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
+// POST - Agregar nueva refacción
+router.post("/:id/refacciones", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { descripcion, numero_parte, cantidad, costo_unitario } = req.body;
+
+    // Validaciones
+    if (!descripcion || !costo_unitario) {
+      return res.status(400).json({ error: "Descripción y costo son requeridos" });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO refacciones_montacargas 
+       (montacargas_id, descripcion, numero_parte, cantidad, costo_unitario) 
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING *`,
+      [id, descripcion, numero_parte || null, cantidad || 1, costo_unitario]
+    );
+
+    res.json({
+      success: true,
+      message: "Refacción agregada correctamente",
+      refaccion: result.rows[0]
+    });
+  } catch (error) {
+    console.error("Error agregando refacción:", error);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
+// PUT - Actualizar refacción
+router.put("/refacciones/:refaccionId", async (req, res) => {
+  try {
+    const { refaccionId } = req.params;
+    const { descripcion, numero_parte, cantidad, costo_unitario } = req.body;
+
+    const result = await pool.query(
+      `UPDATE refacciones_montacargas 
+       SET descripcion = $1, numero_parte = $2, cantidad = $3, 
+           costo_unitario = $4, actualizado_en = CURRENT_TIMESTAMP
+       WHERE id = $5 
+       RETURNING *`,
+      [descripcion, numero_parte, cantidad, costo_unitario, refaccionId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Refacción no encontrada" });
+    }
+
+    res.json({
+      success: true,
+      message: "Refacción actualizada correctamente",
+      refaccion: result.rows[0]
+    });
+  } catch (error) {
+    console.error("Error actualizando refacción:", error);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
+// DELETE - Eliminar refacción
+router.delete("/refacciones/:refaccionId", async (req, res) => {
+  try {
+    const { refaccionId } = req.params;
+
+    const result = await pool.query(
+      "DELETE FROM refacciones_montacargas WHERE id = $1 RETURNING *",
+      [refaccionId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Refacción no encontrada" });
+    }
+
+    res.json({
+      success: true,
+      message: "Refacción eliminada correctamente"
+    });
+  } catch (error) {
+    console.error("Error eliminando refacción:", error);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
 module.exports = router;

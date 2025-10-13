@@ -102,7 +102,7 @@ export default function Inicio() {
   const totalPages = Math.ceil(filteredMontacargas.length / itemsPerPage);
   // FIN DEL BLOQUE 5: Paginación 
 
-  // 🔥 BLOQUE 6: Funciones de manejo de formulario y eventos
+  //  BLOQUE 6: Funciones de manejo de formulario y eventos
   const handleChange = (e) => {
     const name = e.target.name;
     const value = e.target.value;
@@ -563,7 +563,9 @@ export default function Inicio() {
               {activeTab === "Servicios Preventivos Historial" && (
                 <ServiciosHistorial montacargas={selectedMontacargas} />
               )}
-              {activeTab === "Inversión Inicial" && <InversionInicial />}
+              {activeTab === "Inversión Inicial" && (
+                <InversionInicial montacargas={selectedMontacargas} />
+              )}
               {activeTab === "Inversión Habilitar" && <InversionHabilitar />}
               {activeTab === "Refacciones con Cargo" && (
                 <RefaccionesCargo montacargas={selectedMontacargas}/>
