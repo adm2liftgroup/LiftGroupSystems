@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-export default function InversionInicial() {
-  const { id } = useParams(); // ID del montacargas
+export default function InversionInicial({ montacargasId }) {
+  // Asignar montacargasId a una variable 'id' para usar en todo el componente
+  const id = montacargasId;
+  
   const [refacciones, setRefacciones] = useState([]);
   const [totales, setTotales] = useState({ totalRefacciones: 0, costoTotal: 0 });
   const [loading, setLoading] = useState(false);
@@ -20,24 +21,24 @@ export default function InversionInicial() {
 
   // DEBUG: Verificar el ID
   useEffect(() => {
-    console.log('ID del montacargas recibido:', montacargasId);
-    console.log('Tipo de ID:', typeof montacargasId);
-  }, [montacargasId]);
+    console.log('ID del montacargas recibido:', id);
+    console.log('Tipo de ID:', typeof id);
+  }, [id]);
 
-  // Cargar refacciones al montar el componente
+  // Cargar refacciones cuando cambie el ID
   useEffect(() => {
-    if (montacargasId) {
-      console.log('Cargando refacciones para ID:', montacargasId);
+    if (id) {
+      console.log('Cargando refacciones para ID:', id);
       cargarRefacciones();
     }
-  }, [montacargasId]);
+  }, [id]);
 
   const cargarRefacciones = async () => {
     try {
       setLoading(true);
-      console.log('Solicitando refacciones para:', montacargasId);
+      console.log('Solicitando refacciones para:', id);
       
-      const response = await axios.get(`${API_URL}/api/montacargas/${montacargasId}/refacciones`);
+      const response = await axios.get(`${API_URL}/api/montacargas/${id}/refacciones`);
       
       if (response.data.success) {
         setRefacciones(response.data.refacciones);
@@ -104,8 +105,8 @@ export default function InversionInicial() {
     }
   };
 
-  // Si no hay ID, mostrar mensaje de error
-  if (!montacargasId) {
+  // Si no hay ID, mostrar mensaje
+  if (!id) {
     return (
       <div className="p-6">
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
@@ -118,7 +119,7 @@ export default function InversionInicial() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">
-        Control de Refacciones - Montacargas #{montacargasId}
+        Control de Refacciones - Montacargas #{id}
       </h1>
 
       {/* Resumen de Totales */}
