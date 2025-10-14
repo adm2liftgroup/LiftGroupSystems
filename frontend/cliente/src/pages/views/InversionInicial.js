@@ -324,7 +324,7 @@ export default function InversionInicial({ montacargasId }) {
             </div>
           </div>
         </div>
-      )}
+      )}   
     </div>
   );
 }
