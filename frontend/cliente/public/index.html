@@ -15,7 +15,7 @@
     <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="LiftGroupSystems" />
-    <link rel="manifest" href="%PUBLIC_URL%/site.webmanifest" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <!-- ========== FIN NUEVO CÓDIGO ========== -->
     
     <title>LiftGroup Systems - Gestión de Montacargas</title>
@@ -23,5 +23,18 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+    <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('/sw.js')
+        .then(function(registration) {
+          console.log('Service Worker registrado: ', registration.scope);
+        })
+        .catch(function(error) {
+          console.log('Error registrando Service Worker: ', error);
+        });
+    });
+  }
+</script>
   </body>
 </html>
