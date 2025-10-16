@@ -7,10 +7,15 @@ export default function InformacionEquipo({ montacargas }) {
   const [uploading, setUploading] = useState({});
   const [deleting, setDeleting] = useState({});
   const [montacargasLocal, setMontacargasLocal] = useState(montacargas);
+  const [showPedimentoOpcional, setShowPedimentoOpcional] = useState(false);
 
   // Actualizar el estado local cuando cambie el prop
   React.useEffect(() => {
     setMontacargasLocal(montacargas);
+    // Mostrar sección opcional de pedimento si ya existe un documento
+    if (montacargas?.documento_pedimento_opcional) {
+      setShowPedimentoOpcional(true);
+    }
   }, [montacargas]);
 
   if (!montacargasLocal) return <p>No se seleccionó ningún montacargas.</p>;
@@ -53,16 +58,7 @@ export default function InformacionEquipo({ montacargas }) {
       formData.append('Planta', montacargasLocal.Planta || '');
 
       console.log('Enviando datos a:', `${API_URL}/api/montacargas/${montacargasLocal.numero}`);
-      console.log('Datos:', {
-        Marca: montacargasLocal.Marca,
-        Modelo: montacargasLocal.Modelo,
-        Serie: montacargasLocal.Serie,
-        Sistema: montacargasLocal.Sistema,
-        Capacidad: capacidad,
-        Ubicacion: montacargasLocal.Ubicacion,
-        Planta: montacargasLocal.Planta
-      });
-
+      
       const response = await fetch(`${API_URL}/api/montacargas/${montacargasLocal.numero}`, {
         method: 'PUT',
         body: formData,
@@ -73,6 +69,10 @@ export default function InformacionEquipo({ montacargas }) {
       if (response.ok) {
         // Actualizar el estado local
         setMontacargasLocal(responseData);
+        // Si es documento opcional de pedimento, mostrar la sección
+        if (tipo === 'pedimento_opcional') {
+          setShowPedimentoOpcional(true);
+        }
         alert('✅ Documento cargado correctamente');
       } else {
         throw new Error(responseData.error || responseData.details || 'Error al cargar documento');
@@ -132,6 +132,10 @@ export default function InformacionEquipo({ montacargas }) {
           ...prev,
           [`documento_${tipo}`]: null
         }));
+        // Si es documento opcional de pedimento y se elimina, ocultar la sección
+        if (tipo === 'pedimento_opcional') {
+          setShowPedimentoOpcional(false);
+        }
         alert('✅ Documento eliminado correctamente');
       } else {
         throw new Error(result.error || result.details || 'Error al eliminar documento');
@@ -144,7 +148,6 @@ export default function InformacionEquipo({ montacargas }) {
     }
   };
 
-  // ... (el resto del código permanece igual)
   // Función para obtener icono según tipo de archivo
   const getFileIcon = (filename) => {
     if (!filename) return '📄';
@@ -186,7 +189,7 @@ export default function InformacionEquipo({ montacargas }) {
         </div>
       </div>
 
-      {/* Sección de Documentos - Pedimento */}
+      {/* Sección de Documentos - Pedimento (CON DOS DOCUMENTOS) */}
       <div style={{ 
         marginTop: '20px', 
         padding: '20px', 
@@ -202,106 +205,290 @@ export default function InformacionEquipo({ montacargas }) {
           alignItems: 'center',
           gap: '10px'
         }}>
-          📋 Documento de Pedimento
+          📋 Documentos de Pedimento
         </h4>
-        
-        {montacargasLocal.documento_pedimento ? (
-          <div style={{ background: 'white', padding: '15px', borderRadius: '8px', border: '1px solid #ddd' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-              <span style={{ fontSize: '1.5em' }}>{getFileIcon(montacargasLocal.documento_pedimento)}</span>
-              <div>
-                <p style={{ margin: 0, fontWeight: 'bold' }}>
-                  {formatFileName(montacargasLocal.documento_pedimento)}
-                </p>
-                <p style={{ margin: 0, fontSize: '0.8em', color: '#666' }}>
-                  {montacargasLocal.documento_pedimento}
-                </p>
+
+        {/* Documento de Pedimento PRINCIPAL (OBLIGATORIO) */}
+        <div style={{ marginBottom: '25px' }}>
+          <h5 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>Pedimento Principal</h5>
+          
+          {montacargasLocal.documento_pedimento ? (
+            <div style={{ background: 'white', padding: '15px', borderRadius: '8px', border: '1px solid #ddd' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+                <span style={{ fontSize: '1.5em' }}>{getFileIcon(montacargasLocal.documento_pedimento)}</span>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 'bold' }}>
+                    {formatFileName(montacargasLocal.documento_pedimento)}
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.8em', color: '#666' }}>
+                    {montacargasLocal.documento_pedimento}
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <button 
+                  onClick={() => handleDownload(montacargasLocal.documento_pedimento)}
+                  style={{
+                    padding: '10px 20px',
+                    background: 'linear-gradient(135deg, #4CAF50, #45a049)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
+                  onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                >
+                  ⬇️ Descargar
+                </button>
+                <button 
+                  onClick={() => handleDeleteDocument('pedimento')}
+                  style={{
+                    padding: '10px 20px',
+                    background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: deleting.pedimento ? 'not-allowed' : 'pointer',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'all 0.3s ease',
+                    opacity: deleting.pedimento ? 0.6 : 1
+                  }}
+                  onMouseOver={(e) => !deleting.pedimento && (e.target.style.transform = 'scale(1.05)')}
+                  onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                  disabled={deleting.pedimento}
+                >
+                  {deleting.pedimento ? '⏳ Eliminando...' : '🗑️ Eliminar'}
+                </button>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <button 
-                onClick={() => handleDownload(montacargasLocal.documento_pedimento)}
-                style={{
-                  padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #4CAF50, #45a049)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
-                onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
-              >
-                ⬇️ Descargar
-              </button>
-              <button 
-                onClick={() => handleDeleteDocument('pedimento')}
-                style={{
-                  padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: deleting.pedimento ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  transition: 'all 0.3s ease',
-                  opacity: deleting.pedimento ? 0.6 : 1
-                }}
-                onMouseOver={(e) => !deleting.pedimento && (e.target.style.transform = 'scale(1.05)')}
-                onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
-                disabled={deleting.pedimento}
-              >
-                {deleting.pedimento ? '⏳ Eliminando...' : '🗑️ Eliminar'}
-              </button>
-            </div>
+          ) : (
+            <p style={{ color: '#666', fontStyle: 'italic', marginBottom: '15px' }}>
+              No se ha cargado el documento de pedimento principal
+            </p>
+          )}
+          
+          <div style={{ marginTop: '15px' }}>
+            <input
+              type="file"
+              id="pedimento-upload"
+              accept=".pdf,.doc,.docx,.txt"
+              onChange={(e) => handleFileUpload(e, 'pedimento')}
+              style={{ display: 'none' }}
+            />
+            <label 
+              htmlFor="pedimento-upload" 
+              style={{
+                padding: '12px 25px',
+                background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: uploading.pedimento ? 'not-allowed' : 'pointer',
+                fontWeight: 'bold',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.3s ease',
+                opacity: uploading.pedimento ? 0.6 : 1
+              }}
+              onMouseOver={(e) => !uploading.pedimento && (e.target.style.transform = 'scale(1.05)')}
+              onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+            >
+              {uploading.pedimento ? '⏳ Cargando...' : (montacargasLocal.documento_pedimento ? '🔄 Reemplazar Documento' : '📤 Cargar Pedimento Principal')}
+            </label>
           </div>
-        ) : (
-          <p style={{ color: '#666', fontStyle: 'italic', marginBottom: '15px' }}>
-            No se ha cargado el documento de pedimento
-          </p>
-        )}
-        
-        <div style={{ marginTop: '15px' }}>
-          <input
-            type="file"
-            id="pedimento-upload"
-            accept=".pdf,.doc,.docx,.txt"
-            onChange={(e) => handleFileUpload(e, 'pedimento')}
-            style={{ display: 'none' }}
-          />
-          <label 
-            htmlFor="pedimento-upload" 
-            style={{
-              padding: '12px 25px',
-              background: 'linear-gradient(135deg, #667eea, #764ba2)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: uploading.pedimento ? 'not-allowed' : 'pointer',
-              fontWeight: 'bold',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.3s ease',
-              opacity: uploading.pedimento ? 0.6 : 1
-            }}
-            onMouseOver={(e) => !uploading.pedimento && (e.target.style.transform = 'scale(1.05)')}
-            onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
-          >
-            {uploading.pedimento ? '⏳ Cargando...' : (montacargasLocal.documento_pedimento ? '🔄 Reemplazar Documento' : '📤 Cargar Documento')}
-          </label>
         </div>
+
+        {/* Documento de Pedimento OPCIONAL */}
+        {!showPedimentoOpcional && !montacargasLocal.documento_pedimento_opcional && (
+          <div style={{ 
+            textAlign: 'center',
+            padding: '15px',
+            border: '1px dashed #ddd',
+            borderRadius: '8px',
+            background: '#f0f0f0'
+          }}>
+            <button
+              onClick={() => setShowPedimentoOpcional(true)}
+              style={{
+                padding: '10px 20px',
+                background: 'transparent',
+                color: '#28a745',
+                border: '2px solid #28a745',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.background = '#28a745';
+                e.target.style.color = 'white';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.background = 'transparent';
+                e.target.style.color = '#28a745';
+              }}
+            >
+              ➕ Agregar Documento Opcional de Pedimento
+            </button>
+          </div>
+        )}
+
+        {(showPedimentoOpcional || montacargasLocal.documento_pedimento_opcional) && (
+          <div style={{ 
+            marginTop: '20px',
+            padding: '15px',
+            border: '1px solid #e0e0e0',
+            borderRadius: '8px',
+            background: '#f0f8ff'
+          }}>
+            <h5 style={{ 
+              margin: '0 0 10px 0', 
+              color: '#2c3e50',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              📄 Documento Opcional de Pedimento
+            </h5>
+            
+            {montacargasLocal.documento_pedimento_opcional ? (
+              <div style={{ background: 'white', padding: '15px', borderRadius: '8px', border: '1px solid #ddd' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+                  <span style={{ fontSize: '1.5em' }}>{getFileIcon(montacargasLocal.documento_pedimento_opcional)}</span>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 'bold' }}>
+                      {formatFileName(montacargasLocal.documento_pedimento_opcional)}
+                    </p>
+                    <p style={{ margin: 0, fontSize: '0.8em', color: '#666' }}>
+                      {montacargasLocal.documento_pedimento_opcional}
+                    </p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <button 
+                    onClick={() => handleDownload(montacargasLocal.documento_pedimento_opcional)}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'linear-gradient(135deg, #4CAF50, #45a049)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
+                    onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                  >
+                    ⬇️ Descargar
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteDocument('pedimento_opcional')}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: deleting.pedimento_opcional ? 'not-allowed' : 'pointer',
+                      fontWeight: 'bold',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.3s ease',
+                      opacity: deleting.pedimento_opcional ? 0.6 : 1
+                    }}
+                    onMouseOver={(e) => !deleting.pedimento_opcional && (e.target.style.transform = 'scale(1.05)')}
+                    onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                    disabled={deleting.pedimento_opcional}
+                  >
+                    {deleting.pedimento_opcional ? '⏳ Eliminando...' : '🗑️ Eliminar'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p style={{ color: '#666', fontStyle: 'italic', marginBottom: '15px' }}>
+                  No se ha cargado el documento opcional
+                </p>
+                
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    type="file"
+                    id="pedimento-opcional-upload"
+                    accept=".pdf,.doc,.docx,.txt"
+                    onChange={(e) => handleFileUpload(e, 'pedimento_opcional')}
+                    style={{ display: 'none' }}
+                  />
+                  <label 
+                    htmlFor="pedimento-opcional-upload" 
+                    style={{
+                      padding: '10px 20px',
+                      background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: uploading.pedimento_opcional ? 'not-allowed' : 'pointer',
+                      fontWeight: 'bold',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'all 0.3s ease',
+                      opacity: uploading.pedimento_opcional ? 0.6 : 1
+                    }}
+                    onMouseOver={(e) => !uploading.pedimento_opcional && (e.target.style.transform = 'scale(1.05)')}
+                    onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                  >
+                    {uploading.pedimento_opcional ? '⏳ Cargando...' : '📤 Cargar Documento Opcional'}
+                  </label>
+                  
+                  <button
+                    onClick={() => setShowPedimentoOpcional(false)}
+                    style={{
+                      padding: '10px 20px',
+                      background: 'transparent',
+                      color: '#6c757d',
+                      border: '1px solid #6c757d',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.background = '#6c757d';
+                      e.target.style.color = 'white';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.background = 'transparent';
+                      e.target.style.color = '#6c757d';
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Sección de Documentos - Adicional */}
+      {/* Sección de Documentos - Factura (SE MANTIENE IGUAL) */}
       <div style={{ 
         marginTop: '20px', 
         padding: '20px', 
@@ -380,7 +567,7 @@ export default function InformacionEquipo({ montacargas }) {
           </div>
         ) : (
           <p style={{ color: '#666', fontStyle: 'italic', marginBottom: '15px' }}>
-            No se ha cargado el documento adicional
+            No se ha cargado la factura
           </p>
         )}
         
@@ -411,7 +598,7 @@ export default function InformacionEquipo({ montacargas }) {
             onMouseOver={(e) => !uploading.adicional && (e.target.style.transform = 'scale(1.05)')}
             onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
           >
-            {uploading.adicional ? '⏳ Cargando...' : (montacargasLocal.documento_adicional ? '🔄 Reemplazar Documento' : '📤 Cargar Documento')}
+            {uploading.adicional ? '⏳ Cargando...' : (montacargasLocal.documento_adicional ? '🔄 Reemplazar Factura' : '📤 Cargar Factura')}
           </label>
         </div>
       </div>
