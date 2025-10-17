@@ -13,7 +13,7 @@ export default function InformacionEquipo({ montacargas }) {
   React.useEffect(() => {
     setMontacargasLocal(montacargas);
     // Mostrar sección opcional de pedimento si ya existe un documento
-    if (montacargas?.documento_pedimento_opcional) {
+    if (montacargas?.doc_ped_adicional) {
       setShowPedimentoOpcional(true);
     }
   }, [montacargas]);
@@ -42,7 +42,15 @@ export default function InformacionEquipo({ montacargas }) {
 
     try {
       const formData = new FormData();
-      formData.append('documento_' + tipo, file);
+      
+      // CORRECCIÓN: Usar los nombres correctos que espera el backend
+      if (tipo === 'pedimento') {
+        formData.append('documento_pedimento', file);
+      } else if (tipo === 'adicional') {
+        formData.append('documento_adicional', file);
+      } else if (tipo === 'ped_adicional') {
+        formData.append('doc_ped_adicional', file);
+      }
       
       // Asegurarse de que los valores numéricos se envíen correctamente
       formData.append('Marca', montacargasLocal.Marca || '');
@@ -58,6 +66,7 @@ export default function InformacionEquipo({ montacargas }) {
       formData.append('Planta', montacargasLocal.Planta || '');
 
       console.log('Enviando datos a:', `${API_URL}/api/montacargas/${montacargasLocal.numero}`);
+      console.log('Tipo de documento:', tipo);
       
       const response = await fetch(`${API_URL}/api/montacargas/${montacargasLocal.numero}`, {
         method: 'PUT',
@@ -70,7 +79,7 @@ export default function InformacionEquipo({ montacargas }) {
         // Actualizar el estado local
         setMontacargasLocal(responseData);
         // Si es documento opcional de pedimento, mostrar la sección
-        if (tipo === 'pedimento_opcional') {
+        if (tipo === 'ped_adicional') {
           setShowPedimentoOpcional(true);
         }
         alert('✅ Documento cargado correctamente');
@@ -130,10 +139,13 @@ export default function InformacionEquipo({ montacargas }) {
         // Actualizar el estado local
         setMontacargasLocal(prev => ({
           ...prev,
-          [`documento_${tipo}`]: null
+          // CORRECCIÓN: Usar los nombres correctos de campos
+          ...(tipo === 'pedimento' && { documento_pedimento: null }),
+          ...(tipo === 'adicional' && { documento_adicional: null }),
+          ...(tipo === 'ped_adicional' && { doc_ped_adicional: null })
         }));
         // Si es documento opcional de pedimento y se elimina, ocultar la sección
-        if (tipo === 'pedimento_opcional') {
+        if (tipo === 'ped_adicional') {
           setShowPedimentoOpcional(false);
         }
         alert('✅ Documento eliminado correctamente');
@@ -309,7 +321,7 @@ export default function InformacionEquipo({ montacargas }) {
         </div>
 
         {/* Documento de Pedimento OPCIONAL */}
-        {!showPedimentoOpcional && !montacargasLocal.documento_pedimento_opcional && (
+        {!showPedimentoOpcional && !montacargasLocal.doc_ped_adicional && (
           <div style={{ 
             textAlign: 'center',
             padding: '15px',
@@ -346,7 +358,7 @@ export default function InformacionEquipo({ montacargas }) {
           </div>
         )}
 
-        {(showPedimentoOpcional || montacargasLocal.documento_pedimento_opcional) && (
+        {(showPedimentoOpcional || montacargasLocal.doc_ped_adicional) && (
           <div style={{ 
             marginTop: '20px',
             padding: '15px',
@@ -364,22 +376,22 @@ export default function InformacionEquipo({ montacargas }) {
               📄 Documento Opcional de Pedimento
             </h5>
             
-            {montacargasLocal.documento_pedimento_opcional ? (
+            {montacargasLocal.doc_ped_adicional ? (
               <div style={{ background: 'white', padding: '15px', borderRadius: '8px', border: '1px solid #ddd' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-                  <span style={{ fontSize: '1.5em' }}>{getFileIcon(montacargasLocal.documento_pedimento_opcional)}</span>
+                  <span style={{ fontSize: '1.5em' }}>{getFileIcon(montacargasLocal.doc_ped_adicional)}</span>
                   <div>
                     <p style={{ margin: 0, fontWeight: 'bold' }}>
-                      {formatFileName(montacargasLocal.documento_pedimento_opcional)}
+                      {formatFileName(montacargasLocal.doc_ped_adicional)}
                     </p>
                     <p style={{ margin: 0, fontSize: '0.8em', color: '#666' }}>
-                      {montacargasLocal.documento_pedimento_opcional}
+                      {montacargasLocal.doc_ped_adicional}
                     </p>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   <button 
-                    onClick={() => handleDownload(montacargasLocal.documento_pedimento_opcional)}
+                    onClick={() => handleDownload(montacargasLocal.doc_ped_adicional)}
                     style={{
                       padding: '8px 16px',
                       background: 'linear-gradient(135deg, #4CAF50, #45a049)',
@@ -399,26 +411,26 @@ export default function InformacionEquipo({ montacargas }) {
                     ⬇️ Descargar
                   </button>
                   <button 
-                    onClick={() => handleDeleteDocument('pedimento_opcional')}
+                    onClick={() => handleDeleteDocument('ped_adicional')}
                     style={{
                       padding: '8px 16px',
                       background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '6px',
-                      cursor: deleting.pedimento_opcional ? 'not-allowed' : 'pointer',
+                      cursor: deleting.ped_adicional ? 'not-allowed' : 'pointer',
                       fontWeight: 'bold',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '5px',
                       transition: 'all 0.3s ease',
-                      opacity: deleting.pedimento_opcional ? 0.6 : 1
+                      opacity: deleting.ped_adicional ? 0.6 : 1
                     }}
-                    onMouseOver={(e) => !deleting.pedimento_opcional && (e.target.style.transform = 'scale(1.05)')}
+                    onMouseOver={(e) => !deleting.ped_adicional && (e.target.style.transform = 'scale(1.05)')}
                     onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
-                    disabled={deleting.pedimento_opcional}
+                    disabled={deleting.ped_adicional}
                   >
-                    {deleting.pedimento_opcional ? '⏳ Eliminando...' : '🗑️ Eliminar'}
+                    {deleting.ped_adicional ? '⏳ Eliminando...' : '🗑️ Eliminar'}
                   </button>
                 </div>
               </div>
@@ -433,7 +445,7 @@ export default function InformacionEquipo({ montacargas }) {
                     type="file"
                     id="pedimento-opcional-upload"
                     accept=".pdf,.doc,.docx,.txt"
-                    onChange={(e) => handleFileUpload(e, 'pedimento_opcional')}
+                    onChange={(e) => handleFileUpload(e, 'ped_adicional')}
                     style={{ display: 'none' }}
                   />
                   <label 
@@ -444,18 +456,18 @@ export default function InformacionEquipo({ montacargas }) {
                       color: 'white',
                       border: 'none',
                       borderRadius: '6px',
-                      cursor: uploading.pedimento_opcional ? 'not-allowed' : 'pointer',
+                      cursor: uploading.ped_adicional ? 'not-allowed' : 'pointer',
                       fontWeight: 'bold',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '8px',
                       transition: 'all 0.3s ease',
-                      opacity: uploading.pedimento_opcional ? 0.6 : 1
+                      opacity: uploading.ped_adicional ? 0.6 : 1
                     }}
-                    onMouseOver={(e) => !uploading.pedimento_opcional && (e.target.style.transform = 'scale(1.05)')}
+                    onMouseOver={(e) => !uploading.ped_adicional && (e.target.style.transform = 'scale(1.05)')}
                     onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
                   >
-                    {uploading.pedimento_opcional ? '⏳ Cargando...' : '📤 Cargar Documento Opcional'}
+                    {uploading.ped_adicional ? '⏳ Cargando...' : '📤 Cargar Documento Opcional'}
                   </label>
                   
                   <button

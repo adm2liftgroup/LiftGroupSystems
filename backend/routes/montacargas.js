@@ -40,7 +40,7 @@ const upload = multer({
 router.get("/", async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional" FROM "Montacargas" ORDER BY numero ASC'
+      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional", "doc_ped_adicional" FROM "Montacargas" ORDER BY numero ASC'
     );
     res.json(result.rows);
   } catch (err) {
@@ -54,7 +54,7 @@ router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional" FROM "Montacargas" WHERE numero = $1',
+      'SELECT numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional", "doc_ped_adicional" FROM "Montacargas" WHERE numero = $1',
       [id]
     );
 
@@ -72,17 +72,20 @@ router.get("/:id", async (req, res) => {
 // BLOQUE 3: Crear montacargas
 router.post("/", upload.fields([
   { name: 'documento_pedimento', maxCount: 1 },
-  { name: 'documento_adicional', maxCount: 1 }
+  { name: 'documento_adicional', maxCount: 1 },
+  { name: 'doc_ped_adicional', maxCount: 1 }
 ]), async (req, res) => {
   try {
     const { numero, Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta } = req.body;
     
     const documentoPedimento = req.files?.documento_pedimento?.[0]?.filename || null;
     const documentoAdicional = req.files?.documento_adicional?.[0]?.filename || null;
+    const docPedAdicional = req.files?.doc_ped_adicional?.[0]?.filename || null;
 
+    // CORRECCIÓN: Insertar 11 campos con 11 parámetros
     const result = await pool.query(
-      'INSERT INTO "Montacargas" (numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional"',
-      [numero, Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta, documentoPedimento, documentoAdicional]
+      'INSERT INTO "Montacargas" (numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional", "doc_ped_adicional") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional", "doc_ped_adicional"',
+      [numero, Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta, documentoPedimento, documentoAdicional, docPedAdicional]
     );
 
     res.status(201).json(result.rows[0]);
@@ -95,7 +98,8 @@ router.post("/", upload.fields([
 // BLOQUE 4: Actualizar montacargas - CORREGIDO
 router.put("/:id", upload.fields([
   { name: 'documento_pedimento', maxCount: 1 },
-  { name: 'documento_adicional', maxCount: 1 }
+  { name: 'documento_adicional', maxCount: 1 }, 
+  { name: 'doc_ped_adicional', maxCount: 1 }
 ]), async (req, res) => {
   try {
     console.log('=== INICIANDO ACTUALIZACIÓN ===');
@@ -119,7 +123,7 @@ router.put("/:id", upload.fields([
 
     // Primero obtener el montacargas actual
     const currentResult = await pool.query(
-      'SELECT "documento_pedimento", "documento_adicional" FROM "Montacargas" WHERE numero=$1',
+      'SELECT "documento_pedimento", "documento_adicional", "doc_ped_adicional" FROM "Montacargas" WHERE numero=$1',
       [id]
     );
 
@@ -129,12 +133,12 @@ router.put("/:id", upload.fields([
 
     let documentoPedimento = currentResult.rows[0].documento_pedimento;
     let documentoAdicional = currentResult.rows[0].documento_adicional;
+    let docPedAdicional = currentResult.rows[0].doc_ped_adicional;
 
-    console.log('Documentos actuales - pedimento:', documentoPedimento, 'adicional:', documentoAdicional);
+    console.log('Documentos actuales - pedimento:', documentoPedimento, 'adicional:', documentoAdicional, 'ped_adicional:', docPedAdicional);
 
-    // Actualizar si se suben nuevos archivos
+     // Actualizar si se suben nuevos archivos
     if (req.files?.documento_pedimento) {
-      // Eliminar archivo anterior si existe
       if (documentoPedimento) {
         const oldFilePath = path.join(__dirname, '../uploads/montacargas', documentoPedimento);
         if (fs.existsSync(oldFilePath)) {
@@ -147,7 +151,6 @@ router.put("/:id", upload.fields([
     }
     
     if (req.files?.documento_adicional) {
-      // Eliminar archivo anterior si existe
       if (documentoAdicional) {
         const oldFilePath = path.join(__dirname, '../uploads/montacargas', documentoAdicional);
         if (fs.existsSync(oldFilePath)) {
@@ -159,12 +162,25 @@ router.put("/:id", upload.fields([
       console.log('Nuevo archivo adicional:', documentoAdicional);
     }
 
-    console.log('Valores finales - pedimento:', documentoPedimento, 'adicional:', documentoAdicional);
+    // NUEVO: Manejar el archivo doc_ped_adicional
+    if (req.files?.doc_ped_adicional) {
+      if (docPedAdicional) {
+        const oldFilePath = path.join(__dirname, '../uploads/montacargas', docPedAdicional);
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+          console.log('Archivo anterior ped_adicional eliminado:', docPedAdicional);
+        }
+      }
+      docPedAdicional = req.files.doc_ped_adicional[0].filename;
+      console.log('Nuevo archivo ped_adicional:', docPedAdicional);
+    }
+
+    console.log('Valores finales - pedimento:', documentoPedimento, 'adicional:', documentoAdicional, 'ped_adicional:', docPedAdicional);
     console.log('Capacidad procesada:', capacidadNum);
 
     const result = await pool.query(
-      'UPDATE "Montacargas" SET "Marca"=$1, "Modelo"=$2, "Serie"=$3, "Sistema"=$4, "Capacidad"=$5, "Ubicacion"=$6, "Planta"=$7, "documento_pedimento"=$8, "documento_adicional"=$9 WHERE numero=$10 RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional"',
-      [Marca, Modelo, Serie, Sistema, capacidadNum, Ubicacion, Planta, documentoPedimento, documentoAdicional, id]
+      'UPDATE "Montacargas" SET "Marca"=$1, "Modelo"=$2, "Serie"=$3, "Sistema"=$4, "Capacidad"=$5, "Ubicacion"=$6, "Planta"=$7, "documento_pedimento"=$8, "documento_adicional"=$9, "doc_ped_adicional"=$10 WHERE numero=$11 RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional", "doc_ped_adicional"',
+      [Marca, Modelo, Serie, Sistema, capacidadNum, Ubicacion, Planta, documentoPedimento, documentoAdicional, docPedAdicional, id]
     );
 
     console.log('Resultado de la consulta UPDATE:', result.rows[0]);
@@ -197,7 +213,7 @@ router.delete("/:id", async (req, res) => {
 
     // Obtener información de archivos antes de eliminar
     const currentMontacargas = await pool.query(
-      'SELECT "documento_pedimento", "documento_adicional" FROM "Montacargas" WHERE numero=$1',
+      'SELECT "documento_pedimento", "documento_adicional", "doc_ped_adicional" FROM "Montacargas" WHERE numero=$1',
       [id]
     );
 
@@ -211,18 +227,22 @@ router.delete("/:id", async (req, res) => {
     }
 
     // Eliminar archivos físicos si existen
-    if (currentMontacargas.rows[0]?.documento_pedimento) {
-      const filePath = path.join(__dirname, '../uploads/montacargas', currentMontacargas.rows[0].documento_pedimento);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    }
+    const documentos = currentMontacargas.rows[0];
+    if (documentos) {
+      const documentosAEliminar = [
+        documentos.documento_pedimento,
+        documentos.documento_adicional,
+        documentos.doc_ped_adicional // NUEVO
+      ];
 
-    if (currentMontacargas.rows[0]?.documento_adicional) {
-      const filePath = path.join(__dirname, '../uploads/montacargas', currentMontacargas.rows[0].documento_adicional);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      documentosAEliminar.forEach(filename => {
+        if (filename) {
+          const filePath = path.join(__dirname, '../uploads/montacargas', filename);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        }
+      });
     }
 
     res.json({ 
@@ -267,6 +287,8 @@ router.delete("/documento/:id/:tipo", async (req, res) => {
       updateField = 'documento_pedimento';
     } else if (tipo === 'adicional') {
       updateField = 'documento_adicional';
+    } else if (tipo === 'ped_adicional') { 
+      updateField = 'doc_ped_adicional';
     } else {
       return res.status(400).json({ error: "Tipo de documento inválido" });
     }
