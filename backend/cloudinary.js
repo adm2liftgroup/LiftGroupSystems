@@ -9,7 +9,7 @@ cloudinary.config({
 
 console.log('Cloudinary configurado con cloud_name:', process.env.CLOUDINARY_CLOUD_NAME);
 
-// Función para subir archivo a Cloudinary - MEJORADA
+// Función para subir archivo a Cloudinary - CORREGIDA PARA MANTENER EXTENSIÓN
 const uploadToCloudinary = async (fileBuffer, fileName) => {
   try {
     // Determinar el resource_type basado en la extensión
@@ -18,16 +18,23 @@ const uploadToCloudinary = async (fileBuffer, fileName) => {
     const isDocument = ['doc', 'docx', 'txt'].includes(fileExtension);
     const resourceType = (isPDF || isDocument) ? 'raw' : 'auto';
 
-    console.log(`Subiendo archivo: ${fileName}, Tipo: ${resourceType}`);
+    console.log(`Subiendo archivo: ${fileName}, Tipo: ${resourceType}, Extensión: ${fileExtension}`);
 
     return new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream(
         {
           resource_type: resourceType,
           folder: 'montacargas',
-          public_id: fileName.replace(/\.[^/.]+$/, ""),
-          // IMPORTANTE: No usar format para archivos raw
-          ...(resourceType === 'raw' ? {} : { format: 'pdf' })
+          // MANTENER la extensión original en el public_id
+          public_id: fileName.replace(/\.[^/.]+$/, ""), // Solo el nombre sin extensión
+          // Forzar el formato y tipo MIME correctos
+          format: fileExtension, // Usar la extensión real
+          type: 'upload',
+          ...(resourceType === 'raw' ? {
+            // Para archivos raw, asegurar que se descarguen correctamente
+            access_mode: 'public',
+            asset_folder: 'montacargas'
+          } : {})
         },
         (error, result) => {
           if (error) {
@@ -35,6 +42,8 @@ const uploadToCloudinary = async (fileBuffer, fileName) => {
             reject(error);
           } else {
             console.log('✅ Archivo subido a Cloudinary:', result.secure_url);
+            console.log('📁 Tipo de recurso:', result.resource_type);
+            console.log('📊 Formato:', result.format);
             resolve(result.secure_url);
           }
         }
@@ -46,7 +55,7 @@ const uploadToCloudinary = async (fileBuffer, fileName) => {
   }
 };
 
-// Función para eliminar archivo de Cloudinary - MEJORADA
+// Función para eliminar archivo de Cloudinary
 const deleteFromCloudinary = async (fileUrl) => {
   if (!fileUrl) return { result: 'not_deleted' };
   
@@ -73,27 +82,35 @@ const deleteFromCloudinary = async (fileUrl) => {
     return result;
   } catch (error) {
     console.error('❌ Error eliminando de Cloudinary:', error);
-    // No lanzar error para evitar bloquear la aplicación
     return { result: 'error', message: error.message };
   }
 };
 
-// Función para obtener URL de descarga directa - MEJORADA
+// Función para obtener URL de descarga directa - MEJORADA PARA FORZAR DESCARGA CORRECTA
 const getDownloadUrl = (fileUrl) => {
   if (!fileUrl) return null;
   
-  // Si ya es una URL de raw, no modificar
+  console.log('🔗 URL original de Cloudinary:', fileUrl);
+  
+  // Si es una URL de raw, forzar descarga con parámetros correctos
   if (fileUrl.includes('/raw/')) {
-    return fileUrl;
+    // Para archivos raw, usar fl_attachment para forzar descarga
+    const downloadUrl = fileUrl.replace('/upload/', '/upload/fl_attachment/');
+    console.log('⬇️ URL de descarga raw:', downloadUrl);
+    return downloadUrl;
   }
   
-  // Si es una URL de image, forzar descarga como attachment
+  // Si es una URL de image, también forzar descarga
   if (fileUrl.includes('/image/')) {
-    return fileUrl.replace('/upload/', '/upload/fl_attachment/');
+    const downloadUrl = fileUrl.replace('/upload/', '/upload/fl_attachment/');
+    console.log('⬇️ URL de descarga image:', downloadUrl);
+    return downloadUrl;
   }
   
-  // Para URLs antiguas, asumir que son raw
-  return fileUrl.replace('/upload/', '/upload/raw/');
+  // Para cualquier otra URL, forzar descarga
+  const downloadUrl = fileUrl.replace('/upload/', '/upload/fl_attachment/');
+  console.log('⬇️ URL de descarga genérica:', downloadUrl);
+  return downloadUrl;
 };
 
 module.exports = {

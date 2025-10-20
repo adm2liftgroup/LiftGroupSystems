@@ -95,29 +95,44 @@ export default function InformacionEquipo({ montacargas }) {
     }
   };
 
-  const handleDownload = async (fileUrl) => {
+  const handleDownload = async (fileUrl, originalFileName = null) => {
   try {
     if (!fileUrl) {
       alert('No hay documento para descargar');
       return;
     }
 
-    console.log('Intentando descargar:', fileUrl);
+    console.log('📥 Iniciando descarga de:', fileUrl);
 
-    // Si es una URL de Cloudinary (nuevo sistema)
+    // Si es una URL de Cloudinary
     if (fileUrl.includes('cloudinary')) {
       // Codificar la URL para que pase correctamente por la API
       const encodedUrl = encodeURIComponent(fileUrl);
       const downloadUrl = `${API_URL}/api/montacargas/documento/${encodedUrl}`;
       
-      console.log('Descargando desde Cloudinary:', downloadUrl);
+      console.log('🌐 Descargando desde Cloudinary:', downloadUrl);
       
-      // Abrir en nueva pestaña - Cloudinary maneja la descarga automáticamente
-      window.open(downloadUrl, '_blank');
+      // Crear un enlace temporal para forzar la descarga con nombre correcto
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = downloadUrl;
+      
+      // Intentar extraer el nombre del archivo de la URL
+      let fileName = 'documento.pdf'; // Nombre por defecto
+      if (fileUrl.includes('/montacargas/')) {
+        const urlParts = fileUrl.split('/');
+        const lastPart = urlParts[urlParts.length - 1];
+        fileName = lastPart || 'documento.pdf';
+      }
+      
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       
     } else {
       // Si es un archivo local (sistema antiguo)
-      console.log('Descargando archivo local:', `${API_URL}/api/montacargas/documento/${fileUrl}`);
+      console.log('💾 Descargando archivo local:', `${API_URL}/api/montacargas/documento/${fileUrl}`);
       const response = await fetch(`${API_URL}/api/montacargas/documento/${fileUrl}`);
       
       if (response.ok) {
@@ -137,7 +152,7 @@ export default function InformacionEquipo({ montacargas }) {
       }
     }
   } catch (error) {
-    console.error('Error downloading file:', error);
+    console.error('❌ Error downloading file:', error);
     alert('❌ Error al descargar el documento: ' + error.message);
   }
 };
