@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 // URL base para API - usa variable de entorno en producción
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 
-export default function InformacionEquipo({ montacargas }) {
+export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) {
   const [uploading, setUploading] = useState({});
   const [deleting, setDeleting] = useState({});
   const [montacargasLocal, setMontacargasLocal] = useState(montacargas);
@@ -76,8 +76,11 @@ export default function InformacionEquipo({ montacargas }) {
       const responseData = await response.json();
 
       if (response.ok) {
-        // Actualizar el estado local
+        // Actualizar el estado local Y notificar al padre
         setMontacargasLocal(responseData);
+        if (onMontacargasUpdate) {
+          onMontacargasUpdate(responseData);
+        }
         // Si es documento opcional de pedimento, mostrar la sección
         if (tipo === 'ped_adicional') {
           setShowPedimentoOpcional(true);
@@ -96,66 +99,74 @@ export default function InformacionEquipo({ montacargas }) {
   };
 
   const handleDownload = async (fileUrl, originalFileName = null) => {
-  try {
-    if (!fileUrl) {
-      alert('No hay documento para descargar');
-      return;
-    }
-
-    console.log('📥 Iniciando descarga de:', fileUrl);
-
-    // Si es una URL de Cloudinary
-    if (fileUrl.includes('cloudinary')) {
-      // Codificar la URL para que pase correctamente por la API
-      const encodedUrl = encodeURIComponent(fileUrl);
-      const downloadUrl = `${API_URL}/api/montacargas/documento/${encodedUrl}`;
-      
-      console.log('🌐 Descargando desde Cloudinary:', downloadUrl);
-      
-      // Crear un enlace temporal para forzar la descarga con nombre correcto
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = downloadUrl;
-      
-      // Intentar extraer el nombre del archivo de la URL
-      let fileName = 'documento.pdf'; // Nombre por defecto
-      if (fileUrl.includes('/montacargas/')) {
-        const urlParts = fileUrl.split('/');
-        const lastPart = urlParts[urlParts.length - 1];
-        fileName = lastPart || 'documento.pdf';
+    try {
+      if (!fileUrl) {
+        alert('No hay documento para descargar');
+        return;
       }
-      
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      
-    } else {
-      // Si es un archivo local (sistema antiguo)
-      console.log('💾 Descargando archivo local:', `${API_URL}/api/montacargas/documento/${fileUrl}`);
-      const response = await fetch(`${API_URL}/api/montacargas/documento/${fileUrl}`);
-      
-      if (response.ok) {
+
+      console.log('📥 Iniciando descarga de:', fileUrl);
+
+      // Si es una URL de Cloudinary
+      if (fileUrl.includes('cloudinary')) {
+        // SOLUCIÓN MEJORADA: Usar fetch para obtener el blob y descargar
+        const response = await fetch(fileUrl);
+        if (!response.ok) {
+          throw new Error('Error al obtener el archivo de Cloudinary');
+        }
+        
         const blob = await response.blob();
+        
+        // Extraer nombre del archivo de la URL
+        let fileName = 'documento.pdf';
+        try {
+          const urlObj = new URL(fileUrl);
+          const pathParts = urlObj.pathname.split('/');
+          const lastPart = pathParts[pathParts.length - 1];
+          if (lastPart && lastPart.includes('.')) {
+            fileName = lastPart;
+          }
+        } catch (e) {
+          console.log('No se pudo extraer nombre de archivo, usando predeterminado');
+        }
+        
+        // Crear URL temporal y descargar
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
-        a.download = fileUrl;
+        a.download = fileName;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
+        
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al descargar archivo');
+        // Si es un archivo local (sistema antiguo)
+        console.log('💾 Descargando archivo local:', `${API_URL}/api/montacargas/documento/${fileUrl}`);
+        const response = await fetch(`${API_URL}/api/montacargas/documento/${fileUrl}`);
+        
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = fileUrl;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Error al descargar archivo');
+        }
       }
+    } catch (error) {
+      console.error('❌ Error downloading file:', error);
+      alert('❌ Error al descargar el documento: ' + error.message);
     }
-  } catch (error) {
-    console.error('❌ Error downloading file:', error);
-    alert('❌ Error al descargar el documento: ' + error.message);
-  }
-};
+  };
 
   const handleDeleteDocument = async (tipo) => {
     if (!window.confirm('¿Estás seguro de que quieres eliminar este documento?')) {
@@ -173,14 +184,20 @@ export default function InformacionEquipo({ montacargas }) {
       const result = await response.json();
 
       if (response.ok) {
-        // Actualizar el estado local
-        setMontacargasLocal(prev => ({
-          ...prev,
+        // Actualizar el estado local Y notificar al padre
+        const updatedMontacargas = {
+          ...montacargasLocal,
           // CORRECCIÓN: Usar los nombres correctos de campos
           ...(tipo === 'pedimento' && { documento_pedimento: null }),
           ...(tipo === 'adicional' && { documento_adicional: null }),
           ...(tipo === 'ped_adicional' && { doc_ped_adicional: null })
-        }));
+        };
+        
+        setMontacargasLocal(updatedMontacargas);
+        if (onMontacargasUpdate) {
+          onMontacargasUpdate(updatedMontacargas);
+        }
+        
         // Si es documento opcional de pedimento y se elimina, ocultar la sección
         if (tipo === 'ped_adicional') {
           setShowPedimentoOpcional(false);

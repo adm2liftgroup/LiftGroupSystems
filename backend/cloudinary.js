@@ -100,8 +100,17 @@ const getDownloadUrl = (fileUrl) => {
   
   console.log('🔗 Procesando URL para descarga:', fileUrl);
   
-  // Para archivos raw, Cloudinary ya proporciona la descarga directa
-  // Solo asegurarnos de que sea la URL correcta
+  // Para archivos raw en Cloudinary, podemos forzar la descarga
+  // agregando el parámetro fl_attachment
+  if (fileUrl.includes('cloudinary')) {
+    // Si ya tiene parámetros, agregar fl_attachment, sino agregar parámetros
+    if (fileUrl.includes('?')) {
+      return fileUrl + '&fl_attachment';
+    } else {
+      return fileUrl + '?fl_attachment';
+    }
+  }
+  
   return fileUrl;
 };
 
