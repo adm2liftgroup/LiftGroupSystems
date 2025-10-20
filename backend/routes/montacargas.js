@@ -375,22 +375,28 @@ router.delete("/documento/:id/:tipo", async (req, res) => {
     }
 
     const fileUrl = current.rows[0][updateField];
-    console.log('URL a eliminar de Cloudinary:', fileUrl);
+    console.log('📄 URL a eliminar:', fileUrl);
 
-    // Eliminar de Cloudinary si existe (manejar errores sin bloquear)
-    if (fileUrl && fileUrl.includes('cloudinary')) {
-      try {
-        await deleteFromCloudinary(fileUrl);
+    if (!fileUrl) {
+      console.log('ℹ️ No hay documento para eliminar');
+    } else if (fileUrl.includes('cloudinary')) {
+      // Eliminar de Cloudinary
+      console.log('🗑️ Eliminando de Cloudinary...');
+      const cloudinaryResult = await deleteFromCloudinary(fileUrl);
+      console.log('📊 Resultado Cloudinary:', cloudinaryResult);
+      
+      if (cloudinaryResult.result === 'ok') {
         console.log('✅ Archivo eliminado de Cloudinary');
-      } catch (cloudinaryError) {
-        console.error('⚠️ Error eliminando de Cloudinary, pero continuando:', cloudinaryError.message);
-        // Continuar aunque falle Cloudinary para no bloquear la app
+      } else {
+        console.warn('⚠️ Problema eliminando de Cloudinary:', cloudinaryResult);
+        // CONTINUAR aunque falle Cloudinary
       }
-    } else if (fileUrl) {
-      console.log('ℹ️ Archivo local, no se elimina de Cloudinary:', fileUrl);
+    } else {
+      console.log('ℹ️ Archivo local, no se elimina de Cloudinary');
     }
 
-    // Actualizar base de datos - establecer como NULL
+    // ACTUALIZAR BASE DE DATOS - ESTO ES LO MÁS IMPORTANTE
+    console.log('🗄️ Actualizando base de datos...');
     const result = await pool.query(
       `UPDATE "Montacargas" SET "${updateField}"=NULL WHERE numero=$1 RETURNING numero, "${updateField}"`,
       [id]
@@ -400,15 +406,17 @@ router.delete("/documento/:id/:tipo", async (req, res) => {
       return res.status(404).json({ error: "Montacargas no encontrado" });
     }
 
+    console.log('✅ Base de datos actualizada correctamente');
     console.log('=== ELIMINACIÓN EXITOSA ===');
+    
     res.json({ 
       success: true,
       message: "Documento eliminado correctamente" 
     });
 
   } catch (err) {
-    console.error("DELETE /api/montacargas/documento/:id/:tipo error:", err);
-    console.error("Error detallado:", err.message);
+    console.error("❌ DELETE /api/montacargas/documento/:id/:tipo error:", err);
+    console.error("📝 Error detallado:", err.message);
     res.status(500).json({ 
       error: "Error al eliminar documento",
       details: err.message 
