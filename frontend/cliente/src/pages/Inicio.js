@@ -125,94 +125,97 @@ export default function Inicio() {
   };
 
   // BLOQUE 7: Manejo de formulario (crear/editar)
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+ const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    // Guardar el estado actual antes de la actualización
-    const currentSelected = selectedMontacargas;
-    const currentActiveTab = activeTab;
-    const currentPageBeforeEdit = currentPage;
+  // Guardar el estado actual antes de la actualización
+  const currentSelected = selectedMontacargas;
+  const currentActiveTab = activeTab;
+  const currentPageBeforeEdit = currentPage;
 
-    try {
-      if (editingNumero) {
-        // actualizar montacargas existente 
-        const res = await fetch(`${API_URL}/api/montacargas/${encodeURIComponent(editingNumero)}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            Marca: formData.Marca,
-            Modelo: formData.Modelo,
-            Serie: formData.Serie,
-            Sistema: formData.Sistema,
-            Capacidad: formData.Capacidad,
-            Ubicacion: formData.Ubicacion,
-            Planta: formData.Planta
-          })
-        });
+  try {
+    if (editingNumero) {
+      // actualizar montacargas existente 
+      const res = await fetch(`${API_URL}/api/montacargas/${encodeURIComponent(editingNumero)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          Marca: formData.Marca,
+          Modelo: formData.Modelo,
+          Serie: formData.Serie,
+          Sistema: formData.Sistema,
+          Capacidad: formData.Capacidad,
+          Ubicacion: formData.Ubicacion,
+          Planta: formData.Planta
+        })
+      });
 
-        if (res.ok) {
-          const updated = await res.json();
-          setMontacargas(prev =>
-            prev.map(m => (String(m.numero) === String(editingNumero) ? updated : m))
-          );
-          
-          // MANTENER LA SELECCIÓN ACTUAL después de editar
-          if (currentSelected && String(currentSelected.numero) === String(editingNumero)) {
-            setSelectedMontacargas(updated);
-            setActiveTab(currentActiveTab);
-            setCurrentPage(currentPageBeforeEdit);
-          }
-          
-          setEditingNumero(null);
-          setShowForm(false);
-          
-          // LIMPIAR FORMULARIO después de editar exitosamente
-          setFormData({
-            numero: "",
-            Marca: "",
-            Modelo: "",
-            Serie: "",
-            Sistema: "",
-            Capacidad: "",
-            Ubicacion: "",
-            Planta: ""
-          });
+      if (res.ok) {
+        const updated = await res.json();
+        console.log('✅ Montacargas actualizado:', updated);
+        
+        setMontacargas(prev =>
+          prev.map(m => (String(m.numero) === String(editingNumero) ? updated : m))
+        );
+        
+        // MANTENER LA SELECCIÓN ACTUAL después de editar
+        if (currentSelected && String(currentSelected.numero) === String(editingNumero)) {
+          setSelectedMontacargas(updated);
+          setActiveTab(currentActiveTab);
+          setCurrentPage(currentPageBeforeEdit);
         }
-      } else {
-        // Crear nuevo montacargas
-        const res = await fetch(`${API_URL}/api/montacargas`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData)
+        
+        setEditingNumero(null);
+        setShowForm(false);
+        
+        // LIMPIAR FORMULARIO después de editar exitosamente
+        setFormData({
+          numero: "",
+          Marca: "",
+          Modelo: "",
+          Serie: "",
+          Sistema: "",
+          Capacidad: "",
+          Ubicacion: "",
+          Planta: ""
         });
-
-        if (res.ok) {
-          const created = await res.json();
-          setMontacargas(prev => [...prev, created]);
-          setShowForm(false);
-          
-          // LIMPIAR FORMULARIO después de crear exitosamente
-          setFormData({
-            numero: "",
-            Marca: "",
-            Modelo: "",
-            Serie: "",
-            Sistema: "",
-            Capacidad: "",
-            Ubicacion: "",
-            Planta: ""
-          });
-        }
       }
-    } catch (err) {
-      console.error("Error en petición:", err);
-      
-      // En caso de error, mantener la selección
-      setSelectedMontacargas(currentSelected);
-      setActiveTab(currentActiveTab);
-      setCurrentPage(currentPageBeforeEdit);
+    } else {
+      // Crear nuevo montacargas
+      const res = await fetch(`${API_URL}/api/montacargas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
+
+      if (res.ok) {
+        const created = await res.json();
+        console.log('✅ Montacargas creado:', created);
+        setMontacargas(prev => [...prev, created]);
+        setShowForm(false);
+        
+        // LIMPIAR FORMULARIO después de crear exitosamente
+        setFormData({
+          numero: "",
+          Marca: "",
+          Modelo: "",
+          Serie: "",
+          Sistema: "",
+          Capacidad: "",
+          Ubicacion: "",
+          Planta: ""
+        });
+      }
     }
-  };
+  } catch (err) {
+    console.error("Error en petición:", err);
+    
+    // En caso de error, mantener la selección
+    setSelectedMontacargas(currentSelected);
+    setActiveTab(currentActiveTab);
+    setCurrentPage(currentPageBeforeEdit);
+  }
+};
   // FIN DEL BLOQUE 7: Manejo de formulario 
 
   // BLOQUE 8: Eliminar montacargas
@@ -559,7 +562,10 @@ export default function Inicio() {
             {/* Contenido dinámico */}
             <div className="p-4 border rounded bg-gray-100 overflow-x-auto">
               {activeTab === "Información del equipo" && (
-                <InformacionEquipo montacargas={selectedMontacargas} />
+                <InformacionEquipo 
+                 montacargas={selectedMontacargas}
+                onMontacargasUpdate={actualizarMontacargasSeleccionado}
+               />
               )}
               {activeTab === "Servicios Preventivos Historial" && (
                 <ServiciosHistorial montacargas={selectedMontacargas} />
@@ -704,5 +710,19 @@ export default function Inicio() {
     </div>
   );
   // FIN DEL BLOQUE 10: Return UI principal
+
+  // BLOQUE 11: Función para actualizar montacargas seleccionado
+const actualizarMontacargasSeleccionado = (nuevosDatos) => {
+  console.log('🔄 Actualizando montacargas seleccionado:', nuevosDatos);
+  setSelectedMontacargas(nuevosDatos);
+  
+  // También actualizar en la lista general
+  setMontacargas(prev => 
+    prev.map(m => 
+      String(m.numero) === String(nuevosDatos.numero) ? nuevosDatos : m
+    )
+  );
+};
+
 }
 // FIN DEL BLOQUE 1: Componente Inicio
