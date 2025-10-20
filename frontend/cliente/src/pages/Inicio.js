@@ -297,6 +297,23 @@ export default function Inicio() {
   };
   // FIN DEL BLOQUE 9: Preparar edición y funciones de formulario
 
+  // BLOQUE 11: Función para actualizar montacargas seleccionado
+const actualizarMontacargasSeleccionado = (nuevosDatos) => {
+  console.log('🔄 Actualizando montacargas seleccionado:', nuevosDatos);
+  setSelectedMontacargas(nuevosDatos);
+  
+  // También actualizar en la lista general
+  setMontacargas(prev => 
+    prev.map(m => 
+      String(m.numero) === String(nuevosDatos.numero) ? nuevosDatos : m
+    )
+  );
+};
+ // ⭐⭐ BLOQUE 12: Debug useEffect
+  useEffect(() => {
+    console.log('📥 selectedMontacargas actualizado:', selectedMontacargas);
+  }, [selectedMontacargas]);
+
   // BLOQUE 10: Return UI principal
   return (
     <div className="flex flex-col md:flex-row">
@@ -711,18 +728,7 @@ export default function Inicio() {
   );
   // FIN DEL BLOQUE 10: Return UI principal
 
-  // BLOQUE 11: Función para actualizar montacargas seleccionado
-const actualizarMontacargasSeleccionado = (nuevosDatos) => {
-  console.log('🔄 Actualizando montacargas seleccionado:', nuevosDatos);
-  setSelectedMontacargas(nuevosDatos);
   
-  // También actualizar en la lista general
-  setMontacargas(prev => 
-    prev.map(m => 
-      String(m.numero) === String(nuevosDatos.numero) ? nuevosDatos : m
-    )
-  );
-};
 
 }
 // FIN DEL BLOQUE 1: Componente Inicio
