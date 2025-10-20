@@ -15,44 +15,46 @@ const uploadToCloudinary = async (fileBuffer, fileName) => {
     console.log(`📤 Subiendo archivo a Cloudinary: ${fileName}`);
 
     return new Promise((resolve, reject) => {
-      cloudinary.uploader.upload_stream(
+      const uploadStream = cloudinary.uploader.upload_stream(
         {
           resource_type: 'raw',
           folder: 'montacargas',
           public_id: fileName,
           type: 'upload',
-          access_mode: 'public', // ← ESTO ES CRÍTICO
-          invalidate: true
+          access_mode: 'public' // Intentar hacer público desde el inicio
         },
-        (error, result) => {
+        async (error, result) => {
           if (error) {
             console.error('❌ Error subiendo a Cloudinary:', error);
             reject(error);
           } else {
-            console.log('✅ Archivo subido correctamente a Cloudinary');
-            console.log('🔗 URL:', result.secure_url);
+            console.log('✅ Archivo subido correctamente');
             console.log('🔓 Access mode:', result.access_mode);
             
-            // Verificar que sea público, si no, intentar cambiarlo
+            // ⭐⭐ VERIFICACIÓN EXTRA: Si no es público, forzarlo
             if (result.access_mode !== 'public') {
-              console.log('⚠️ Archivo no es público, intentando cambiar acceso...');
-              cloudinary.uploader.explicit(result.public_id, {
-                resource_type: 'raw',
-                type: 'upload',
-                access_mode: 'public'
-              }, (explicitError, explicitResult) => {
-                if (explicitError) {
-                  console.error('❌ Error haciendo público:', explicitError);
-                } else {
-                  console.log('✅ Archivo hecho público');
-                }
-              });
+              console.log('⚠️ Archivo no es público, forzando...');
+              try {
+                const explicitResult = await cloudinary.uploader.explicit(result.public_id, {
+                  resource_type: 'raw',
+                  type: 'upload',
+                  access_mode: 'public'
+                });
+                console.log('✅ Archivo hecho público via explicit()');
+                resolve(explicitResult.secure_url);
+              } catch (explicitError) {
+                console.error('❌ Error haciendo público:', explicitError);
+                // Aún así devolver la URL, intentaremos con URLs firmadas
+                resolve(result.secure_url);
+              }
+            } else {
+              resolve(result.secure_url);
             }
-            
-            resolve(result.secure_url);
           }
         }
-      ).end(fileBuffer);
+      );
+      
+      uploadStream.end(fileBuffer);
     });
   } catch (error) {
     console.error('❌ Error en uploadToCloudinary:', error);

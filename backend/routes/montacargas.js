@@ -384,28 +384,64 @@ router.get("/documento/:url", async (req, res) => {
       return res.status(404).json({ error: "Archivo no encontrado" });
     }
 
-    // Si es Cloudinary - SOLUCIÓN SIMPLIFICADA
+    // Si es Cloudinary
     if (fileUrl.includes('cloudinary')) {
-      console.log('🌐 Descargando archivo de Cloudinary...');
+      console.log('🌐 Procesando archivo Cloudinary...');
 
-      // ⭐⭐ SOLUCIÓN MEJORADA: Redirigir directamente al cliente
-      // Cloudinary ya provee URLs públicas para descarga
-      let downloadUrl = fileUrl;
-      
-      // Forzar descarga agregando parámetro fl_attachment
-      if (downloadUrl.includes('?')) {
-        downloadUrl += '&fl_attachment';
-      } else {
-        downloadUrl += '?fl_attachment';
+      try {
+        // Extraer public_id de forma más robusta
+        const urlParts = fileUrl.split('/');
+        const uploadIndex = urlParts.indexOf('upload');
+        
+        if (uploadIndex === -1) {
+          return res.status(400).json({ error: "URL de Cloudinary inválida" });
+        }
+
+        // Reconstruir public_id (saltar 'upload' y versión 'v123456')
+        const publicIdParts = urlParts.slice(uploadIndex + 2);
+        let publicId = publicIdParts.join('/');
+        
+        // Limpiar public_id
+        publicId = publicId.split('?')[0]; // remover parámetros
+        publicId = decodeURIComponent(publicId); // decodificar URL
+
+        console.log('🔍 Public ID extraído:', publicId);
+
+        // ⭐⭐ SOLUCIÓN: Generar URL firmada para descarga
+        const downloadUrl = cloudinary.url(publicId, {
+          resource_type: 'raw',
+          type: 'authenticated',
+          sign_url: true,
+          expires_at: Math.floor(Date.now() / 1000) + 300, // 5 minutos
+          flags: 'attachment', // Forzar descarga
+          format: 'pdf' // Especificar formato
+        });
+
+        console.log('🔗 URL firmada generada:', downloadUrl);
+        
+        // Redirigir directamente a la URL firmada
+        return res.redirect(downloadUrl);
+
+      } catch (error) {
+        console.error('❌ Error generando URL firmada:', error);
+        
+        // Fallback: usar la URL original pero a través de un proxy
+        console.log('🔄 Usando método fallback...');
+        try {
+          const response = await fetch(fileUrl);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          
+          const buffer = await response.buffer();
+          res.setHeader('Content-Type', response.headers.get('content-type') || 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename="documento.pdf"`);
+          res.send(buffer);
+        } catch (fetchError) {
+          throw new Error(`No se pudo descargar el archivo: ${fetchError.message}`);
+        }
       }
-
-      console.log('🔗 URL de descarga final:', downloadUrl);
-      
-      // ⭐⭐ REDIRECCIÓN DIRECTA - MÁS EFICIENTE
-      return res.redirect(downloadUrl);
     }
 
-    // Para archivos locales antiguos (mantener por compatibilidad)
+    // Para archivos locales antiguos
     const filePath = path.join(__dirname, '../uploads/montacargas', fileUrl);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: "Archivo no encontrado" });
@@ -647,6 +683,74 @@ router.delete("/refacciones/:refaccionId", async (req, res) => {
   } catch (error) {
     console.error("Error eliminando refacción:", error);
     res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
+// BLOQUE EXTRA: Forzar archivos públicos via API
+router.get("/fix-permissions", async (req, res) => {
+  try {
+    console.log('🔓 Iniciando corrección de permisos...');
+    
+    // Listar todos los archivos RAW en la carpeta montacargas
+    const listResult = await cloudinary.api.resources({
+      type: 'upload',
+      resource_type: 'raw',
+      prefix: 'montacargas',
+      max_results: 100
+    });
+
+    console.log(`📁 Encontrados ${listResult.resources.length} archivos`);
+
+    const results = [];
+    
+    // Hacer cada archivo público usando explicit()
+    for (const resource of listResult.resources) {
+      try {
+        console.log(`🔓 Procesando: ${resource.public_id}`);
+        console.log(`   Estado actual: ${resource.access_mode}`);
+        
+        // Usar explicit() para cambiar permisos
+        const updateResult = await cloudinary.api.update(resource.public_id, {
+          resource_type: 'raw',
+          access_mode: 'public',
+          type: 'upload'
+        });
+
+        results.push({
+          public_id: resource.public_id,
+          status: 'success',
+          old_access: resource.access_mode,
+          new_access: updateResult.access_mode,
+          url: updateResult.secure_url
+        });
+
+        console.log(`✅ ${resource.public_id} -> ${updateResult.access_mode}`);
+        
+        // Pequeña pausa para no sobrecargar la API
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+      } catch (error) {
+        console.error(`❌ Error con ${resource.public_id}:`, error.message);
+        results.push({
+          public_id: resource.public_id,
+          status: 'error',
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Procesados ${listResult.resources.length} archivos`,
+      results: results
+    });
+
+  } catch (error) {
+    console.error('❌ Error general:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 
