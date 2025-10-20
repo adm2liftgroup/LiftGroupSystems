@@ -389,59 +389,76 @@ router.get("/documento/:url", async (req, res) => {
       console.log('🌐 Procesando archivo Cloudinary...');
 
       try {
-        // Extraer public_id de forma más robusta
-        const urlParts = fileUrl.split('/');
-        const uploadIndex = urlParts.indexOf('upload');
-        
-        if (uploadIndex === -1) {
-          return res.status(400).json({ error: "URL de Cloudinary inválida" });
+        // Extraer public_id
+        const urlMatch = fileUrl.match(/\/upload\/(?:v\d+\/)?(.+)$/);
+        if (!urlMatch) {
+          throw new Error('URL de Cloudinary inválida');
         }
 
-        // Reconstruir public_id (saltar 'upload' y versión 'v123456')
-        const publicIdParts = urlParts.slice(uploadIndex + 2);
-        let publicId = publicIdParts.join('/');
+        let publicId = urlMatch[1].split('?')[0];
+        publicId = decodeURIComponent(publicId);
         
-        // Limpiar public_id
-        publicId = publicId.split('?')[0]; // remover parámetros
-        publicId = decodeURIComponent(publicId); // decodificar URL
+        console.log('🔍 Public ID:', publicId);
 
-        console.log('🔍 Public ID extraído:', publicId);
-
-        // ⭐⭐ SOLUCIÓN: Generar URL firmada para descarga
-        const downloadUrl = cloudinary.url(publicId, {
-          resource_type: 'raw',
-          type: 'authenticated',
-          sign_url: true,
-          expires_at: Math.floor(Date.now() / 1000) + 300, // 5 minutos
-          flags: 'attachment', // Forzar descarga
-          format: 'pdf' // Especificar formato
+        // Obtener información del recurso
+        const resourceInfo = await cloudinary.api.resource(publicId, {
+          resource_type: 'raw'
         });
 
-        console.log('🔗 URL firmada generada:', downloadUrl);
+        console.log('✅ Información del recurso:', {
+          original_filename: resourceInfo.original_filename,
+          format: resourceInfo.format,
+          bytes: resourceInfo.bytes
+        });
+
+        // ⭐⭐ SOLUCIÓN: Descargar el archivo y servirlo directamente
+        console.log('⬇️ Descargando archivo desde Cloudinary...');
+        const response = await fetch(resourceInfo.secure_url);
         
-        // Redirigir directamente a la URL firmada
-        return res.redirect(downloadUrl);
+        if (!response.ok) {
+          throw new Error(`Error ${response.status} al obtener archivo`);
+        }
+
+        // Obtener el buffer del archivo
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        // Determinar el nombre del archivo
+        let fileName = 'documento.pdf';
+        if (resourceInfo.original_filename) {
+          fileName = resourceInfo.original_filename;
+        } else {
+          // Extraer nombre del public_id
+          const nameFromId = publicId.split('/').pop();
+          if (nameFromId && nameFromId.includes('.')) {
+            fileName = nameFromId;
+          }
+        }
+
+        // ⭐⭐ CONFIGURAR HEADERS PARA FORZAR DESCARGA
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Length', buffer.length);
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+
+        console.log(`✅ Enviando archivo: ${fileName} (${buffer.length} bytes)`);
+        
+        // Enviar el archivo
+        res.send(buffer);
 
       } catch (error) {
-        console.error('❌ Error generando URL firmada:', error);
+        console.error('❌ Error descargando archivo:', error);
         
-        // Fallback: usar la URL original pero a través de un proxy
-        console.log('🔄 Usando método fallback...');
-        try {
-          const response = await fetch(fileUrl);
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          
-          const buffer = await response.buffer();
-          res.setHeader('Content-Type', response.headers.get('content-type') || 'application/pdf');
-          res.setHeader('Content-Disposition', `attachment; filename="documento.pdf"`);
-          res.send(buffer);
-        } catch (fetchError) {
-          throw new Error(`No se pudo descargar el archivo: ${fetchError.message}`);
-        }
+        // Fallback: redirección simple con fl_attachment
+        console.log('🔄 Usando fallback de redirección...');
+        const downloadUrl = fileUrl + (fileUrl.includes('?') ? '&' : '?') + 'fl_attachment';
+        return res.redirect(downloadUrl);
       }
     }
 
-    // Para archivos locales antiguos
+    // Para archivos locales
     const filePath = path.join(__dirname, '../uploads/montacargas', fileUrl);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: "Archivo no encontrado" });

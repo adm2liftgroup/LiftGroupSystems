@@ -123,45 +123,34 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
 
     console.log('📥 Iniciando descarga de:', fileUrl);
 
-    // ⭐⭐ SOLUCIÓN MEJORADA: Descarga directa para Cloudinary
-    if (fileUrl.includes('cloudinary')) {
-      // Forzar descarga directa desde Cloudinary
-      let downloadUrl = fileUrl;
-      if (downloadUrl.includes('?')) {
-        downloadUrl += '&fl_attachment';
-      } else {
-        downloadUrl += '?fl_attachment';
-      }
-      
-      // Abrir en nueva pestaña/descargar directamente
-      window.open(downloadUrl, '_blank');
-      console.log('✅ Descarga directa iniciada');
-      return;
-    }
-
-    // Para archivos locales, usar el backend como proxy
+    // ⭐⭐ SOLUCIÓN: Usar siempre el backend como proxy para descargas
     const encodedUrl = encodeURIComponent(fileUrl);
     const downloadUrl = `${API_URL}/api/montacargas/documento/${encodedUrl}`;
     
     console.log('🌐 Descargando a través del backend:', downloadUrl);
     
+    // Crear un enlace temporal
     const a = document.createElement('a');
     a.style.display = 'none';
     a.href = downloadUrl;
-    a.target = '_blank'; // Abrir en nueva pestaña
     
-    // Extraer nombre del archivo
-    let fileName = 'documento';
+    // Extraer nombre del archivo de forma más robusta
+    let fileName = 'documento.pdf';
     try {
-      const urlParts = fileUrl.split('/');
-      let extractedName = urlParts[urlParts.length - 1];
-      try {
-        extractedName = decodeURIComponent(extractedName);
-      } catch (e) {
-        console.log('No se pudo decodificar nombre');
+      // Para URLs de Cloudinary, extraer del public_id
+      if (fileUrl.includes('cloudinary')) {
+        const urlParts = fileUrl.split('/');
+        const publicIdPart = urlParts[urlParts.length - 1];
+        const publicId = decodeURIComponent(publicIdPart.split('?')[0]);
+        const nameFromPublicId = publicId.split('/').pop();
+        if (nameFromPublicId && nameFromPublicId.includes('.')) {
+          fileName = nameFromPublicId;
+        }
+      } else {
+        // Para archivos locales
+        const urlParts = fileUrl.split('/');
+        fileName = urlParts[urlParts.length - 1];
       }
-      // Limpiar parámetros de URL
-      fileName = extractedName.split('?')[0] || 'documento';
     } catch (e) {
       console.log('Error extrayendo nombre:', e);
     }
@@ -170,6 +159,8 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    
+    console.log('✅ Descarga iniciada:', fileName);
     
   } catch (error) {
     console.error('❌ Error downloading file:', error);
