@@ -7,19 +7,7 @@ const fs = require('fs');
 const { uploadToCloudinary, deleteFromCloudinary, getDownloadUrl } = require('../cloudinary');
 
 // Configurar multer para almacenamiento de archivos
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = 'uploads/montacargas';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'montacargas-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage: storage,
@@ -86,21 +74,17 @@ router.post("/", upload.fields([
     // ACTUALIZADO: Subir a Cloudinary si hay archivos
     if (req.files?.documento_pedimento) {
       const file = req.files.documento_pedimento[0];
-      documentoPedimento = await uploadToCloudinary(file.buffer, file.filename);
-      console.log('☁️ Archivo de pedimento subido a Cloudinary:', documentoPedimento);
-    }
+      documentoPedimento = await uploadToCloudinary(file.buffer, file.originalname); }
     
     if (req.files?.documento_adicional) {
       const file = req.files.documento_adicional[0];
-      documentoAdicional = await uploadToCloudinary(file.buffer, file.filename);
-      console.log('☁️ Archivo adicional subido a Cloudinary:', documentoAdicional);
-    }
+      documentoPedimento = await uploadToCloudinary(file.buffer, file.originalname); }
+    
     
     if (req.files?.doc_ped_adicional) {
       const file = req.files.doc_ped_adicional[0];
-      docPedAdicional = await uploadToCloudinary(file.buffer, file.filename);
-      console.log('☁️ Archivo ped_adicional subido a Cloudinary:', docPedAdicional);
-    }
+      documentoPedimento = await uploadToCloudinary(file.buffer, file.originalname); }
+    
 
     const result = await pool.query(
       'INSERT INTO "Montacargas" (numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional", "doc_ped_adicional") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional", "doc_ped_adicional"',
@@ -173,7 +157,7 @@ router.put("/:id", upload.fields([
       
       // SUBIR nuevo archivo a Cloudinary
       const file = req.files.documento_pedimento[0];
-      documentoPedimento = await uploadToCloudinary(file.buffer, file.filename);
+      documentoPedimento = await uploadToCloudinary(file.buffer, file.originalname);
       console.log('☁️ Nuevo archivo de pedimento (Cloudinary):', documentoPedimento);
     }
     
