@@ -123,29 +123,45 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
 
     console.log('📥 Iniciando descarga de:', fileUrl);
 
-    // ⭐⭐ SOLUCIÓN MEJORADA: Usar el backend como proxy
+    // ⭐⭐ SOLUCIÓN MEJORADA: Descarga directa para Cloudinary
+    if (fileUrl.includes('cloudinary')) {
+      // Forzar descarga directa desde Cloudinary
+      let downloadUrl = fileUrl;
+      if (downloadUrl.includes('?')) {
+        downloadUrl += '&fl_attachment';
+      } else {
+        downloadUrl += '?fl_attachment';
+      }
+      
+      // Abrir en nueva pestaña/descargar directamente
+      window.open(downloadUrl, '_blank');
+      console.log('✅ Descarga directa iniciada');
+      return;
+    }
+
+    // Para archivos locales, usar el backend como proxy
     const encodedUrl = encodeURIComponent(fileUrl);
     const downloadUrl = `${API_URL}/api/montacargas/documento/${encodedUrl}`;
     
     console.log('🌐 Descargando a través del backend:', downloadUrl);
     
-    // Crear un enlace temporal para forzar la descarga
     const a = document.createElement('a');
     a.style.display = 'none';
     a.href = downloadUrl;
+    a.target = '_blank'; // Abrir en nueva pestaña
     
-    // Extraer nombre del archivo para la descarga
+    // Extraer nombre del archivo
     let fileName = 'documento';
     try {
       const urlParts = fileUrl.split('/');
       let extractedName = urlParts[urlParts.length - 1];
-      // Decodificar nombre si está codificado
       try {
         extractedName = decodeURIComponent(extractedName);
       } catch (e) {
         console.log('No se pudo decodificar nombre');
       }
-      fileName = extractedName || 'documento';
+      // Limpiar parámetros de URL
+      fileName = extractedName.split('?')[0] || 'documento';
     } catch (e) {
       console.log('Error extrayendo nombre:', e);
     }
@@ -154,8 +170,6 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    
-    console.log('✅ Descarga iniciada');
     
   } catch (error) {
     console.error('❌ Error downloading file:', error);

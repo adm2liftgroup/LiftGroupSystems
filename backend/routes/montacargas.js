@@ -378,82 +378,47 @@ router.get("/documento/:url", async (req, res) => {
   try {
     const { url } = req.params;
     const fileUrl = decodeURIComponent(url || "");
-    console.log('Descargando URL:', fileUrl);
+    console.log('📥 Descargando URL:', fileUrl);
 
-    if (!fileUrl) return res.status(404).json({ error: "Archivo no encontrado" });
+    if (!fileUrl) {
+      return res.status(404).json({ error: "Archivo no encontrado" });
+    }
 
-    // Si es Cloudinary
+    // Si es Cloudinary - SOLUCIÓN SIMPLIFICADA
     if (fileUrl.includes('cloudinary')) {
       console.log('🌐 Descargando archivo de Cloudinary...');
 
-      // Extraer public_id de forma robusta
-      // Busca "/upload/" y luego la parte después de la versión v123/ (si existe)
-      const uploadMatch = fileUrl.match(/\/upload\/(?:.*\/)?(?:v\d+\/)?(.+)$/);
-      if (!uploadMatch || !uploadMatch[1]) {
-        throw new Error('URL de Cloudinary inválida o no se pudo extraer public_id');
+      // ⭐⭐ SOLUCIÓN MEJORADA: Redirigir directamente al cliente
+      // Cloudinary ya provee URLs públicas para descarga
+      let downloadUrl = fileUrl;
+      
+      // Forzar descarga agregando parámetro fl_attachment
+      if (downloadUrl.includes('?')) {
+        downloadUrl += '&fl_attachment';
+      } else {
+        downloadUrl += '?fl_attachment';
       }
 
-      // publicWithExt puede contener transformaciones o extensión al final
-      let publicWithExt = uploadMatch[1];
-      // quitar posibles transformaciones que vengan antes de v\d+ (ya manejado por regex)
-      // quitar extensión final
-      const publicId = publicWithExt.replace(/\.[^/.]+$/, '');
-
-      console.log('🔍 Public ID extraído:', publicId);
-
-      // Usar API para obtener recurso (server-side) — resource_type 'raw' para documentos
-      let resource;
-      try {
-        resource = await cloudinary.api.resource(publicId, { resource_type: 'raw' });
-      } catch (err) {
-        console.error('❌ cloudinary.api.resource error:', err);
-        // si es 404/401 devolver mensaje claro
-        if (err.http_code === 401 || /auth|authentication|unauthorized/i.test(err.message)) {
-          return res.status(403).json({ error: "Error de autenticación con Cloudinary. Revisa credenciales." });
-        }
-        if (err.http_code === 404) {
-          return res.status(404).json({ error: "Recurso no encontrado en Cloudinary" });
-        }
-        // continuar a fallback
-        resource = null;
-      }
-
-      // si obtuvimos resource, tomar secure_url
-      let downloadUrl = resource?.secure_url || resource?.url || fileUrl;
-
-      // Intentar descargar desde la URL final
-      const fetchRes = await fetch(downloadUrl);
-      if (!fetchRes.ok) {
-        throw new Error(`Error al obtener archivo: ${fetchRes.status}`);
-      }
-
-      const buffer = await fetchRes.arrayBuffer ? Buffer.from(await fetchRes.arrayBuffer()) : await fetchRes.buffer();
-      const contentType = fetchRes.headers.get('content-type') || 'application/octet-stream';
-
-      // determinar nombre de archivo
-      let fileName = 'documento';
-      try {
-        if (resource?.original_filename) fileName = resource.original_filename;
-        else {
-          const parts = downloadUrl.split('/');
-          fileName = decodeURIComponent(parts[parts.length - 1].split('?')[0]);
-        }
-      } catch (e) { /* ignore */ }
-
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-      res.setHeader('Content-Length', Buffer.byteLength(buffer));
-      console.log('✅ Enviando archivo al cliente, tamaño:', Buffer.byteLength(buffer));
-      return res.send(buffer);
+      console.log('🔗 URL de descarga final:', downloadUrl);
+      
+      // ⭐⭐ REDIRECCIÓN DIRECTA - MÁS EFICIENTE
+      return res.redirect(downloadUrl);
     }
 
-    // archivo local antiguo
+    // Para archivos locales antiguos (mantener por compatibilidad)
     const filePath = path.join(__dirname, '../uploads/montacargas', fileUrl);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: "Archivo no encontrado" });
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "Archivo no encontrado" });
+    }
+    
     return res.download(filePath);
+
   } catch (err) {
-    console.error("GET /api/montacargas/documento/:url error:", err);
-    res.status(500).json({ error: "Error al descargar archivo: " + err.message });
+    console.error("❌ GET /api/montacargas/documento/:url error:", err);
+    res.status(500).json({ 
+      error: "Error al descargar archivo",
+      details: err.message 
+    });
   }
 });
 
