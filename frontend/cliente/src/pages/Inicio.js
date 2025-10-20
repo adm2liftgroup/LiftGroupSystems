@@ -298,18 +298,19 @@ export default function Inicio() {
   // FIN DEL BLOQUE 9: Preparar edición y funciones de formulario
 
   // BLOQUE 11: Función para actualizar montacargas seleccionado
-const actualizarMontacargasSeleccionado = (nuevosDatos) => {
-  console.log('🔄 Actualizando montacargas seleccionado:', nuevosDatos);
-  setSelectedMontacargas(nuevosDatos);
-  
-  // También actualizar en la lista general
-  setMontacargas(prev => 
-    prev.map(m => 
-      String(m.numero) === String(nuevosDatos.numero) ? nuevosDatos : m
-    )
-  );
-};
- // ⭐⭐ BLOQUE 12: Debug useEffect
+  const actualizarMontacargasSeleccionado = (nuevosDatos) => {
+    console.log('🔄 Actualizando montacargas seleccionado:', nuevosDatos);
+    setSelectedMontacargas(nuevosDatos);
+    
+    // También actualizar en la lista general
+    setMontacargas(prev => 
+      prev.map(m => 
+        String(m.numero) === String(nuevosDatos.numero) ? nuevosDatos : m
+      )
+    );
+  };
+
+  // ⭐⭐ BLOQUE 12: Debug useEffect
   useEffect(() => {
     console.log('📥 selectedMontacargas actualizado:', selectedMontacargas);
   }, [selectedMontacargas]);
@@ -581,7 +582,7 @@ const actualizarMontacargasSeleccionado = (nuevosDatos) => {
               {activeTab === "Información del equipo" && (
                 <InformacionEquipo 
                  montacargas={selectedMontacargas}
-                onMontacargasUpdate={actualizarMontacargasSeleccionado}
+                 onMontacargasUpdate={actualizarMontacargasSeleccionado}
                />
               )}
               {activeTab === "Servicios Preventivos Historial" && (
@@ -727,8 +728,5 @@ const actualizarMontacargasSeleccionado = (nuevosDatos) => {
     </div>
   );
   // FIN DEL BLOQUE 10: Return UI principal
-
-  
-
 }
 // FIN DEL BLOQUE 1: Componente Inicio
