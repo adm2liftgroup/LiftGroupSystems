@@ -15,14 +15,14 @@ const uploadToCloudinary = async (fileBuffer, fileName) => {
     console.log(`📤 Subiendo archivo a Cloudinary: ${fileName}`);
 
     return new Promise((resolve, reject) => {
-      // SUBIR COMO ARCHIVO RAW SIN PROCESAMIENTO
       cloudinary.uploader.upload_stream(
         {
-          resource_type: 'raw', // ← CRÍTICO: Siempre como raw
+          resource_type: 'raw',
           folder: 'montacargas',
-          public_id: fileName, // ← CRÍTICO: Mantener nombre completo con extensión
+          public_id: fileName,
           type: 'upload',
-          access_mode: 'public'
+          access_mode: 'public', // ← ESTO ES CRÍTICO
+          invalidate: true
         },
         (error, result) => {
           if (error) {
@@ -31,7 +31,24 @@ const uploadToCloudinary = async (fileBuffer, fileName) => {
           } else {
             console.log('✅ Archivo subido correctamente a Cloudinary');
             console.log('🔗 URL:', result.secure_url);
-            console.log('📊 Tipo:', result.resource_type);
+            console.log('🔓 Access mode:', result.access_mode);
+            
+            // Verificar que sea público, si no, intentar cambiarlo
+            if (result.access_mode !== 'public') {
+              console.log('⚠️ Archivo no es público, intentando cambiar acceso...');
+              cloudinary.uploader.explicit(result.public_id, {
+                resource_type: 'raw',
+                type: 'upload',
+                access_mode: 'public'
+              }, (explicitError, explicitResult) => {
+                if (explicitError) {
+                  console.error('❌ Error haciendo público:', explicitError);
+                } else {
+                  console.log('✅ Archivo hecho público');
+                }
+              });
+            }
+            
             resolve(result.secure_url);
           }
         }
