@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // URL base para API - usa variable de entorno en producción
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
@@ -9,8 +9,10 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
   const [montacargasLocal, setMontacargasLocal] = useState(montacargas);
   const [showPedimentoOpcional, setShowPedimentoOpcional] = useState(false);
 
+  // ⭐⭐ TODOS LOS USEEFFECT DEBEN ESTAR ANTES DEL RETURN CONDICIONAL
+
   // Actualizar el estado local cuando cambie el prop
-  React.useEffect(() => {
+  useEffect(() => {
     setMontacargasLocal(montacargas);
     // Mostrar sección opcional de pedimento si ya existe un documento
     if (montacargas?.doc_ped_adicional) {
@@ -18,252 +20,253 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
     }
   }, [montacargas]);
 
+  // Debug useEffect
+  useEffect(() => {
+    console.log('🔄 montacargasLocal actualizado:', montacargasLocal);
+  }, [montacargasLocal]);
+
+  // Debug useEffect para el prop
+  useEffect(() => {
+    console.log('📥 montacargas (prop) actualizado:', montacargas);
+  }, [montacargas]);
+
+  // ⭐⭐ AHORA SÍ EL RETURN CONDICIONAL
   if (!montacargasLocal) return <p>No se seleccionó ningún montacargas.</p>;
 
   const handleFileUpload = async (event, tipo) => {
-  const file = event.target.files[0];
-  if (!file) return;
+    const file = event.target.files[0];
+    if (!file) return;
 
-  // Validar tipo de archivo
-  const allowedTypes = ['.pdf', '.doc', '.docx', '.txt'];
-  const fileExt = '.' + file.name.split('.').pop().toLowerCase();
-  if (!allowedTypes.includes(fileExt)) {
-    alert('Solo se permiten archivos PDF, Word y texto');
-    return;
-  }
-
-  // Validar tamaño (10MB)
-  if (file.size > 10 * 1024 * 1024) {
-    alert('El archivo no debe exceder 10MB');
-    return;
-  }
-
-  setUploading(prev => ({ ...prev, [tipo]: true }));
-
-  try {
-    const formData = new FormData();
-    
-    // CORRECCIÓN: Usar los nombres correctos que espera el backend
-    if (tipo === 'pedimento') {
-      formData.append('documento_pedimento', file);
-    } else if (tipo === 'adicional') {
-      formData.append('documento_adicional', file);
-    } else if (tipo === 'ped_adicional') {
-      formData.append('doc_ped_adicional', file);
-    }
-    
-    // Asegurarse de que los valores numéricos se envíen correctamente
-    formData.append('Marca', montacargasLocal.Marca || '');
-    formData.append('Modelo', montacargasLocal.Modelo || '');
-    formData.append('Serie', montacargasLocal.Serie || '');
-    formData.append('Sistema', montacargasLocal.Sistema || '');
-    
-    // CORRECCIÓN: Convertir Capacidad a número, usar 0 si está vacío
-    const capacidad = montacargasLocal.Capacidad ? parseInt(montacargasLocal.Capacidad) : 0;
-    formData.append('Capacidad', capacidad.toString());
-    
-    formData.append('Ubicacion', montacargasLocal.Ubicacion || '');
-    formData.append('Planta', montacargasLocal.Planta || '');
-
-    console.log('📤 Enviando datos a:', `${API_URL}/api/montacargas/${montacargasLocal.numero}`);
-    console.log('📄 Tipo de documento:', tipo);
-    
-    const response = await fetch(`${API_URL}/api/montacargas/${montacargasLocal.numero}`, {
-      method: 'PUT',
-      body: formData,
-    });
-
-    const responseData = await response.json();
-
-    if (response.ok) {
-      console.log('✅ Respuesta del servidor:', responseData);
-      
-      // ⭐⭐ ACTUALIZACIÓN CRÍTICA: Usar los datos que devuelve el servidor
-      setMontacargasLocal(responseData);
-      if (onMontacargasUpdate) {
-        onMontacargasUpdate(responseData);
-      }
-      
-      // Si es documento opcional de pedimento, mostrar la sección
-      if (tipo === 'ped_adicional') {
-        setShowPedimentoOpcional(true);
-      }
-      alert('✅ Documento cargado correctamente');
-    } else {
-      throw new Error(responseData.error || responseData.details || 'Error al cargar documento');
-    }
-  } catch (error) {
-    console.error('❌ Error uploading file:', error);
-    alert('❌ Error al cargar el documento: ' + error.message);
-  } finally {
-    setUploading(prev => ({ ...prev, [tipo]: false }));
-    event.target.value = '';
-  }
-};
-
-  const handleDownload = async (fileUrl, originalFileName = null) => {
-  try {
-    if (!fileUrl) {
-      alert('No hay documento para descargar');
+    // Validar tipo de archivo
+    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt'];
+    const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+    if (!allowedTypes.includes(fileExt)) {
+      alert('Solo se permiten archivos PDF, Word y texto');
       return;
     }
 
-    console.log('📥 Iniciando descarga de:', fileUrl);
-
-    // ⭐⭐ SOLUCIÓN MEJORADA: Siempre usar el backend como proxy
-    const encodedUrl = encodeURIComponent(fileUrl);
-    const downloadUrl = `${API_URL}/api/montacargas/documento/${encodedUrl}`;
-    
-    console.log('🌐 Descargando a través del backend:', downloadUrl);
-    
-    const response = await fetch(downloadUrl);
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Error al descargar archivo');
+    // Validar tamaño (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('El archivo no debe exceder 10MB');
+      return;
     }
-    
-    // Obtener el blob
-    const blob = await response.blob();
-    
-    // Extraer nombre del archivo del header Content-Disposition o de la URL
-    let fileName = 'documento';
-    const contentDisposition = response.headers.get('content-disposition');
-    
-    if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
-      if (filenameMatch) {
-        fileName = filenameMatch[1];
-      }
-    } else {
-      // Fallback: extraer de la URL
-      try {
-        const urlParts = fileUrl.split('/');
-        const publicId = urlParts[urlParts.length - 1];
-        fileName = publicId || 'documento';
-      } catch (e) {
-        console.log('No se pudo extraer nombre de archivo:', e);
-      }
-    }
-    
-    // Crear URL temporal y descargar
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-    
-  } catch (error) {
-    console.error('❌ Error downloading file:', error);
-    alert('❌ Error al descargar el documento: ' + error.message);
-  }
-};
 
-  const handleDeleteDocument = async (tipo) => {
-  if (!window.confirm('¿Estás seguro de que quieres eliminar este documento?')) {
-    return;
-  }
+    setUploading(prev => ({ ...prev, [tipo]: true }));
 
-  setDeleting(prev => ({ ...prev, [tipo]: true }));
-
-  try {
-    console.log('🗑️ Eliminando documento desde:', `${API_URL}/api/montacargas/documento/${montacargasLocal.numero}/${tipo}`);
-    const response = await fetch(`${API_URL}/api/montacargas/documento/${montacargasLocal.numero}/${tipo}`, {
-      method: 'DELETE',
-    });
-
-    const result = await response.json();
-
-    if (response.ok) {
-      console.log('✅ Respuesta de eliminación:', result);
+    try {
+      const formData = new FormData();
       
-      // ⭐⭐ ACTUALIZACIÓN CRÍTICA: Usar los datos que devuelve el servidor
-      if (result.montacargas) {
-        setMontacargasLocal(result.montacargas);
+      // CORRECCIÓN: Usar los nombres correctos que espera el backend
+      if (tipo === 'pedimento') {
+        formData.append('documento_pedimento', file);
+      } else if (tipo === 'adicional') {
+        formData.append('documento_adicional', file);
+      } else if (tipo === 'ped_adicional') {
+        formData.append('doc_ped_adicional', file);
+      }
+      
+      // Asegurarse de que los valores numéricos se envíen correctamente
+      formData.append('Marca', montacargasLocal.Marca || '');
+      formData.append('Modelo', montacargasLocal.Modelo || '');
+      formData.append('Serie', montacargasLocal.Serie || '');
+      formData.append('Sistema', montacargasLocal.Sistema || '');
+      
+      // CORRECCIÓN: Convertir Capacidad a número, usar 0 si está vacío
+      const capacidad = montacargasLocal.Capacidad ? parseInt(montacargasLocal.Capacidad) : 0;
+      formData.append('Capacidad', capacidad.toString());
+      
+      formData.append('Ubicacion', montacargasLocal.Ubicacion || '');
+      formData.append('Planta', montacargasLocal.Planta || '');
+
+      console.log('📤 Enviando datos a:', `${API_URL}/api/montacargas/${montacargasLocal.numero}`);
+      console.log('📄 Tipo de documento:', tipo);
+      
+      const response = await fetch(`${API_URL}/api/montacargas/${montacargasLocal.numero}`, {
+        method: 'PUT',
+        body: formData,
+      });
+
+      const responseData = await response.json();
+
+      if (response.ok) {
+        console.log('✅ Respuesta del servidor:', responseData);
+        
+        // ⭐⭐ ACTUALIZACIÓN CRÍTICA: Usar los datos que devuelve el servidor
+        setMontacargasLocal(responseData);
         if (onMontacargasUpdate) {
-          onMontacargasUpdate(result.montacargas);
+          onMontacargasUpdate(responseData);
+        }
+        
+        // Si es documento opcional de pedimento, mostrar la sección
+        if (tipo === 'ped_adicional') {
+          setShowPedimentoOpcional(true);
+        }
+        alert('✅ Documento cargado correctamente');
+      } else {
+        throw new Error(responseData.error || responseData.details || 'Error al cargar documento');
+      }
+    } catch (error) {
+      console.error('❌ Error uploading file:', error);
+      alert('❌ Error al cargar el documento: ' + error.message);
+    } finally {
+      setUploading(prev => ({ ...prev, [tipo]: false }));
+      event.target.value = '';
+    }
+  };
+
+  const handleDownload = async (fileUrl, originalFileName = null) => {
+    try {
+      if (!fileUrl) {
+        alert('No hay documento para descargar');
+        return;
+      }
+
+      console.log('📥 Iniciando descarga de:', fileUrl);
+
+      // ⭐⭐ SOLUCIÓN MEJORADA: Siempre usar el backend como proxy
+      const encodedUrl = encodeURIComponent(fileUrl);
+      const downloadUrl = `${API_URL}/api/montacargas/documento/${encodedUrl}`;
+      
+      console.log('🌐 Descargando a través del backend:', downloadUrl);
+      
+      const response = await fetch(downloadUrl);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al descargar archivo');
+      }
+      
+      // Obtener el blob
+      const blob = await response.blob();
+      
+      // Extraer nombre del archivo del header Content-Disposition o de la URL
+      let fileName = 'documento';
+      const contentDisposition = response.headers.get('content-disposition');
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+        if (filenameMatch) {
+          fileName = filenameMatch[1];
         }
       } else {
-        // Fallback: recargar desde el servidor
-        const refreshResponse = await fetch(`${API_URL}/api/montacargas/${montacargasLocal.numero}`);
-        const refreshData = await refreshResponse.json();
-        
-        if (refreshData.success) {
-          setMontacargasLocal(refreshData.montacargas);
-          if (onMontacargasUpdate) {
-            onMontacargasUpdate(refreshData.montacargas);
-          }
+        // Fallback: extraer de la URL
+        try {
+          const urlParts = fileUrl.split('/');
+          const publicId = urlParts[urlParts.length - 1];
+          fileName = publicId || 'documento';
+        } catch (e) {
+          console.log('No se pudo extraer nombre de archivo:', e);
         }
       }
       
-      // Si es documento opcional de pedimento y se elimina, ocultar la sección
-      if (tipo === 'ped_adicional') {
-        setShowPedimentoOpcional(false);
-      }
-      alert('✅ Documento eliminado correctamente');
-    } else {
-      throw new Error(result.error || result.details || 'Error al eliminar documento');
+      // Crear URL temporal y descargar
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+    } catch (error) {
+      console.error('❌ Error downloading file:', error);
+      alert('❌ Error al descargar el documento: ' + error.message);
     }
-  } catch (error) {
-    console.error('❌ Error deleting document:', error);
-    alert('❌ Error al eliminar el documento: ' + error.message);
-  } finally {
-    setDeleting(prev => ({ ...prev, [tipo]: false }));
-  }
-};
+  };
 
-// Agrega este useEffect para debuggear
-React.useEffect(() => {
-  console.log('🔄 montacargasLocal actualizado:', montacargasLocal);
-}, [montacargasLocal]);
+  const handleDeleteDocument = async (tipo) => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar este documento?')) {
+      return;
+    }
 
-// Y este para debuggear el prop original
-React.useEffect(() => {
-  console.log('📥 montacargas (prop) actualizado:', montacargas);
-}, [montacargas]);
+    setDeleting(prev => ({ ...prev, [tipo]: true }));
+
+    try {
+      console.log('🗑️ Eliminando documento desde:', `${API_URL}/api/montacargas/documento/${montacargasLocal.numero}/${tipo}`);
+      const response = await fetch(`${API_URL}/api/montacargas/documento/${montacargasLocal.numero}/${tipo}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        console.log('✅ Respuesta de eliminación:', result);
+        
+        // ⭐⭐ ACTUALIZACIÓN CRÍTICA: Usar los datos que devuelve el servidor
+        if (result.montacargas) {
+          setMontacargasLocal(result.montacargas);
+          if (onMontacargasUpdate) {
+            onMontacargasUpdate(result.montacargas);
+          }
+        } else {
+          // Fallback: recargar desde el servidor
+          const refreshResponse = await fetch(`${API_URL}/api/montacargas/${montacargasLocal.numero}`);
+          const refreshData = await refreshResponse.json();
+          
+          if (refreshData.success) {
+            setMontacargasLocal(refreshData.montacargas);
+            if (onMontacargasUpdate) {
+              onMontacargasUpdate(refreshData.montacargas);
+            }
+          }
+        }
+        
+        // Si es documento opcional de pedimento y se elimina, ocultar la sección
+        if (tipo === 'ped_adicional') {
+          setShowPedimentoOpcional(false);
+        }
+        alert('✅ Documento eliminado correctamente');
+      } else {
+        throw new Error(result.error || result.details || 'Error al eliminar documento');
+      }
+    } catch (error) {
+      console.error('❌ Error deleting document:', error);
+      alert('❌ Error al eliminar el documento: ' + error.message);
+    } finally {
+      setDeleting(prev => ({ ...prev, [tipo]: false }));
+    }
+  };
 
   // Función para obtener icono según tipo de archivo
   const getFileIcon = (fileUrl) => {
-  if (!fileUrl) return '📄';
-  
-  let ext = '';
-  
-  // Si es una URL de Cloudinary, intentar detectar la extensión
-  if (fileUrl.includes('cloudinary')) {
-    // Cloudinary puede detectar el tipo automáticamente, pero por seguridad usar PDF
-    ext = 'pdf';
-  } else {
-    // Si es un archivo local
-    ext = fileUrl.split('.').pop().toLowerCase();
-  }
-  
-  if (ext === 'pdf') return '📕';
-  if (['doc', 'docx'].includes(ext)) return '📘';
-  if (ext === 'txt') return '📃';
-  return '📄';
-};
+    if (!fileUrl) return '📄';
+    
+    let ext = '';
+    
+    // Si es una URL de Cloudinary, intentar detectar la extensión
+    if (fileUrl.includes('cloudinary')) {
+      // Cloudinary puede detectar el tipo automáticamente, pero por seguridad usar PDF
+      ext = 'pdf';
+    } else {
+      // Si es un archivo local
+      ext = fileUrl.split('.').pop().toLowerCase();
+    }
+    
+    if (ext === 'pdf') return '📕';
+    if (['doc', 'docx'].includes(ext)) return '📘';
+    if (ext === 'txt') return '📃';
+    return '📄';
+  };
 
   // Función para formatear el nombre del archivo
   const formatFileName = (fileUrl) => {
-  if (!fileUrl) return '';
-  
-  // Si es una URL de Cloudinary, extraer el nombre del public_id
-  if (fileUrl.includes('cloudinary')) {
-    const parts = fileUrl.split('/');
-    const publicId = parts[parts.length - 1];
-    const fileName = publicId.split('.')[0];
-    // Remover el prefijo "montacargas-" si existe
-    return fileName.replace(/^montacargas-/, '').substring(0, 20) + '...';
-  }
-  
-  // Si es un archivo local (antiguo)
-  const cleanName = fileUrl.replace(/^montacargas-\d+-/, '');
-  return cleanName.length > 20 ? cleanName.substring(0, 20) + '...' : cleanName;
-};
+    if (!fileUrl) return '';
+    
+    // Si es una URL de Cloudinary, extraer el nombre del public_id
+    if (fileUrl.includes('cloudinary')) {
+      const parts = fileUrl.split('/');
+      const publicId = parts[parts.length - 1];
+      const fileName = publicId.split('.')[0];
+      // Remover el prefijo "montacargas-" si existe
+      return fileName.replace(/^montacargas-/, '').substring(0, 20) + '...';
+    }
+    
+    // Si es un archivo local (antiguo)
+    const cleanName = fileUrl.replace(/^montacargas-\d+-/, '');
+    return cleanName.length > 20 ? cleanName.substring(0, 20) + '...' : cleanName;
+  };
 
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', maxWidth: '800px', margin: '0 auto' }}>
