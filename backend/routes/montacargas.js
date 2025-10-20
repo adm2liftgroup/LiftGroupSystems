@@ -78,12 +78,12 @@ router.post("/", upload.fields([
     
     if (req.files?.documento_adicional) {
       const file = req.files.documento_adicional[0];
-      documentoPedimento = await uploadToCloudinary(file.buffer, file.originalname); }
+      documentoAdicional = await uploadToCloudinary(file.buffer, file.originalname); }
     
     
     if (req.files?.doc_ped_adicional) {
       const file = req.files.doc_ped_adicional[0];
-      documentoPedimento = await uploadToCloudinary(file.buffer, file.originalname); }
+      docPedAdicional = await uploadToCloudinary(file.buffer, file.originalname); }
     
 
     const result = await pool.query(
@@ -140,12 +140,16 @@ router.put("/:id", upload.fields([
 
     console.log('Documentos actuales - pedimento:', documentoPedimento, 'adicional:', documentoAdicional, 'ped_adicional:', docPedAdicional);
 
-    // ACTUALIZADO: Manejar archivos con Cloudinary
+    // ACTUALIZADO: Manejar archivos con Cloudinary - CORREGIDO
     if (req.files?.documento_pedimento) {
       // PRIMERO eliminar el archivo anterior de Cloudinary si existe
       if (documentoPedimento && documentoPedimento.includes('cloudinary')) {
-        await deleteFromCloudinary(documentoPedimento);
-        console.log('✅ Archivo anterior de pedimento eliminado de Cloudinary');
+        try {
+          await deleteFromCloudinary(documentoPedimento);
+          console.log('✅ Archivo anterior de pedimento eliminado de Cloudinary');
+        } catch (error) {
+          console.error('⚠️ Error eliminando archivo anterior de pedimento, pero continuando:', error.message);
+        }
       } else if (documentoPedimento) {
         // Si es un archivo local antiguo, eliminarlo localmente
         const oldFilePath = path.join(__dirname, '../uploads/montacargas', documentoPedimento);
@@ -155,7 +159,7 @@ router.put("/:id", upload.fields([
         }
       }
       
-      // SUBIR nuevo archivo a Cloudinary
+      // SUBIR nuevo archivo a Cloudinary - CORREGIDO: usar originalname
       const file = req.files.documento_pedimento[0];
       documentoPedimento = await uploadToCloudinary(file.buffer, file.originalname);
       console.log('☁️ Nuevo archivo de pedimento (Cloudinary):', documentoPedimento);
@@ -164,8 +168,12 @@ router.put("/:id", upload.fields([
     if (req.files?.documento_adicional) {
       // PRIMERO eliminar el archivo anterior de Cloudinary si existe
       if (documentoAdicional && documentoAdicional.includes('cloudinary')) {
-        await deleteFromCloudinary(documentoAdicional);
-        console.log('✅ Archivo anterior adicional eliminado de Cloudinary');
+        try {
+          await deleteFromCloudinary(documentoAdicional);
+          console.log('✅ Archivo anterior adicional eliminado de Cloudinary');
+        } catch (error) {
+          console.error('⚠️ Error eliminando archivo anterior adicional, pero continuando:', error.message);
+        }
       } else if (documentoAdicional) {
         // Si es un archivo local antiguo, eliminarlo localmente
         const oldFilePath = path.join(__dirname, '../uploads/montacargas', documentoAdicional);
@@ -175,17 +183,21 @@ router.put("/:id", upload.fields([
         }
       }
       
-      // SUBIR nuevo archivo a Cloudinary
+      // SUBIR nuevo archivo a Cloudinary - CORREGIDO: usar originalname y asignar a variable correcta
       const file = req.files.documento_adicional[0];
-      documentoAdicional = await uploadToCloudinary(file.buffer, file.filename);
+      documentoAdicional = await uploadToCloudinary(file.buffer, file.originalname);
       console.log('☁️ Nuevo archivo adicional (Cloudinary):', documentoAdicional);
     }
 
     if (req.files?.doc_ped_adicional) {
       // PRIMERO eliminar el archivo anterior de Cloudinary si existe
       if (docPedAdicional && docPedAdicional.includes('cloudinary')) {
-        await deleteFromCloudinary(docPedAdicional);
-        console.log('✅ Archivo anterior ped_adicional eliminado de Cloudinary');
+        try {
+          await deleteFromCloudinary(docPedAdicional);
+          console.log('✅ Archivo anterior ped_adicional eliminado de Cloudinary');
+        } catch (error) {
+          console.error('⚠️ Error eliminando archivo anterior ped_adicional, pero continuando:', error.message);
+        }
       } else if (docPedAdicional) {
         // Si es un archivo local antiguo, eliminarlo localmente
         const oldFilePath = path.join(__dirname, '../uploads/montacargas', docPedAdicional);
@@ -195,9 +207,9 @@ router.put("/:id", upload.fields([
         }
       }
       
-      // SUBIR nuevo archivo a Cloudinary
+      // SUBIR nuevo archivo a Cloudinary - CORREGIDO: usar originalname y asignar a variable correcta
       const file = req.files.doc_ped_adicional[0];
-      docPedAdicional = await uploadToCloudinary(file.buffer, file.filename);
+      docPedAdicional = await uploadToCloudinary(file.buffer, file.originalname);
       console.log('☁️ Nuevo archivo ped_adicional (Cloudinary):', docPedAdicional);
     }
 
