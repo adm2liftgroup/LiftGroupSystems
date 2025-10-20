@@ -4,3 +4,13 @@ node_modules/
 .env.production
 uploads/
 *.log
+.DS_Store
+dist/
+build/
+*.tmp
+*.temp
+
+*.pdf
+*.doc
+*.docx
+*.txt
