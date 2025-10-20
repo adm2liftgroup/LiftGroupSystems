@@ -5,6 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { uploadToCloudinary, deleteFromCloudinary, getDownloadUrl } = require('../cloudinary');
+const cloudinary = require('cloudinary').v2;
 
 // Configurar multer para almacenamiento de archivos
 const storage = multer.memoryStorage();
@@ -71,25 +72,58 @@ router.post("/", upload.fields([
     let documentoAdicional = null;
     let docPedAdicional = null;
 
-    // ACTUALIZADO: Subir a Cloudinary si hay archivos
+    console.log('📁 Archivos recibidos:', req.files);
+    
+    // ACTUALIZADO: Subir a Cloudinary si hay archivos - CON MEJOR MANEJO DE ERRORES
     if (req.files?.documento_pedimento) {
-      const file = req.files.documento_pedimento[0];
-      documentoPedimento = await uploadToCloudinary(file.buffer, file.originalname); }
+      try {
+        const file = req.files.documento_pedimento[0];
+        console.log(`📤 Subiendo documento_pedimento: ${file.originalname}`);
+        documentoPedimento = await uploadToCloudinary(file.buffer, file.originalname);
+        console.log('✅ documento_pedimento subido:', documentoPedimento);
+      } catch (error) {
+        console.error('❌ Error subiendo documento_pedimento:', error);
+        // Continuar sin el documento
+      }
+    }
     
     if (req.files?.documento_adicional) {
-      const file = req.files.documento_adicional[0];
-      documentoAdicional = await uploadToCloudinary(file.buffer, file.originalname); }
-    
+      try {
+        const file = req.files.documento_adicional[0];
+        console.log(`📤 Subiendo documento_adicional: ${file.originalname}`);
+        documentoAdicional = await uploadToCloudinary(file.buffer, file.originalname);
+        console.log('✅ documento_adicional subido:', documentoAdicional);
+      } catch (error) {
+        console.error('❌ Error subiendo documento_adicional:', error);
+        // Continuar sin el documento
+      }
+    }
     
     if (req.files?.doc_ped_adicional) {
-      const file = req.files.doc_ped_adicional[0];
-      docPedAdicional = await uploadToCloudinary(file.buffer, file.originalname); }
-    
+      try {
+        const file = req.files.doc_ped_adicional[0];
+        console.log(`📤 Subiendo doc_ped_adicional: ${file.originalname}`);
+        docPedAdicional = await uploadToCloudinary(file.buffer, file.originalname);
+        console.log('✅ doc_ped_adicional subido:', docPedAdicional);
+      } catch (error) {
+        console.error('❌ Error subiendo doc_ped_adicional:', error);
+        // Continuar sin el documento
+      }
+    }
+
+    // ⭐⭐ LOG CRÍTICO: Verificar qué se va a guardar en la BD
+    console.log('💾 Guardando en BD:');
+    console.log('   - documento_pedimento:', documentoPedimento);
+    console.log('   - documento_adicional:', documentoAdicional);
+    console.log('   - doc_ped_adicional:', docPedAdicional);
 
     const result = await pool.query(
       'INSERT INTO "Montacargas" (numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional", "doc_ped_adicional") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional", "doc_ped_adicional"',
       [numero, Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta, documentoPedimento, documentoAdicional, docPedAdicional]
     );
+
+    // ⭐⭐ LOG CRÍTICO: Verificar qué se guardó realmente en la BD
+    console.log('📊 Resultado de INSERT en BD:', result.rows[0]);
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -138,90 +172,116 @@ router.put("/:id", upload.fields([
     let documentoAdicional = currentResult.rows[0].documento_adicional;
     let docPedAdicional = currentResult.rows[0].doc_ped_adicional;
 
-    console.log('Documentos actuales - pedimento:', documentoPedimento, 'adicional:', documentoAdicional, 'ped_adicional:', docPedAdicional);
+    console.log('📄 Documentos actuales en BD:');
+    console.log('   - pedimento:', documentoPedimento);
+    console.log('   - adicional:', documentoAdicional);
+    console.log('   - ped_adicional:', docPedAdicional);
 
-    // ACTUALIZADO: Manejar archivos con Cloudinary - CORREGIDO
+    // ACTUALIZADO: Manejar archivos con Cloudinary - CON MEJOR MANEJO DE ERRORES
     if (req.files?.documento_pedimento) {
-      // PRIMERO eliminar el archivo anterior de Cloudinary si existe
-      if (documentoPedimento && documentoPedimento.includes('cloudinary')) {
-        try {
-          await deleteFromCloudinary(documentoPedimento);
-          console.log('✅ Archivo anterior de pedimento eliminado de Cloudinary');
-        } catch (error) {
-          console.error('⚠️ Error eliminando archivo anterior de pedimento, pero continuando:', error.message);
+      try {
+        // PRIMERO eliminar el archivo anterior de Cloudinary si existe
+        if (documentoPedimento && documentoPedimento.includes('cloudinary')) {
+          try {
+            await deleteFromCloudinary(documentoPedimento);
+            console.log('✅ Archivo anterior de pedimento eliminado de Cloudinary');
+          } catch (error) {
+            console.error('⚠️ Error eliminando archivo anterior de pedimento, pero continuando:', error.message);
+          }
+        } else if (documentoPedimento) {
+          // Si es un archivo local antiguo, eliminarlo localmente
+          const oldFilePath = path.join(__dirname, '../uploads/montacargas', documentoPedimento);
+          if (fs.existsSync(oldFilePath)) {
+            fs.unlinkSync(oldFilePath);
+            console.log('🗑️ Archivo anterior local eliminado:', documentoPedimento);
+          }
         }
-      } else if (documentoPedimento) {
-        // Si es un archivo local antiguo, eliminarlo localmente
-        const oldFilePath = path.join(__dirname, '../uploads/montacargas', documentoPedimento);
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
-          console.log('🗑️ Archivo anterior local eliminado:', documentoPedimento);
-        }
+        
+        // SUBIR nuevo archivo a Cloudinary
+        const file = req.files.documento_pedimento[0];
+        console.log(`📤 Subiendo nuevo documento_pedimento: ${file.originalname}`);
+        documentoPedimento = await uploadToCloudinary(file.buffer, file.originalname);
+        console.log('☁️ Nuevo archivo de pedimento (Cloudinary):', documentoPedimento);
+      } catch (error) {
+        console.error('❌ Error subiendo nuevo documento_pedimento:', error);
+        // Mantener el documento anterior si hay error
       }
-      
-      // SUBIR nuevo archivo a Cloudinary - CORREGIDO: usar originalname
-      const file = req.files.documento_pedimento[0];
-      documentoPedimento = await uploadToCloudinary(file.buffer, file.originalname);
-      console.log('☁️ Nuevo archivo de pedimento (Cloudinary):', documentoPedimento);
     }
     
     if (req.files?.documento_adicional) {
-      // PRIMERO eliminar el archivo anterior de Cloudinary si existe
-      if (documentoAdicional && documentoAdicional.includes('cloudinary')) {
-        try {
-          await deleteFromCloudinary(documentoAdicional);
-          console.log('✅ Archivo anterior adicional eliminado de Cloudinary');
-        } catch (error) {
-          console.error('⚠️ Error eliminando archivo anterior adicional, pero continuando:', error.message);
+      try {
+        // PRIMERO eliminar el archivo anterior de Cloudinary si existe
+        if (documentoAdicional && documentoAdicional.includes('cloudinary')) {
+          try {
+            await deleteFromCloudinary(documentoAdicional);
+            console.log('✅ Archivo anterior adicional eliminado de Cloudinary');
+          } catch (error) {
+            console.error('⚠️ Error eliminando archivo anterior adicional, pero continuando:', error.message);
+          }
+        } else if (documentoAdicional) {
+          // Si es un archivo local antiguo, eliminarlo localmente
+          const oldFilePath = path.join(__dirname, '../uploads/montacargas', documentoAdicional);
+          if (fs.existsSync(oldFilePath)) {
+            fs.unlinkSync(oldFilePath);
+            console.log('🗑️ Archivo anterior local eliminado:', documentoAdicional);
+          }
         }
-      } else if (documentoAdicional) {
-        // Si es un archivo local antiguo, eliminarlo localmente
-        const oldFilePath = path.join(__dirname, '../uploads/montacargas', documentoAdicional);
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
-          console.log('🗑️ Archivo anterior local eliminado:', documentoAdicional);
-        }
+        
+        // SUBIR nuevo archivo a Cloudinary
+        const file = req.files.documento_adicional[0];
+        console.log(`📤 Subiendo nuevo documento_adicional: ${file.originalname}`);
+        documentoAdicional = await uploadToCloudinary(file.buffer, file.originalname);
+        console.log('☁️ Nuevo archivo adicional (Cloudinary):', documentoAdicional);
+      } catch (error) {
+        console.error('❌ Error subiendo nuevo documento_adicional:', error);
+        // Mantener el documento anterior si hay error
       }
-      
-      // SUBIR nuevo archivo a Cloudinary - CORREGIDO: usar originalname y asignar a variable correcta
-      const file = req.files.documento_adicional[0];
-      documentoAdicional = await uploadToCloudinary(file.buffer, file.originalname);
-      console.log('☁️ Nuevo archivo adicional (Cloudinary):', documentoAdicional);
     }
 
     if (req.files?.doc_ped_adicional) {
-      // PRIMERO eliminar el archivo anterior de Cloudinary si existe
-      if (docPedAdicional && docPedAdicional.includes('cloudinary')) {
-        try {
-          await deleteFromCloudinary(docPedAdicional);
-          console.log('✅ Archivo anterior ped_adicional eliminado de Cloudinary');
-        } catch (error) {
-          console.error('⚠️ Error eliminando archivo anterior ped_adicional, pero continuando:', error.message);
+      try {
+        // PRIMERO eliminar el archivo anterior de Cloudinary si existe
+        if (docPedAdicional && docPedAdicional.includes('cloudinary')) {
+          try {
+            await deleteFromCloudinary(docPedAdicional);
+            console.log('✅ Archivo anterior ped_adicional eliminado de Cloudinary');
+          } catch (error) {
+            console.error('⚠️ Error eliminando archivo anterior ped_adicional, pero continuando:', error.message);
+          }
+        } else if (docPedAdicional) {
+          // Si es un archivo local antiguo, eliminarlo localmente
+          const oldFilePath = path.join(__dirname, '../uploads/montacargas', docPedAdicional);
+          if (fs.existsSync(oldFilePath)) {
+            fs.unlinkSync(oldFilePath);
+            console.log('🗑️ Archivo anterior local eliminado:', docPedAdicional);
+          }
         }
-      } else if (docPedAdicional) {
-        // Si es un archivo local antiguo, eliminarlo localmente
-        const oldFilePath = path.join(__dirname, '../uploads/montacargas', docPedAdicional);
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
-          console.log('🗑️ Archivo anterior local eliminado:', docPedAdicional);
-        }
+        
+        // SUBIR nuevo archivo a Cloudinary
+        const file = req.files.doc_ped_adicional[0];
+        console.log(`📤 Subiendo nuevo doc_ped_adicional: ${file.originalname}`);
+        docPedAdicional = await uploadToCloudinary(file.buffer, file.originalname);
+        console.log('☁️ Nuevo archivo ped_adicional (Cloudinary):', docPedAdicional);
+      } catch (error) {
+        console.error('❌ Error subiendo nuevo doc_ped_adicional:', error);
+        // Mantener el documento anterior si hay error
       }
-      
-      // SUBIR nuevo archivo a Cloudinary - CORREGIDO: usar originalname y asignar a variable correcta
-      const file = req.files.doc_ped_adicional[0];
-      docPedAdicional = await uploadToCloudinary(file.buffer, file.originalname);
-      console.log('☁️ Nuevo archivo ped_adicional (Cloudinary):', docPedAdicional);
     }
 
-    console.log('Valores finales - pedimento:', documentoPedimento, 'adicional:', documentoAdicional, 'ped_adicional:', docPedAdicional);
-    console.log('Capacidad procesada:', capacidadNum);
+    // ⭐⭐ LOG CRÍTICO: Verificar qué se va a guardar en la BD
+    console.log('💾 Valores finales para guardar en BD:');
+    console.log('   - pedimento:', documentoPedimento);
+    console.log('   - adicional:', documentoAdicional);
+    console.log('   - ped_adicional:', docPedAdicional);
+    console.log('   - Capacidad procesada:', capacidadNum);
 
     const result = await pool.query(
       'UPDATE "Montacargas" SET "Marca"=$1, "Modelo"=$2, "Serie"=$3, "Sistema"=$4, "Capacidad"=$5, "Ubicacion"=$6, "Planta"=$7, "documento_pedimento"=$8, "documento_adicional"=$9, "doc_ped_adicional"=$10 WHERE numero=$11 RETURNING numero, "Marca", "Modelo", "Serie", "Sistema", "Capacidad", "Ubicacion", "Planta", "documento_pedimento", "documento_adicional", "doc_ped_adicional"',
       [Marca, Modelo, Serie, Sistema, capacidadNum, Ubicacion, Planta, documentoPedimento, documentoAdicional, docPedAdicional, id]
     );
 
-    console.log('Resultado de la consulta UPDATE:', result.rows[0]);
+    // ⭐⭐ LOG CRÍTICO: Verificar qué se guardó realmente en la BD
+    console.log('📊 Resultado de UPDATE en BD:', result.rows[0]);
 
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Montacargas no encontrado" });
@@ -325,58 +385,21 @@ router.get("/documento/:url", async (req, res) => {
       return res.status(404).json({ error: "Archivo no encontrado" });
     }
 
-    // Si es una URL de Cloudinary, usar el SDK para obtener el archivo
+    // ⭐⭐ SOLUCIÓN SIMPLE: Redirigir directamente a Cloudinary
+    // Cloudinary maneja mejor las descargas con su propia CDN
     if (fileUrl.includes('cloudinary')) {
-      console.log('🌐 Obteniendo archivo de Cloudinary...');
+      console.log('🌐 Redirigiendo a Cloudinary para descarga...');
       
-      try {
-        // Extraer public_id de la URL
-        const urlParts = fileUrl.split('/');
-        const uploadIndex = urlParts.indexOf('upload');
-        
-        if (uploadIndex === -1) {
-          throw new Error('URL de Cloudinary inválida');
-        }
-        
-        const versionIndex = uploadIndex + 1;
-        if (versionIndex >= urlParts.length) {
-          throw new Error('URL de Cloudinary incompleta');
-        }
-        
-        const publicIdParts = urlParts.slice(versionIndex + 1);
-        const publicId = publicIdParts.join('/');
-        
-        console.log('🔍 Public ID extraído:', publicId);
-        
-        // Usar el SDK de Cloudinary para obtener el archivo como stream
-        const downloadStream = cloudinary.uploader.download(publicId, {
-          resource_type: 'raw'
-        });
-        
-        // Configurar headers
-        res.setHeader('Content-Type', 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="${publicId}"`);
-        
-        // Pipe el stream a la respuesta
-        downloadStream.pipe(res);
-        
-      } catch (cloudinaryError) {
-        console.error('❌ Error con Cloudinary SDK:', cloudinaryError);
-        
-        // Fallback: intentar con fetch directo
-        console.log('🔄 Intentando fallback con fetch...');
-        const response = await fetch(fileUrl);
-        
-        if (!response.ok) {
-          throw new Error(`Cloudinary respondió con status: ${response.status}`);
-        }
-        
-        const buffer = await response.buffer();
-        res.setHeader('Content-Type', response.headers.get('content-type') || 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="documento"`);
-        res.setHeader('Content-Length', buffer.length);
-        res.send(buffer);
+      // Agregar parámetro de descarga forzada
+      let downloadUrl = fileUrl;
+      if (fileUrl.includes('?')) {
+        downloadUrl = fileUrl + '&fl_attachment';
+      } else {
+        downloadUrl = fileUrl + '?fl_attachment';
       }
+      
+      console.log('🔗 URL final de descarga:', downloadUrl);
+      return res.redirect(downloadUrl);
       
     } else {
       // Si es un archivo local (antiguo), usar el sistema anterior

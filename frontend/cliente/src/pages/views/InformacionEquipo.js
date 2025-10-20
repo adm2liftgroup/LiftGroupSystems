@@ -176,26 +176,29 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
     const result = await response.json();
 
     if (response.ok) {
-      // ⭐⭐ SOLUCIÓN MEJORADA: Recargar los datos desde el servidor
-      // en lugar de confiar en la respuesta
-      const refreshResponse = await fetch(`${API_URL}/api/montacargas/${montacargasLocal.numero}`);
-      const refreshData = await refreshResponse.json();
-      
-      if (refreshData.success) {
-        const updatedMontacargas = refreshData.montacargas;
-        setMontacargasLocal(updatedMontacargas);
-        if (onMontacargasUpdate) {
-          onMontacargasUpdate(updatedMontacargas);
-        }
+      // ⭐⭐ FORZAR RECARGA COMPLETA DESDE EL SERVIDOR
+      // Esperar un momento para que Cloudinary procese la eliminación
+      setTimeout(async () => {
+        const refreshResponse = await fetch(`${API_URL}/api/montacargas/${montacargasLocal.numero}`);
+        const refreshData = await refreshResponse.json();
         
-        // Si es documento opcional de pedimento y se elimina, ocultar la sección
-        if (tipo === 'ped_adicional') {
-          setShowPedimentoOpcional(false);
+        if (refreshData.success) {
+          const updatedMontacargas = refreshData.montacargas;
+          setMontacargasLocal(updatedMontacargas);
+          if (onMontacargasUpdate) {
+            onMontacargasUpdate(updatedMontacargas);
+          }
+          
+          // Si es documento opcional de pedimento y se elimina, ocultar la sección
+          if (tipo === 'ped_adicional') {
+            setShowPedimentoOpcional(false);
+          }
+          alert('✅ Documento eliminado correctamente');
+        } else {
+          throw new Error('Error al actualizar datos después de eliminar');
         }
-        alert('✅ Documento eliminado correctamente');
-      } else {
-        throw new Error('Error al actualizar datos después de eliminar');
-      }
+      }, 1000);
+      
     } else {
       throw new Error(result.error || result.details || 'Error al eliminar documento');
     }

@@ -53,7 +53,7 @@ const deleteFromCloudinary = async (fileUrl) => {
   try {
     console.log('🗑️ Intentando eliminar de Cloudinary:', fileUrl);
     
-    // Extraer el public_id de la URL de Cloudinary
+    // Extraer el public_id de la URL de Cloudinary - MÉTODO MEJORADO
     const urlParts = fileUrl.split('/');
     const uploadIndex = urlParts.indexOf('upload');
     
@@ -70,9 +70,18 @@ const deleteFromCloudinary = async (fileUrl) => {
     }
     
     const publicIdParts = urlParts.slice(versionIndex + 1);
-    const publicId = publicIdParts.join('/').replace(/\.[^/.]+$/, ""); // Remover extensión
     
-    console.log('🔍 Public ID extraído:', publicId);
+    // ⭐⭐ CORRECCIÓN CRÍTICA: NO remover la extensión y decodificar URL
+    let publicId = publicIdParts.join('/');
+    
+    // Decodificar caracteres especiales como %5B -> [
+    try {
+      publicId = decodeURIComponent(publicId);
+    } catch (e) {
+      console.log('⚠️ No se pudo decodificar publicId, usando original');
+    }
+    
+    console.log('🔍 Public ID extraído (CON extensión):', publicId);
     
     // Eliminar como raw file
     const result = await cloudinary.uploader.destroy(publicId, {
@@ -84,6 +93,22 @@ const deleteFromCloudinary = async (fileUrl) => {
     
     if (result.result !== 'ok') {
       console.warn('⚠️ Cloudinary reportó:', result.result);
+      
+      // ⭐⭐ INTENTAR ALTERNATIVA: Quizás el archivo está en una subcarpeta diferente
+      if (result.result === 'not found') {
+        console.log('🔄 Intentando alternativa...');
+        // Intentar sin la carpeta "montacargas/"
+        const altPublicId = publicId.replace(/^montacargas\//, '');
+        if (altPublicId !== publicId) {
+          console.log('🔍 Public ID alternativo:', altPublicId);
+          const altResult = await cloudinary.uploader.destroy(altPublicId, {
+            resource_type: 'raw',
+            invalidate: true
+          });
+          console.log('✅ Resultado eliminación alternativa:', altResult);
+          return altResult;
+        }
+      }
     }
     
     return result;
