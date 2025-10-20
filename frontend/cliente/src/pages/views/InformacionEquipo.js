@@ -115,143 +115,53 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
   };
 
   const handleDownload = async (fileUrl, tipo) => {
-    try {
-      if (!fileUrl) {
-        alert('No hay documento para descargar');
-        return;
-      }
-
-      console.log('📥 Iniciando descarga de:', fileUrl);
-
-      // ⭐⭐ SOLUCIÓN MEJORADA: Usar el backend como proxy con mejor manejo de errores
-      const encodedUrl = encodeURIComponent(fileUrl);
-      const downloadUrl = `${API_URL}/api/montacargas/documento/${encodedUrl}`;
-      
-      console.log('🌐 Descargando a través del backend:', downloadUrl);
-      
-      const response = await fetch(downloadUrl);
-      
-      if (!response.ok) {
-        // ⭐⭐ MEJOR MANEJO DE ERROR: Intentar obtener el error como texto primero
-        let errorMessage = 'Error al descargar archivo';
-        try {
-          const errorText = await response.text();
-          console.error('❌ Error response text:', errorText);
-          
-          // Intentar parsear como JSON si es posible
-          try {
-            const errorData = JSON.parse(errorText);
-            errorMessage = errorData.error || errorMessage;
-          } catch {
-            // Si no es JSON, usar el texto como está
-            if (errorText && errorText.length < 100) { // Solo si es texto corto
-              errorMessage = errorText;
-            }
-          }
-        } catch (textError) {
-          console.error('❌ No se pudo obtener texto del error:', textError);
-        }
-        
-        throw new Error(`${errorMessage} (Status: ${response.status})`);
-      }
-      
-      // Verificar que la respuesta sea un archivo válido
-      const contentType = response.headers.get('content-type');
-      const contentLength = response.headers.get('content-length');
-      
-      console.log('📄 Headers de respuesta:', {
-        contentType,
-        contentLength,
-        status: response.status
-      });
-      
-      // Si es una redirección o el contenido es muy pequeño, puede ser un error
-      if (contentLength && parseInt(contentLength) < 100) {
-        console.warn('⚠️ Contenido muy pequeño, posible error');
-      }
-      
-      // Obtener el blob
-      const blob = await response.blob();
-      
-      // Verificar que el blob tenga datos
-      if (blob.size === 0) {
-        throw new Error('El archivo está vacío');
-      }
-      
-      console.log('✅ Blob obtenido, tamaño:', blob.size, 'type:', blob.type);
-      
-      // Extraer nombre del archivo
-      let fileName = 'documento';
-      const contentDisposition = response.headers.get('content-disposition');
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
-        if (filenameMatch) {
-          fileName = filenameMatch[1];
-        }
-      } else {
-        // Fallback: extraer de la URL
-        try {
-          const urlParts = fileUrl.split('/');
-          let publicId = urlParts[urlParts.length - 1];
-          
-          // Decodificar URL si es necesario
-          try {
-            publicId = decodeURIComponent(publicId);
-          } catch (e) {
-            console.log('No se pudo decodificar publicId');
-          }
-          
-          fileName = publicId || 'documento';
-          
-          // Asegurar extensión si no la tiene
-          if (!fileName.includes('.')) {
-            if (blob.type.includes('pdf')) fileName += '.pdf';
-            else if (blob.type.includes('word')) fileName += '.docx';
-            else if (blob.type.includes('text')) fileName += '.txt';
-            else fileName += '.bin';
-          }
-        } catch (e) {
-          console.log('No se pudo extraer nombre de archivo:', e);
-        }
-      }
-      
-      console.log('💾 Descargando como:', fileName);
-      
-      // Crear URL temporal y descargar
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      console.log('✅ Descarga completada exitosamente');
-      
-    } catch (error) {
-      console.error('❌ Error downloading file:', error);
-      
-      // ⭐⭐ MEJOR MENSAJE DE ERROR
-      let userMessage = 'Error al descargar el documento';
-      
-      if (error.message.includes('401')) {
-        userMessage = 'Error de autenticación. El documento no está disponible.';
-      } else if (error.message.includes('404')) {
-        userMessage = 'Documento no encontrado. Puede haber sido eliminado.';
-      } else if (error.message.includes('403')) {
-        userMessage = 'No tiene permisos para descargar este documento.';
-      } else if (error.message.includes('Empty')) {
-        userMessage = 'El documento está vacío o corrupto.';
-      } else {
-        userMessage = error.message;
-      }
-      
-      alert(`❌ ${userMessage}`);
+  try {
+    if (!fileUrl) {
+      alert('No hay documento para descargar');
+      return;
     }
-  };
+
+    console.log('📥 Iniciando descarga de:', fileUrl);
+
+    // ⭐⭐ SOLUCIÓN MEJORADA: Usar el backend como proxy
+    const encodedUrl = encodeURIComponent(fileUrl);
+    const downloadUrl = `${API_URL}/api/montacargas/documento/${encodedUrl}`;
+    
+    console.log('🌐 Descargando a través del backend:', downloadUrl);
+    
+    // Crear un enlace temporal para forzar la descarga
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = downloadUrl;
+    
+    // Extraer nombre del archivo para la descarga
+    let fileName = 'documento';
+    try {
+      const urlParts = fileUrl.split('/');
+      let extractedName = urlParts[urlParts.length - 1];
+      // Decodificar nombre si está codificado
+      try {
+        extractedName = decodeURIComponent(extractedName);
+      } catch (e) {
+        console.log('No se pudo decodificar nombre');
+      }
+      fileName = extractedName || 'documento';
+    } catch (e) {
+      console.log('Error extrayendo nombre:', e);
+    }
+    
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    console.log('✅ Descarga iniciada');
+    
+  } catch (error) {
+    console.error('❌ Error downloading file:', error);
+    alert('❌ Error al descargar el documento: ' + error.message);
+  }
+};
 
   const handleDeleteDocument = async (tipo) => {
     if (!window.confirm('¿Estás seguro de que quieres eliminar este documento?')) {

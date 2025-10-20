@@ -385,21 +385,107 @@ router.get("/documento/:url", async (req, res) => {
       return res.status(404).json({ error: "Archivo no encontrado" });
     }
 
-    // ⭐⭐ SOLUCIÓN SIMPLE: Redirigir directamente a Cloudinary
-    // Cloudinary maneja mejor las descargas con su propia CDN
+    // Si es una URL de Cloudinary, el backend debe descargar y servir el archivo
     if (fileUrl.includes('cloudinary')) {
-      console.log('🌐 Redirigiendo a Cloudinary para descarga...');
+      console.log('🌐 Descargando archivo de Cloudinary...');
       
-      // Agregar parámetro de descarga forzada
-      let downloadUrl = fileUrl;
-      if (fileUrl.includes('?')) {
-        downloadUrl = fileUrl + '&fl_attachment';
-      } else {
-        downloadUrl = fileUrl + '?fl_attachment';
+      try {
+        // Extraer public_id de la URL
+        const urlParts = fileUrl.split('/');
+        const uploadIndex = urlParts.indexOf('upload');
+        
+        if (uploadIndex === -1) {
+          throw new Error('URL de Cloudinary inválida');
+        }
+        
+        const versionIndex = uploadIndex + 1;
+        if (versionIndex >= urlParts.length) {
+          throw new Error('URL de Cloudinary incompleta');
+        }
+        
+        const publicIdParts = urlParts.slice(versionIndex + 1);
+        let publicId = publicIdParts.join('/');
+        
+        // Decodificar public_id si es necesario
+        try {
+          publicId = decodeURIComponent(publicId);
+        } catch (e) {
+          console.log('No se pudo decodificar publicId, usando original');
+        }
+        
+        console.log('🔍 Public ID extraído:', publicId);
+        
+        // ⭐⭐ SOLUCIÓN: Usar el SDK de Cloudinary para obtener el archivo
+        const result = await cloudinary.uploader.download(publicId, {
+          resource_type: 'raw'
+        });
+        
+        console.log('✅ Archivo obtenido de Cloudinary, tipo:', typeof result);
+        
+        // Si result es una URL (redirección), hacer fetch
+        if (typeof result === 'string' && result.includes('http')) {
+          console.log('🔄 Cloudinary devolvió URL, haciendo fetch...');
+          const response = await fetch(result);
+          
+          if (!response.ok) {
+            throw new Error(`Error al obtener archivo: ${response.status}`);
+          }
+          
+          const buffer = await response.buffer();
+          const contentType = response.headers.get('content-type') || 'application/octet-stream';
+          
+          // Configurar headers para descarga
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Disposition', `attachment; filename="${publicId}"`);
+          res.setHeader('Content-Length', buffer.length);
+          
+          return res.send(buffer);
+        } else {
+          // Si result es un buffer o stream directo
+          console.log('📦 Cloudinary devolvió datos directos');
+          res.setHeader('Content-Type', 'application/octet-stream');
+          res.setHeader('Content-Disposition', `attachment; filename="${publicId}"`);
+          return res.send(result);
+        }
+        
+      } catch (cloudinaryError) {
+        console.error('❌ Error con Cloudinary SDK:', cloudinaryError);
+        
+        // ⭐⭐ FALLBACK: Intentar descarga directa con fetch
+        console.log('🔄 Intentando descarga directa con fetch...');
+        try {
+          const response = await fetch(fileUrl);
+          
+          if (!response.ok) {
+            throw new Error(`Cloudinary respondió con status: ${response.status}`);
+          }
+          
+          const buffer = await response.buffer();
+          const contentType = response.headers.get('content-type') || 'application/octet-stream';
+          
+          // Extraer nombre de archivo de la URL
+          let fileName = 'documento';
+          try {
+            const urlParts = fileUrl.split('/');
+            fileName = urlParts[urlParts.length - 1];
+            fileName = decodeURIComponent(fileName);
+          } catch (e) {
+            console.log('No se pudo extraer nombre de archivo');
+          }
+          
+          // Configurar headers para descarga
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+          res.setHeader('Content-Length', buffer.length);
+          
+          console.log('✅ Enviando archivo al cliente, tamaño:', buffer.length);
+          return res.send(buffer);
+          
+        } catch (fetchError) {
+          console.error('❌ Error en descarga directa:', fetchError);
+          throw new Error(`No se pudo descargar el archivo: ${fetchError.message}`);
+        }
       }
-      
-      console.log('🔗 URL final de descarga:', downloadUrl);
-      return res.redirect(downloadUrl);
       
     } else {
       // Si es un archivo local (antiguo), usar el sistema anterior
