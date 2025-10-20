@@ -107,78 +107,53 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
 
     console.log('📥 Iniciando descarga de:', fileUrl);
 
-    // Si es una URL de Cloudinary
-    if (fileUrl.includes('cloudinary')) {
-      // SOLUCIÓN MEJORADA: Para archivos raw en Cloudinary necesitamos una estrategia diferente
-      
-      // Opción 1: Usar la API de tu backend para manejar la descarga
-      const encodedUrl = encodeURIComponent(fileUrl);
-      const downloadUrl = `${API_URL}/api/montacargas/documento/${encodedUrl}`;
-      
-      console.log('🌐 Descargando a través del backend:', downloadUrl);
-      
-      const response = await fetch(downloadUrl);
-      if (!response.ok) {
-        throw new Error('Error al obtener el archivo');
+    // ⭐⭐ SOLUCIÓN MEJORADA: Siempre usar el backend como proxy
+    const encodedUrl = encodeURIComponent(fileUrl);
+    const downloadUrl = `${API_URL}/api/montacargas/documento/${encodedUrl}`;
+    
+    console.log('🌐 Descargando a través del backend:', downloadUrl);
+    
+    const response = await fetch(downloadUrl);
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Error al descargar archivo');
+    }
+    
+    // Obtener el blob
+    const blob = await response.blob();
+    
+    // Extraer nombre del archivo del header Content-Disposition o de la URL
+    let fileName = 'documento';
+    const contentDisposition = response.headers.get('content-disposition');
+    
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+      if (filenameMatch) {
+        fileName = filenameMatch[1];
       }
-      
-      const blob = await response.blob();
-      
-      // Extraer nombre del archivo
-      let fileName = 'documento';
+    } else {
+      // Fallback: extraer de la URL
       try {
-        // Intentar extraer el nombre original de la URL de Cloudinary
         const urlParts = fileUrl.split('/');
         const publicId = urlParts[urlParts.length - 1];
         fileName = publicId || 'documento';
-        
-        // Si el public_id tiene formato de carpeta, tomar solo la última parte
-        if (fileName.includes('/')) {
-          fileName = fileName.split('/').pop();
-        }
       } catch (e) {
         console.log('No se pudo extraer nombre de archivo:', e);
       }
-      
-      // Agregar extensión basada en el tipo de contenido
-      const extension = blob.type.includes('pdf') ? '.pdf' : 
-                       blob.type.includes('word') ? '.docx' : 
-                       blob.type.includes('text') ? '.txt' : '.bin';
-      
-      fileName = fileName.replace(/\.[^/.]+$/, "") + extension;
-      
-      // Crear URL temporal y descargar
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-    } else {
-      // Si es un archivo local (sistema antiguo)
-      console.log('💾 Descargando archivo local:', `${API_URL}/api/montacargas/documento/${fileUrl}`);
-      const response = await fetch(`${API_URL}/api/montacargas/documento/${fileUrl}`);
-      
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = fileUrl;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al descargar archivo');
-      }
     }
+    
+    // Crear URL temporal y descargar
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
   } catch (error) {
     console.error('❌ Error downloading file:', error);
     alert('❌ Error al descargar el documento: ' + error.message);
@@ -201,24 +176,26 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
     const result = await response.json();
 
     if (response.ok) {
-      // ⭐⭐ ACTUALIZACIÓN CRÍTICA: Usar los datos que devuelve el servidor
-      const updatedMontacargas = result.montacargas || {
-        ...montacargasLocal,
-        ...(tipo === 'pedimento' && { documento_pedimento: null }),
-        ...(tipo === 'adicional' && { documento_adicional: null }),
-        ...(tipo === 'ped_adicional' && { doc_ped_adicional: null })
-      };
+      // ⭐⭐ SOLUCIÓN MEJORADA: Recargar los datos desde el servidor
+      // en lugar de confiar en la respuesta
+      const refreshResponse = await fetch(`${API_URL}/api/montacargas/${montacargasLocal.numero}`);
+      const refreshData = await refreshResponse.json();
       
-      setMontacargasLocal(updatedMontacargas);
-      if (onMontacargasUpdate) {
-        onMontacargasUpdate(updatedMontacargas);
+      if (refreshData.success) {
+        const updatedMontacargas = refreshData.montacargas;
+        setMontacargasLocal(updatedMontacargas);
+        if (onMontacargasUpdate) {
+          onMontacargasUpdate(updatedMontacargas);
+        }
+        
+        // Si es documento opcional de pedimento y se elimina, ocultar la sección
+        if (tipo === 'ped_adicional') {
+          setShowPedimentoOpcional(false);
+        }
+        alert('✅ Documento eliminado correctamente');
+      } else {
+        throw new Error('Error al actualizar datos después de eliminar');
       }
-      
-      // Si es documento opcional de pedimento y se elimina, ocultar la sección
-      if (tipo === 'ped_adicional') {
-        setShowPedimentoOpcional(false);
-      }
-      alert('✅ Documento eliminado correctamente');
     } else {
       throw new Error(result.error || result.details || 'Error al eliminar documento');
     }

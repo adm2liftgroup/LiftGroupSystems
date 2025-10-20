@@ -325,46 +325,58 @@ router.get("/documento/:url", async (req, res) => {
       return res.status(404).json({ error: "Archivo no encontrado" });
     }
 
-    // Si es una URL de Cloudinary, usar fetch para obtener el archivo
+    // Si es una URL de Cloudinary, usar el SDK para obtener el archivo
     if (fileUrl.includes('cloudinary')) {
       console.log('🌐 Obteniendo archivo de Cloudinary...');
       
-      const response = await fetch(fileUrl);
-      
-      if (!response.ok) {
-        throw new Error(`Cloudinary respondió con status: ${response.status}`);
-      }
-      
-      // Obtener el buffer del archivo
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      
-      // Obtener headers importantes de la respuesta de Cloudinary
-      const contentType = response.headers.get('content-type') || 'application/octet-stream';
-      const contentDisposition = response.headers.get('content-disposition');
-      
-      console.log('📄 Content-Type:', contentType);
-      console.log('📄 Content-Disposition:', contentDisposition);
-      
-      // Configurar headers de respuesta
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Length', buffer.length);
-      
-      // Intentar extraer nombre de archivo para la descarga
-      let filename = 'documento';
-      if (contentDisposition && contentDisposition.includes('filename=')) {
-        filename = contentDisposition.split('filename=')[1].replace(/"/g, '');
-      } else {
-        // Extraer de la URL como fallback
+      try {
+        // Extraer public_id de la URL
         const urlParts = fileUrl.split('/');
-        const publicId = urlParts[urlParts.length - 1];
-        filename = publicId || 'documento';
+        const uploadIndex = urlParts.indexOf('upload');
+        
+        if (uploadIndex === -1) {
+          throw new Error('URL de Cloudinary inválida');
+        }
+        
+        const versionIndex = uploadIndex + 1;
+        if (versionIndex >= urlParts.length) {
+          throw new Error('URL de Cloudinary incompleta');
+        }
+        
+        const publicIdParts = urlParts.slice(versionIndex + 1);
+        const publicId = publicIdParts.join('/');
+        
+        console.log('🔍 Public ID extraído:', publicId);
+        
+        // Usar el SDK de Cloudinary para obtener el archivo como stream
+        const downloadStream = cloudinary.uploader.download(publicId, {
+          resource_type: 'raw'
+        });
+        
+        // Configurar headers
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${publicId}"`);
+        
+        // Pipe el stream a la respuesta
+        downloadStream.pipe(res);
+        
+      } catch (cloudinaryError) {
+        console.error('❌ Error con Cloudinary SDK:', cloudinaryError);
+        
+        // Fallback: intentar con fetch directo
+        console.log('🔄 Intentando fallback con fetch...');
+        const response = await fetch(fileUrl);
+        
+        if (!response.ok) {
+          throw new Error(`Cloudinary respondió con status: ${response.status}`);
+        }
+        
+        const buffer = await response.buffer();
+        res.setHeader('Content-Type', response.headers.get('content-type') || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="documento"`);
+        res.setHeader('Content-Length', buffer.length);
+        res.send(buffer);
       }
-      
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      
-      // Enviar el archivo
-      return res.send(buffer);
       
     } else {
       // Si es un archivo local (antiguo), usar el sistema anterior
@@ -413,10 +425,28 @@ router.delete("/documento/:id/:tipo", async (req, res) => {
     const fileUrl = current.rows[0][updateField];
     console.log('📄 URL a eliminar:', fileUrl);
 
-    // LUEGO actualizar la base de datos a NULL
+    // Eliminar de Cloudinary SI existe (de forma síncrona)
+    if (fileUrl && fileUrl.includes('cloudinary')) {
+      console.log('🗑️ Eliminando de Cloudinary...');
+      try {
+        const cloudinaryResult = await deleteFromCloudinary(fileUrl);
+        console.log('📊 Resultado Cloudinary:', cloudinaryResult);
+        if (cloudinaryResult.result === 'ok') {
+          console.log('✅ Archivo eliminado de Cloudinary');
+        } else {
+          console.warn('⚠️ Cloudinary reportó:', cloudinaryResult.result);
+          // CONTINUAR aunque falle Cloudinary
+        }
+      } catch (cloudinaryError) {
+        console.error('❌ Error eliminando de Cloudinary:', cloudinaryError);
+        // CONTINUAR aunque falle Cloudinary
+      }
+    }
+
+    // ACTUALIZAR base de datos a NULL
     console.log('🗄️ Actualizando base de datos...');
     const result = await pool.query(
-      `UPDATE "Montacargas" SET "${updateField}"=NULL WHERE numero=$1 RETURNING numero, "${updateField}"`,
+      `UPDATE "Montacargas" SET "${updateField}"=NULL WHERE numero=$1 RETURNING *`,
       [id]
     );
 
@@ -425,30 +455,11 @@ router.delete("/documento/:id/:tipo", async (req, res) => {
     }
 
     console.log('✅ Base de datos actualizada correctamente');
-
-    // FINALMENTE eliminar de Cloudinary (esto puede ser asíncrono)
-    if (fileUrl && fileUrl.includes('cloudinary')) {
-      console.log('🗑️ Eliminando de Cloudinary...');
-      deleteFromCloudinary(fileUrl)
-        .then(cloudinaryResult => {
-          console.log('📊 Resultado Cloudinary:', cloudinaryResult);
-          if (cloudinaryResult.result === 'ok') {
-            console.log('✅ Archivo eliminado de Cloudinary');
-          } else {
-            console.warn('⚠️ Problema eliminando de Cloudinary:', cloudinaryResult);
-          }
-        })
-        .catch(error => {
-          console.error('❌ Error en eliminación Cloudinary:', error);
-        });
-    }
-
     console.log('=== ELIMINACIÓN EXITOSA ===');
     
     res.json({ 
       success: true,
       message: "Documento eliminado correctamente",
-      // Devolver los datos actualizados
       montacargas: result.rows[0]
     });
 

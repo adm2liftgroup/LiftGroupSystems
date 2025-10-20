@@ -94,6 +94,30 @@ const deleteFromCloudinary = async (fileUrl) => {
   }
 };
 
+// Función para descargar archivo de Cloudinary
+const downloadFromCloudinary = async (publicId) => {
+  try {
+    console.log(`📥 Descargando archivo de Cloudinary: ${publicId}`);
+    
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader.download(publicId, {
+        resource_type: 'raw'
+      }, (error, result) => {
+        if (error) {
+          console.error('❌ Error descargando de Cloudinary:', error);
+          reject(error);
+        } else {
+          console.log('✅ Archivo descargado correctamente de Cloudinary');
+          resolve(result);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('❌ Error en downloadFromCloudinary:', error);
+    throw error;
+  }
+};
+
 // Función para obtener URL de descarga directa - SIMPLIFICADA
 const getDownloadUrl = (fileUrl) => {
   if (!fileUrl) return null;
@@ -117,5 +141,6 @@ const getDownloadUrl = (fileUrl) => {
 module.exports = {
   uploadToCloudinary,
   deleteFromCloudinary,
-  getDownloadUrl
+  getDownloadUrl,
+  downloadFromCloudinary
 };
