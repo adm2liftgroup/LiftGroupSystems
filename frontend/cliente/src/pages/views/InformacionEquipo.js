@@ -95,17 +95,38 @@ export default function InformacionEquipo({ montacargas }) {
     }
   };
 
-  const handleDownload = async (filename) => {
-    try {
-      console.log('Descargando desde:', `${API_URL}/api/montacargas/documento/${filename}`);
-      const response = await fetch(`${API_URL}/api/montacargas/documento/${filename}`);
+  const handleDownload = async (fileUrl) => {
+  try {
+    if (!fileUrl) {
+      alert('No hay documento para descargar');
+      return;
+    }
+
+    console.log('Intentando descargar:', fileUrl);
+
+    // Si es una URL de Cloudinary (nuevo sistema)
+    if (fileUrl.includes('cloudinary')) {
+      // Codificar la URL para que pase correctamente por la API
+      const encodedUrl = encodeURIComponent(fileUrl);
+      const downloadUrl = `${API_URL}/api/montacargas/documento/${encodedUrl}`;
+      
+      console.log('Descargando desde Cloudinary:', downloadUrl);
+      
+      // Abrir en nueva pestaña - Cloudinary maneja la descarga automáticamente
+      window.open(downloadUrl, '_blank');
+      
+    } else {
+      // Si es un archivo local (sistema antiguo)
+      console.log('Descargando archivo local:', `${API_URL}/api/montacargas/documento/${fileUrl}`);
+      const response = await fetch(`${API_URL}/api/montacargas/documento/${fileUrl}`);
+      
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
-        a.download = filename;
+        a.download = fileUrl;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -114,11 +135,12 @@ export default function InformacionEquipo({ montacargas }) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al descargar archivo');
       }
-    } catch (error) {
-      console.error('Error downloading file:', error);
-      alert('❌ Error al descargar el documento: ' + error.message);
     }
-  };
+  } catch (error) {
+    console.error('Error downloading file:', error);
+    alert('❌ Error al descargar el documento: ' + error.message);
+  }
+};
 
   const handleDeleteDocument = async (tipo) => {
     if (!window.confirm('¿Estás seguro de que quieres eliminar este documento?')) {
@@ -161,21 +183,43 @@ export default function InformacionEquipo({ montacargas }) {
   };
 
   // Función para obtener icono según tipo de archivo
-  const getFileIcon = (filename) => {
-    if (!filename) return '📄';
-    const ext = filename.split('.').pop().toLowerCase();
-    if (ext === 'pdf') return '📕';
-    if (['doc', 'docx'].includes(ext)) return '📘';
-    if (ext === 'txt') return '📃';
-    return '📄';
-  };
+  const getFileIcon = (fileUrl) => {
+  if (!fileUrl) return '📄';
+  
+  let ext = '';
+  
+  // Si es una URL de Cloudinary, intentar detectar la extensión
+  if (fileUrl.includes('cloudinary')) {
+    // Cloudinary puede detectar el tipo automáticamente, pero por seguridad usar PDF
+    ext = 'pdf';
+  } else {
+    // Si es un archivo local
+    ext = fileUrl.split('.').pop().toLowerCase();
+  }
+  
+  if (ext === 'pdf') return '📕';
+  if (['doc', 'docx'].includes(ext)) return '📘';
+  if (ext === 'txt') return '📃';
+  return '📄';
+};
 
   // Función para formatear el nombre del archivo
-  const formatFileName = (filename) => {
-    if (!filename) return '';
-    const cleanName = filename.replace(/^montacargas-\d+-/, '');
-    return cleanName.length > 20 ? cleanName.substring(0, 20) + '...' : cleanName;
-  };
+  const formatFileName = (fileUrl) => {
+  if (!fileUrl) return '';
+  
+  // Si es una URL de Cloudinary, extraer el nombre del public_id
+  if (fileUrl.includes('cloudinary')) {
+    const parts = fileUrl.split('/');
+    const publicId = parts[parts.length - 1];
+    const fileName = publicId.split('.')[0];
+    // Remover el prefijo "montacargas-" si existe
+    return fileName.replace(/^montacargas-/, '').substring(0, 20) + '...';
+  }
+  
+  // Si es un archivo local (antiguo)
+  const cleanName = fileUrl.replace(/^montacargas-\d+-/, '');
+  return cleanName.length > 20 ? cleanName.substring(0, 20) + '...' : cleanName;
+};
 
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', maxWidth: '800px', margin: '0 auto' }}>
