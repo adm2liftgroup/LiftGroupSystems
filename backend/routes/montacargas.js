@@ -365,10 +365,15 @@ router.delete("/documento/:id/:tipo", async (req, res) => {
     const fileUrl = current.rows[0][updateField];
     console.log('URL a eliminar de Cloudinary:', fileUrl);
 
-    // Eliminar de Cloudinary si existe
+    // Eliminar de Cloudinary si existe (manejar errores sin bloquear)
     if (fileUrl && fileUrl.includes('cloudinary')) {
-      await deleteFromCloudinary(fileUrl);
-      console.log('✅ Archivo eliminado de Cloudinary');
+      try {
+        await deleteFromCloudinary(fileUrl);
+        console.log('✅ Archivo eliminado de Cloudinary');
+      } catch (cloudinaryError) {
+        console.error('⚠️ Error eliminando de Cloudinary, pero continuando:', cloudinaryError.message);
+        // Continuar aunque falle Cloudinary para no bloquear la app
+      }
     } else if (fileUrl) {
       console.log('ℹ️ Archivo local, no se elimina de Cloudinary:', fileUrl);
     }

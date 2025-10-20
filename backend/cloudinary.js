@@ -8,36 +8,41 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+console.log('Cloudinary configurado con cloud_name:', process.env.CLOUDINARY_CLOUD_NAME);
+
 // Función para subir archivo a Cloudinary
 const uploadToCloudinary = (fileBuffer, fileName) => {
   return new Promise((resolve, reject) => {
-    // Crear un stream de lectura desde el buffer
+    // Determinar el resource_type basado en la extensión del archivo
+    const fileExtension = fileName.split('.').pop().toLowerCase();
+    const isPDF = fileExtension === 'pdf';
+    const resourceType = isPDF ? 'raw' : 'auto'; // 'raw' para PDFs, 'auto' para otros
+
     const uploadStream = cloudinary.uploader.upload_stream(
       {
-        resource_type: 'auto', // Detecta automáticamente si es PDF, imagen, etc.
-        folder: 'montacargas', // Carpeta en Cloudinary
-        public_id: fileName.replace(/\.[^/.]+$/, ""), // Remover extensión
-        format: 'pdf' // Forzar formato PDF si es necesario
+        resource_type: resourceType, // ← CORRECCIÓN IMPORTANTE
+        folder: 'montacargas',
+        public_id: fileName.replace(/\.[^/.]+$/, ""),
+        // Quitar el format forzado para permitir diferentes tipos de archivo
       },
       (error, result) => {
         if (error) {
-          console.error('Error uploading to Cloudinary:', error);
+          console.error('❌ Error subiendo a Cloudinary:', error);
           reject(error);
         } else {
-          console.log('Archivo subido a Cloudinary:', result.secure_url);
-          resolve(result.secure_url); // Retorna la URL pública
+          console.log('✅ Archivo subido a Cloudinary:', fileName, 'Tipo:', resourceType);
+          resolve(result.secure_url);
         }
       }
     );
 
-    // Crear un stream desde el buffer y pipe al upload stream
     const bufferStream = new stream.PassThrough();
     bufferStream.end(fileBuffer);
     bufferStream.pipe(uploadStream);
   });
 };
 
-// Función para eliminar archivo de Cloudinary
+// Función para eliminar archivo de Cloudinary - CORREGIDA
 const deleteFromCloudinary = async (fileUrl) => {
   if (!fileUrl) return;
   
@@ -47,26 +52,36 @@ const deleteFromCloudinary = async (fileUrl) => {
     const publicIdWithExtension = parts[parts.length - 1];
     const publicId = 'montacargas/' + publicIdWithExtension.split('.')[0];
     
-    console.log('Eliminando de Cloudinary:', publicId);
+    console.log('🗑️ Eliminando de Cloudinary:', publicId);
+    
+    // Determinar el resource_type basado en la URL
+    const isPDF = fileUrl.includes('/raw/') || fileUrl.toLowerCase().includes('.pdf');
+    const resourceType = isPDF ? 'raw' : 'image';
     
     const result = await cloudinary.uploader.destroy(publicId, {
-      resource_type: 'raw' // Para PDFs usar 'raw', para imágenes 'image'
+      resource_type: resourceType // ← CORRECCIÓN IMPORTANTE
     });
     
-    console.log('Resultado eliminación:', result);
+    console.log('✅ Resultado eliminación:', result);
     return result;
   } catch (error) {
-    console.error('Error eliminando de Cloudinary:', error);
-    throw error;
+    console.error('❌ Error eliminando de Cloudinary:', error);
+    // No lanzar error para evitar bloquear la aplicación
+    return { result: 'error', message: error.message };
   }
 };
 
-// Función para obtener URL de descarga directa
+// Función para obtener URL de descarga directa - CORREGIDA
 const getDownloadUrl = (fileUrl) => {
   if (!fileUrl) return null;
   
-  // Cloudinary ya da URLs públicas, pero podemos forzar descarga
-  return fileUrl.replace('/upload/', '/upload/fl_attachment/');
+  // Para archivos raw (PDFs), Cloudinary ya proporciona descarga directa
+  // Para imágenes, forzar descarga
+  if (fileUrl.includes('/raw/')) {
+    return fileUrl; // Los raw files ya son descargables
+  } else {
+    return fileUrl.replace('/upload/', '/upload/fl_attachment/');
+  }
 };
 
 module.exports = {
