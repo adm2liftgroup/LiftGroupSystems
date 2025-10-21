@@ -4,8 +4,7 @@ const pool = require("../db");
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { uploadToCloudinary, deleteFromCloudinary, getDownloadUrl } = require('../cloudinary');
-const cloudinary = require('cloudinary').v2;
+const { uploadToSupabase, deleteFromSupabase } = require('../supabase-storage');
 
 // Configurar multer para almacenamiento de archivos
 const storage = multer.memoryStorage();
@@ -74,12 +73,12 @@ router.post("/", upload.fields([
 
     console.log('📁 Archivos recibidos:', req.files);
     
-    // ACTUALIZADO: Subir a Cloudinary si hay archivos - CON MEJOR MANEJO DE ERRORES
+    // CAMBIO: Subir a Supabase en lugar de Cloudinary
     if (req.files?.documento_pedimento) {
       try {
         const file = req.files.documento_pedimento[0];
         console.log(`📤 Subiendo documento_pedimento: ${file.originalname}`);
-        documentoPedimento = await uploadToCloudinary(file.buffer, file.originalname);
+        documentoPedimento = await uploadToSupabase(file.buffer, file.originalname, file.mimetype);
         console.log('✅ documento_pedimento subido:', documentoPedimento);
       } catch (error) {
         console.error('❌ Error subiendo documento_pedimento:', error);
@@ -91,7 +90,7 @@ router.post("/", upload.fields([
       try {
         const file = req.files.documento_adicional[0];
         console.log(`📤 Subiendo documento_adicional: ${file.originalname}`);
-        documentoAdicional = await uploadToCloudinary(file.buffer, file.originalname);
+        documentoAdicional = await uploadToSupabase(file.buffer, file.originalname, file.mimetype);
         console.log('✅ documento_adicional subido:', documentoAdicional);
       } catch (error) {
         console.error('❌ Error subiendo documento_adicional:', error);
@@ -103,7 +102,7 @@ router.post("/", upload.fields([
       try {
         const file = req.files.doc_ped_adicional[0];
         console.log(`📤 Subiendo doc_ped_adicional: ${file.originalname}`);
-        docPedAdicional = await uploadToCloudinary(file.buffer, file.originalname);
+        docPedAdicional = await uploadToSupabase(file.buffer, file.originalname, file.mimetype);
         console.log('✅ doc_ped_adicional subido:', docPedAdicional);
       } catch (error) {
         console.error('❌ Error subiendo doc_ped_adicional:', error);
@@ -111,7 +110,7 @@ router.post("/", upload.fields([
       }
     }
 
-    // ⭐⭐ LOG CRÍTICO: Verificar qué se va a guardar en la BD
+    // Resto del código igual...
     console.log('💾 Guardando en BD:');
     console.log('   - documento_pedimento:', documentoPedimento);
     console.log('   - documento_adicional:', documentoAdicional);
@@ -122,9 +121,7 @@ router.post("/", upload.fields([
       [numero, Marca, Modelo, Serie, Sistema, Capacidad, Ubicacion, Planta, documentoPedimento, documentoAdicional, docPedAdicional]
     );
 
-    // ⭐⭐ LOG CRÍTICO: Verificar qué se guardó realmente en la BD
     console.log('📊 Resultado de INSERT en BD:', result.rows[0]);
-
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error("POST /api/montacargas error:", err);
@@ -177,14 +174,14 @@ router.put("/:id", upload.fields([
     console.log('   - adicional:', documentoAdicional);
     console.log('   - ped_adicional:', docPedAdicional);
 
-    // ACTUALIZADO: Manejar archivos con Cloudinary - CON MEJOR MANEJO DE ERRORES
+    // CAMBIO: Manejar archivos con Supabase en lugar de Cloudinary
     if (req.files?.documento_pedimento) {
       try {
-        // PRIMERO eliminar el archivo anterior de Cloudinary si existe
-        if (documentoPedimento && documentoPedimento.includes('cloudinary')) {
+        // PRIMERO eliminar el archivo anterior de Supabase si existe
+        if (documentoPedimento && documentoPedimento.includes('supabase.co')) {
           try {
-            await deleteFromCloudinary(documentoPedimento);
-            console.log('✅ Archivo anterior de pedimento eliminado de Cloudinary');
+            await deleteFromSupabase(documentoPedimento);
+            console.log('✅ Archivo anterior de pedimento eliminado de Supabase');
           } catch (error) {
             console.error('⚠️ Error eliminando archivo anterior de pedimento, pero continuando:', error.message);
           }
@@ -197,11 +194,11 @@ router.put("/:id", upload.fields([
           }
         }
         
-        // SUBIR nuevo archivo a Cloudinary
+        // SUBIR nuevo archivo a Supabase
         const file = req.files.documento_pedimento[0];
         console.log(`📤 Subiendo nuevo documento_pedimento: ${file.originalname}`);
-        documentoPedimento = await uploadToCloudinary(file.buffer, file.originalname);
-        console.log('☁️ Nuevo archivo de pedimento (Cloudinary):', documentoPedimento);
+        documentoPedimento = await uploadToSupabase(file.buffer, file.originalname, file.mimetype);
+        console.log('☁️ Nuevo archivo de pedimento (Supabase):', documentoPedimento);
       } catch (error) {
         console.error('❌ Error subiendo nuevo documento_pedimento:', error);
         // Mantener el documento anterior si hay error
@@ -210,11 +207,11 @@ router.put("/:id", upload.fields([
     
     if (req.files?.documento_adicional) {
       try {
-        // PRIMERO eliminar el archivo anterior de Cloudinary si existe
-        if (documentoAdicional && documentoAdicional.includes('cloudinary')) {
+        // PRIMERO eliminar el archivo anterior de Supabase si existe
+        if (documentoAdicional && documentoAdicional.includes('supabase.co')) {
           try {
-            await deleteFromCloudinary(documentoAdicional);
-            console.log('✅ Archivo anterior adicional eliminado de Cloudinary');
+            await deleteFromSupabase(documentoAdicional);
+            console.log('✅ Archivo anterior adicional eliminado de Supabase');
           } catch (error) {
             console.error('⚠️ Error eliminando archivo anterior adicional, pero continuando:', error.message);
           }
@@ -227,11 +224,11 @@ router.put("/:id", upload.fields([
           }
         }
         
-        // SUBIR nuevo archivo a Cloudinary
+        // SUBIR nuevo archivo a Supabase
         const file = req.files.documento_adicional[0];
         console.log(`📤 Subiendo nuevo documento_adicional: ${file.originalname}`);
-        documentoAdicional = await uploadToCloudinary(file.buffer, file.originalname);
-        console.log('☁️ Nuevo archivo adicional (Cloudinary):', documentoAdicional);
+        documentoAdicional = await uploadToSupabase(file.buffer, file.originalname, file.mimetype);
+        console.log('☁️ Nuevo archivo adicional (Supabase):', documentoAdicional);
       } catch (error) {
         console.error('❌ Error subiendo nuevo documento_adicional:', error);
         // Mantener el documento anterior si hay error
@@ -240,11 +237,11 @@ router.put("/:id", upload.fields([
 
     if (req.files?.doc_ped_adicional) {
       try {
-        // PRIMERO eliminar el archivo anterior de Cloudinary si existe
-        if (docPedAdicional && docPedAdicional.includes('cloudinary')) {
+        // PRIMERO eliminar el archivo anterior de Supabase si existe
+        if (docPedAdicional && docPedAdicional.includes('supabase.co')) {
           try {
-            await deleteFromCloudinary(docPedAdicional);
-            console.log('✅ Archivo anterior ped_adicional eliminado de Cloudinary');
+            await deleteFromSupabase(docPedAdicional);
+            console.log('✅ Archivo anterior ped_adicional eliminado de Supabase');
           } catch (error) {
             console.error('⚠️ Error eliminando archivo anterior ped_adicional, pero continuando:', error.message);
           }
@@ -257,18 +254,18 @@ router.put("/:id", upload.fields([
           }
         }
         
-        // SUBIR nuevo archivo a Cloudinary
+        // SUBIR nuevo archivo a Supabase
         const file = req.files.doc_ped_adicional[0];
         console.log(`📤 Subiendo nuevo doc_ped_adicional: ${file.originalname}`);
-        docPedAdicional = await uploadToCloudinary(file.buffer, file.originalname);
-        console.log('☁️ Nuevo archivo ped_adicional (Cloudinary):', docPedAdicional);
+        docPedAdicional = await uploadToSupabase(file.buffer, file.originalname, file.mimetype);
+        console.log('☁️ Nuevo archivo ped_adicional (Supabase):', docPedAdicional);
       } catch (error) {
         console.error('❌ Error subiendo nuevo doc_ped_adicional:', error);
         // Mantener el documento anterior si hay error
       }
     }
 
-    // ⭐⭐ LOG CRÍTICO: Verificar qué se va a guardar en la BD
+    // Resto del código igual...
     console.log('💾 Valores finales para guardar en BD:');
     console.log('   - pedimento:', documentoPedimento);
     console.log('   - adicional:', documentoAdicional);
@@ -280,7 +277,6 @@ router.put("/:id", upload.fields([
       [Marca, Modelo, Serie, Sistema, capacidadNum, Ubicacion, Planta, documentoPedimento, documentoAdicional, docPedAdicional, id]
     );
 
-    // ⭐⭐ LOG CRÍTICO: Verificar qué se guardó realmente en la BD
     console.log('📊 Resultado de UPDATE en BD:', result.rows[0]);
 
     if (result.rowCount === 0) {
@@ -324,23 +320,23 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ error: "Montacargas no encontrado" });
     }
 
-    // ACTUALIZADO: Eliminar archivos de Cloudinary si existen
+    // CAMBIO: Eliminar archivos de Supabase si existen
     const documentos = currentMontacargas.rows[0];
     if (documentos) {
-      // Eliminar de Cloudinary si son URLs de Cloudinary
-      if (documentos.documento_pedimento && documentos.documento_pedimento.includes('cloudinary')) {
-        await deleteFromCloudinary(documentos.documento_pedimento);
-        console.log('✅ documento_pedimento eliminado de Cloudinary');
+      // Eliminar de Supabase si son URLs de Supabase
+      if (documentos.documento_pedimento && documentos.documento_pedimento.includes('supabase.co')) {
+        await deleteFromSupabase(documentos.documento_pedimento);
+        console.log('✅ documento_pedimento eliminado de Supabase');
       }
       
-      if (documentos.documento_adicional && documentos.documento_adicional.includes('cloudinary')) {
-        await deleteFromCloudinary(documentos.documento_adicional);
-        console.log('✅ documento_adicional eliminado de Cloudinary');
+      if (documentos.documento_adicional && documentos.documento_adicional.includes('supabase.co')) {
+        await deleteFromSupabase(documentos.documento_adicional);
+        console.log('✅ documento_adicional eliminado de Supabase');
       }
       
-      if (documentos.doc_ped_adicional && documentos.doc_ped_adicional.includes('cloudinary')) {
-        await deleteFromCloudinary(documentos.doc_ped_adicional);
-        console.log('✅ doc_ped_adicional eliminado de Cloudinary');
+      if (documentos.doc_ped_adicional && documentos.doc_ped_adicional.includes('supabase.co')) {
+        await deleteFromSupabase(documentos.doc_ped_adicional);
+        console.log('✅ doc_ped_adicional eliminado de Supabase');
       }
 
       // También eliminar archivos locales antiguos si existen (para desarrollo)
@@ -351,7 +347,7 @@ router.delete("/:id", async (req, res) => {
       ];
 
       documentosLocales.forEach(filename => {
-        if (filename && !filename.includes('cloudinary')) {
+        if (filename && !filename.includes('supabase.co') && !filename.includes('cloudinary')) {
           const filePath = path.join(__dirname, '../uploads/montacargas', filename);
           if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
@@ -372,99 +368,19 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-
 // BLOQUE 6: Descargar documento
 router.get("/documento/:url", async (req, res) => {
   try {
     const { url } = req.params;
     const fileUrl = decodeURIComponent(url || "");
-    console.log('📥 Descargando URL:', fileUrl);
+    console.log('📥 Redirigiendo a:', fileUrl);
 
     if (!fileUrl) {
       return res.status(404).json({ error: "Archivo no encontrado" });
     }
 
-    // Si es Cloudinary
-    if (fileUrl.includes('cloudinary')) {
-      console.log('🌐 Procesando archivo Cloudinary...');
-
-      try {
-        // Extraer public_id
-        const urlMatch = fileUrl.match(/\/upload\/(?:v\d+\/)?(.+)$/);
-        if (!urlMatch) {
-          throw new Error('URL de Cloudinary inválida');
-        }
-
-        let publicId = urlMatch[1].split('?')[0];
-        publicId = decodeURIComponent(publicId);
-        
-        console.log('🔍 Public ID:', publicId);
-
-        // Obtener información del recurso
-        const resourceInfo = await cloudinary.api.resource(publicId, {
-          resource_type: 'raw'
-        });
-
-        console.log('✅ Información del recurso:', {
-          original_filename: resourceInfo.original_filename,
-          format: resourceInfo.format,
-          bytes: resourceInfo.bytes
-        });
-
-        // ⭐⭐ SOLUCIÓN: Descargar el archivo y servirlo directamente
-        console.log('⬇️ Descargando archivo desde Cloudinary...');
-        const response = await fetch(resourceInfo.secure_url);
-        
-        if (!response.ok) {
-          throw new Error(`Error ${response.status} al obtener archivo`);
-        }
-
-        // Obtener el buffer del archivo
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        // Determinar el nombre del archivo
-        let fileName = 'documento.pdf';
-        if (resourceInfo.original_filename) {
-          fileName = resourceInfo.original_filename;
-        } else {
-          // Extraer nombre del public_id
-          const nameFromId = publicId.split('/').pop();
-          if (nameFromId && nameFromId.includes('.')) {
-            fileName = nameFromId;
-          }
-        }
-
-        // ⭐⭐ CONFIGURAR HEADERS PARA FORZAR DESCARGA
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-        res.setHeader('Content-Length', buffer.length);
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-
-        console.log(`✅ Enviando archivo: ${fileName} (${buffer.length} bytes)`);
-        
-        // Enviar el archivo
-        res.send(buffer);
-
-      } catch (error) {
-        console.error('❌ Error descargando archivo:', error);
-        
-        // Fallback: redirección simple con fl_attachment
-        console.log('🔄 Usando fallback de redirección...');
-        const downloadUrl = fileUrl + (fileUrl.includes('?') ? '&' : '?') + 'fl_attachment';
-        return res.redirect(downloadUrl);
-      }
-    }
-
-    // Para archivos locales
-    const filePath = path.join(__dirname, '../uploads/montacargas', fileUrl);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "Archivo no encontrado" });
-    }
-    
-    return res.download(filePath);
+    // Redirigir directamente a la URL (funciona para Supabase y archivos locales)
+    res.redirect(fileUrl);
 
   } catch (err) {
     console.error("❌ GET /api/montacargas/documento/:url error:", err);
@@ -508,21 +424,15 @@ router.delete("/documento/:id/:tipo", async (req, res) => {
     const fileUrl = current.rows[0][updateField];
     console.log('📄 URL a eliminar:', fileUrl);
 
-    // Eliminar de Cloudinary SI existe (de forma síncrona)
-    if (fileUrl && fileUrl.includes('cloudinary')) {
-      console.log('🗑️ Eliminando de Cloudinary...');
+    // CAMBIO: Eliminar de Supabase SI existe
+    if (fileUrl && fileUrl.includes('supabase.co')) {
+      console.log('🗑️ Eliminando de Supabase...');
       try {
-        const cloudinaryResult = await deleteFromCloudinary(fileUrl);
-        console.log('📊 Resultado Cloudinary:', cloudinaryResult);
-        if (cloudinaryResult.result === 'ok') {
-          console.log('✅ Archivo eliminado de Cloudinary');
-        } else {
-          console.warn('⚠️ Cloudinary reportó:', cloudinaryResult.result);
-          // CONTINUAR aunque falle Cloudinary
-        }
-      } catch (cloudinaryError) {
-        console.error('❌ Error eliminando de Cloudinary:', cloudinaryError);
-        // CONTINUAR aunque falle Cloudinary
+        await deleteFromSupabase(fileUrl);
+        console.log('✅ Archivo eliminado de Supabase');
+      } catch (supabaseError) {
+        console.error('❌ Error eliminando de Supabase:', supabaseError);
+        // CONTINUAR aunque falle Supabase
       }
     }
 
@@ -700,74 +610,6 @@ router.delete("/refacciones/:refaccionId", async (req, res) => {
   } catch (error) {
     console.error("Error eliminando refacción:", error);
     res.status(500).json({ error: "Error del servidor" });
-  }
-});
-
-// BLOQUE EXTRA: Forzar archivos públicos via API
-router.get("/fix-permissions", async (req, res) => {
-  try {
-    console.log('🔓 Iniciando corrección de permisos...');
-    
-    // Listar todos los archivos RAW en la carpeta montacargas
-    const listResult = await cloudinary.api.resources({
-      type: 'upload',
-      resource_type: 'raw',
-      prefix: 'montacargas',
-      max_results: 100
-    });
-
-    console.log(`📁 Encontrados ${listResult.resources.length} archivos`);
-
-    const results = [];
-    
-    // Hacer cada archivo público usando explicit()
-    for (const resource of listResult.resources) {
-      try {
-        console.log(`🔓 Procesando: ${resource.public_id}`);
-        console.log(`   Estado actual: ${resource.access_mode}`);
-        
-        // Usar explicit() para cambiar permisos
-        const updateResult = await cloudinary.api.update(resource.public_id, {
-          resource_type: 'raw',
-          access_mode: 'public',
-          type: 'upload'
-        });
-
-        results.push({
-          public_id: resource.public_id,
-          status: 'success',
-          old_access: resource.access_mode,
-          new_access: updateResult.access_mode,
-          url: updateResult.secure_url
-        });
-
-        console.log(`✅ ${resource.public_id} -> ${updateResult.access_mode}`);
-        
-        // Pequeña pausa para no sobrecargar la API
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-      } catch (error) {
-        console.error(`❌ Error con ${resource.public_id}:`, error.message);
-        results.push({
-          public_id: resource.public_id,
-          status: 'error',
-          error: error.message
-        });
-      }
-    }
-
-    res.json({
-      success: true,
-      message: `Procesados ${listResult.resources.length} archivos`,
-      results: results
-    });
-
-  } catch (error) {
-    console.error('❌ Error general:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
   }
 });
 
