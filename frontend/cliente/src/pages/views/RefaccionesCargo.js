@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export default function RefaccionesCargo({ montacargas }) {
   const [mantenimientos, setMantenimientos] = useState([]);
@@ -13,6 +13,11 @@ export default function RefaccionesCargo({ montacargas }) {
     cargo_a: 'empresa'
   });
   const [editandoObservacion, setEditandoObservacion] = useState(null);
+  
+  // NUEVOS ESTADOS PARA IMÁGENES
+  const [image, setImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
   
   // Estados para los filtros
   const [filtros, setFiltros] = useState({
@@ -47,6 +52,90 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   }, [mantenimientoSeleccionado]);
 
+  // NUEVAS FUNCIONES PARA MANEJO DE IMÁGENES
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validar tipo de archivo
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        setError('Solo se permiten archivos de imagen (JPEG, PNG, GIF, WebP)');
+        return;
+      }
+
+      // Validar tamaño (5MB máximo)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('La imagen no debe superar los 5MB');
+        return;
+      }
+
+      setImage(file);
+      
+      // Crear preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+      
+      setError(''); // Limpiar error si todo está bien
+    }
+  };
+
+  const removeImage = () => {
+    setImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const triggerFileInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // FUNCIÓN PARA ELIMINAR IMAGEN DE UNA OBSERVACIÓN EXISTENTE
+  const handleEliminarImagen = async (observacionId) => {
+    if (!window.confirm('¿Está seguro de que desea eliminar la imagen de esta observación?')) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/api/refacciones/${observacionId}/imagen`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setSuccess('Imagen eliminada correctamente');
+        // Recargar las observaciones
+        fetchObservaciones(mantenimientoSeleccionado.id);
+      } else {
+        throw new Error(data.error || 'Error al eliminar imagen');
+      }
+    } catch (err) {
+      console.error('Error en handleEliminarImagen:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // FUNCIONES EXISTENTES (MANTENIENDO LA LÓGICA ORIGINAL)
   const fetchMantenimientos = async (montacargasId) => {
     setLoading(true);
     setError('');
@@ -66,7 +155,6 @@ export default function RefaccionesCargo({ montacargas }) {
         const data = await response.json();
         
         if (data.success) {
-          // Ordenar por año y mes, mostrar los más recientes primero
           const mantenimientosOrdenados = (data.mantenimientos || [])
             .sort((a, b) => {
               if (b.anio !== a.anio) return b.anio - a.anio;
@@ -75,7 +163,6 @@ export default function RefaccionesCargo({ montacargas }) {
           
           setMantenimientos(mantenimientosOrdenados);
           
-          // Seleccionar automáticamente el primer mantenimiento si existe
           if (mantenimientosOrdenados.length > 0) {
             setMantenimientoSeleccionado(mantenimientosOrdenados[0]);
           } else {
@@ -101,29 +188,24 @@ export default function RefaccionesCargo({ montacargas }) {
   const aplicarFiltros = () => {
     let filtrados = [...mantenimientos];
 
-    // Filtrar por año
     if (filtros.anio) {
       filtrados = filtrados.filter(m => m.anio === parseInt(filtros.anio));
     }
 
-    // Filtrar por mes
     if (filtros.mes) {
       filtrados = filtrados.filter(m => m.mes === parseInt(filtros.mes));
     }
 
-    // Filtrar por tipo
     if (filtros.tipo) {
       filtrados = filtrados.filter(m => m.tipo === filtros.tipo);
     }
 
-    // Filtrar por status
     if (filtros.status) {
       filtrados = filtrados.filter(m => m.status === filtros.status);
     }
 
     setMantenimientosFiltrados(filtrados);
 
-    // Si el mantenimiento seleccionado no está en los filtrados, deseleccionar
     if (mantenimientoSeleccionado && !filtrados.find(m => m.id === mantenimientoSeleccionado.id)) {
       setMantenimientoSeleccionado(filtrados.length > 0 ? filtrados[0] : null);
     }
@@ -181,6 +263,7 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   };
 
+  // MODIFICADA: Ahora maneja imágenes
   const handleSubmitObservacion = async (e) => {
     e.preventDefault();
     
@@ -200,31 +283,37 @@ export default function RefaccionesCargo({ montacargas }) {
 
     try {
       const token = localStorage.getItem("token");
+      const formDataToSend = new FormData();
+      
+      formDataToSend.append('mantenimiento_id', mantenimientoSeleccionado.id);
+      formDataToSend.append('descripcion', formData.descripcion.trim());
+      formDataToSend.append('cargo_a', formData.cargo_a);
+
+      // Agregar imagen si existe
+      if (image) {
+        formDataToSend.append('imagen', image);
+      }
+
       const response = await fetch(
         `${process.env.REACT_APP_API_URL}/api/refacciones`,
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({
-            mantenimiento_id: mantenimientoSeleccionado.id,
-            descripcion: formData.descripcion.trim(),
-            cargo_a: formData.cargo_a
-          })
+          body: formDataToSend
         }
       );
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setSuccess('Observación agregada correctamente');
+        setSuccess('Observación agregada correctamente' + (image ? ' con imagen' : ''));
         setFormData({
           descripcion: '',
           cargo_a: 'empresa'
         });
-        // Recargar las observaciones
+        removeImage(); // Limpiar imagen después de enviar
         fetchObservaciones(mantenimientoSeleccionado.id);
       } else {
         throw new Error(data.error || 'Error al agregar observación');
@@ -237,6 +326,7 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   };
 
+  // MODIFICADA: Ahora maneja imágenes
   const handleEditarObservacion = async (e) => {
     e.preventDefault();
     
@@ -251,28 +341,34 @@ export default function RefaccionesCargo({ montacargas }) {
 
     try {
       const token = localStorage.getItem("token");
+      const formDataToSend = new FormData();
+      
+      formDataToSend.append('descripcion', editandoObservacion.descripcion.trim());
+      formDataToSend.append('cargo_a', editandoObservacion.cargo_a);
+      formDataToSend.append('estado_resolucion', editandoObservacion.estado_resolucion || 'pendiente');
+
+      // Agregar nueva imagen si existe
+      if (image) {
+        formDataToSend.append('imagen', image);
+      }
+
       const response = await fetch(
         `${process.env.REACT_APP_API_URL}/api/refacciones/${editandoObservacion.id}`,
         {
           method: 'PUT',
           headers: {
-            'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({
-            descripcion: editandoObservacion.descripcion.trim(),
-            cargo_a: editandoObservacion.cargo_a,
-            estado_resolucion: editandoObservacion.estado_resolucion
-          })
+          body: formDataToSend
         }
       );
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setSuccess('Observación actualizada correctamente');
+        setSuccess('Observación actualizada correctamente' + (image ? ' con nueva imagen' : ''));
         setEditandoObservacion(null);
-        // Recargar las observaciones
+        removeImage();
         fetchObservaciones(mantenimientoSeleccionado.id);
       } else {
         throw new Error(data.error || 'Error al actualizar observación');
@@ -310,7 +406,6 @@ export default function RefaccionesCargo({ montacargas }) {
 
       if (response.ok && data.success) {
         setSuccess('Observación eliminada correctamente');
-        // Recargar las observaciones
         fetchObservaciones(mantenimientoSeleccionado.id);
       } else {
         throw new Error(data.error || 'Error al eliminar observación');
@@ -352,7 +447,6 @@ export default function RefaccionesCargo({ montacargas }) {
 
       if (response.ok && data.success) {
         setSuccess('Observación marcada como resuelta');
-        // Recargar las observaciones
         fetchObservaciones(mantenimientoSeleccionado.id);
       } else {
         throw new Error(data.error || 'Error al resolver observación');
@@ -381,14 +475,25 @@ export default function RefaccionesCargo({ montacargas }) {
     }));
   };
 
+  // MODIFICADA: Limpia imagen al iniciar edición
   const iniciarEdicion = (observacion) => {
     setEditandoObservacion({ ...observacion });
+    setImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     setError('');
     setSuccess('');
   };
 
   const cancelarEdicion = () => {
     setEditandoObservacion(null);
+    setImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     setError('');
     setSuccess('');
   };
@@ -443,13 +548,11 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   };
 
-  // Obtener años únicos para el filtro
   const obtenerAniosUnicos = () => {
     const anios = [...new Set(mantenimientos.map(m => m.anio))];
     return anios.sort((a, b) => b - a);
   };
 
-  // Obtener meses únicos para el filtro
   const obtenerMesesUnicos = () => {
     const meses = [...new Set(mantenimientos.map(m => m.mes))];
     return meses.sort((a, b) => a - b);
@@ -670,8 +773,7 @@ export default function RefaccionesCargo({ montacargas }) {
           </div>
         </div>
 
-        {/* Resto del código permanece igual (Columnas 2 y 3) */}
-        {/* Columna 2: Formulario para agregar observación */}
+        {/* Columna 2: Formulario para agregar observación CON IMAGEN */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -697,6 +799,57 @@ export default function RefaccionesCargo({ montacargas }) {
                       </select>
                     </div>
                   )}
+
+                  {/* SECCIÓN DE IMAGEN - NUEVA */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {editandoObservacion ? 'Nueva Imagen (opcional)' : 'Imagen (opcional)'}
+                    </label>
+                    
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageSelect}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    
+                    <div className="flex flex-col space-y-3">
+                      <button
+                        type="button"
+                        onClick={triggerFileInput}
+                        className="w-full bg-gray-100 border border-gray-300 rounded-md py-2 px-4 text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      >
+                        📷 Seleccionar Imagen
+                      </button>
+                      
+                      {imagePreview && (
+                        <div className="relative">
+                          <img 
+                            src={imagePreview} 
+                            alt="Vista previa" 
+                            className="w-full h-48 object-cover rounded-md border border-gray-300"
+                          />
+                          <button
+                            type="button"
+                            onClick={removeImage}
+                            className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {image?.name} ({(image?.size / 1024 / 1024).toFixed(2)} MB)
+                          </p>
+                        </div>
+                      )}
+                      
+                      <p className="text-xs text-gray-500">
+                        Formatos permitidos: JPEG, PNG, GIF, WebP. Tamaño máximo: 5MB
+                      </p>
+                    </div>
+                  </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -763,7 +916,7 @@ export default function RefaccionesCargo({ montacargas }) {
           </div>
         </div>
 
-        {/* Columna 3: Lista de observaciones existentes */}
+        {/* Columna 3: Lista de observaciones existentes CON IMAGEN */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-4">
@@ -795,6 +948,32 @@ export default function RefaccionesCargo({ montacargas }) {
                           </span>
                         </div>
                       </div>
+                      
+                      {/* MOSTRAR IMAGEN SI EXISTE */}
+                      {observacion.imagen_url && (
+                        <div className="mb-3">
+                          <div className="relative inline-block">
+                            <img 
+                              src={observacion.imagen_url} 
+                              alt="Observación"
+                              className="h-32 w-auto rounded-md border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => window.open(observacion.imagen_url, '_blank')}
+                            />
+                            <button
+                              onClick={() => handleEliminarImagen(observacion.id)}
+                              className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                              title="Eliminar imagen"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {observacion.imagen_nombre}
+                          </p>
+                        </div>
+                      )}
                       
                       <p className="text-gray-800 mb-3 whitespace-pre-wrap text-sm">
                         {observacion.descripcion}
