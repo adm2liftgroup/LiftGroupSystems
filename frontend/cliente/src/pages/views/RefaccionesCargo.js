@@ -263,7 +263,7 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   };
 
-  // MODIFICADA: Ahora maneja imágenes
+  // CORREGIDA: Maneja correctamente el mantenimiento_id
   const handleSubmitObservacion = async (e) => {
     e.preventDefault();
     
@@ -285,9 +285,15 @@ export default function RefaccionesCargo({ montacargas }) {
       const token = localStorage.getItem("token");
       const formDataToSend = new FormData();
       
+      // AGREGAR TODOS LOS CAMPOS NECESARIOS
       formDataToSend.append('mantenimiento_id', mantenimientoSeleccionado.id);
       formDataToSend.append('descripcion', formData.descripcion.trim());
       formDataToSend.append('cargo_a', formData.cargo_a);
+
+      console.log('Enviando observación para mantenimiento:', mantenimientoSeleccionado.id);
+      console.log('Descripción:', formData.descripcion.trim());
+      console.log('Cargo a:', formData.cargo_a);
+      console.log('Imagen:', image ? 'Sí' : 'No');
 
       // Agregar imagen si existe
       if (image) {
@@ -300,6 +306,7 @@ export default function RefaccionesCargo({ montacargas }) {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
+            // NO incluir 'Content-Type' - el navegador lo establece automáticamente con el boundary correcto
           },
           body: formDataToSend
         }
@@ -326,12 +333,17 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   };
 
-  // MODIFICADA: Ahora maneja imágenes
+  // CORREGIDA: Maneja correctamente la edición con imágenes
   const handleEditarObservacion = async (e) => {
     e.preventDefault();
     
     if (!editandoObservacion || !editandoObservacion.descripcion.trim()) {
       setError('La descripción es requerida');
+      return;
+    }
+
+    if (!mantenimientoSeleccionado) {
+      setError('No hay mantenimiento seleccionado');
       return;
     }
 
@@ -343,9 +355,16 @@ export default function RefaccionesCargo({ montacargas }) {
       const token = localStorage.getItem("token");
       const formDataToSend = new FormData();
       
+      // AGREGAR TODOS LOS CAMPOS NECESARIOS
       formDataToSend.append('descripcion', editandoObservacion.descripcion.trim());
       formDataToSend.append('cargo_a', editandoObservacion.cargo_a);
       formDataToSend.append('estado_resolucion', editandoObservacion.estado_resolucion || 'pendiente');
+
+      console.log('Editando observación:', editandoObservacion.id);
+      console.log('Nueva descripción:', editandoObservacion.descripcion.trim());
+      console.log('Nuevo cargo a:', editandoObservacion.cargo_a);
+      console.log('Nuevo estado:', editandoObservacion.estado_resolucion || 'pendiente');
+      console.log('Nueva imagen:', image ? 'Sí' : 'No');
 
       // Agregar nueva imagen si existe
       if (image) {
@@ -781,128 +800,140 @@ export default function RefaccionesCargo({ montacargas }) {
             </h3>
             
             {mantenimientoSeleccionado ? (
-              <form onSubmit={editandoObservacion ? handleEditarObservacion : handleSubmitObservacion}>
-                <div className="space-y-4">
-                  {editandoObservacion && (
+              <div>
+                {/* Información del mantenimiento seleccionado */}
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-sm font-medium text-blue-800">
+                    Mantenimiento seleccionado:
+                  </p>
+                  <p className="text-sm text-blue-700">
+                    {nombresMeses[mantenimientoSeleccionado.mes]} {mantenimientoSeleccionado.anio} - {mantenimientoSeleccionado.tipo}
+                  </p>
+                </div>
+
+                <form onSubmit={editandoObservacion ? handleEditarObservacion : handleSubmitObservacion}>
+                  <div className="space-y-4">
+                    {editandoObservacion && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Estado
+                        </label>
+                        <select
+                          name="estado_resolucion"
+                          value={editandoObservacion.estado_resolucion || 'pendiente'}
+                          onChange={handleEditInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="pendiente">Pendiente</option>
+                          <option value="resuelto">Resuelto</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* SECCIÓN DE IMAGEN */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Estado
+                        {editandoObservacion ? 'Nueva Imagen (opcional)' : 'Imagen (opcional)'}
+                      </label>
+                      
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleImageSelect}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                      
+                      <div className="flex flex-col space-y-3">
+                        <button
+                          type="button"
+                          onClick={triggerFileInput}
+                          className="w-full bg-gray-100 border border-gray-300 rounded-md py-2 px-4 text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        >
+                          📷 Seleccionar Imagen
+                        </button>
+                        
+                        {imagePreview && (
+                          <div className="relative">
+                            <img 
+                              src={imagePreview} 
+                              alt="Vista previa" 
+                              className="w-full h-48 object-cover rounded-md border border-gray-300"
+                            />
+                            <button
+                              type="button"
+                              onClick={removeImage}
+                              className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {image?.name} ({(image?.size / 1024 / 1024).toFixed(2)} MB)
+                            </p>
+                          </div>
+                        )}
+                        
+                        <p className="text-xs text-gray-500">
+                          Formatos permitidos: JPEG, PNG, GIF, WebP. Tamaño máximo: 5MB
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Descripción de la observación *
+                      </label>
+                      <textarea
+                        name="descripcion"
+                        value={editandoObservacion ? editandoObservacion.descripcion : formData.descripcion}
+                        onChange={editandoObservacion ? handleEditInputChange : handleInputChange}
+                        rows="4"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Describa la falla encontrada, refacción necesaria, o observación del mantenimiento..."
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Cargo de la reparación
                       </label>
                       <select
-                        name="estado_resolucion"
-                        value={editandoObservacion.estado_resolucion || 'pendiente'}
-                        onChange={handleEditInputChange}
+                        name="cargo_a"
+                        value={editandoObservacion ? editandoObservacion.cargo_a : formData.cargo_a}
+                        onChange={editandoObservacion ? handleEditInputChange : handleInputChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                       >
-                        <option value="pendiente">Pendiente</option>
-                        <option value="resuelto">Resuelto</option>
+                        <option value="empresa">Cargo a Empresa</option>
+                        <option value="cliente">Cargo a Cliente</option>
                       </select>
                     </div>
-                  )}
 
-                  {/* SECCIÓN DE IMAGEN - NUEVA */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {editandoObservacion ? 'Nueva Imagen (opcional)' : 'Imagen (opcional)'}
-                    </label>
-                    
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleImageSelect}
-                      accept="image/*"
-                      className="hidden"
-                    />
-                    
-                    <div className="flex flex-col space-y-3">
+                    <div className="flex gap-3">
                       <button
-                        type="button"
-                        onClick={triggerFileInput}
-                        className="w-full bg-gray-100 border border-gray-300 rounded-md py-2 px-4 text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        type="submit"
+                        disabled={loading}
+                        className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        📷 Seleccionar Imagen
+                        {loading ? 'Guardando...' : editandoObservacion ? 'Actualizar' : 'Agregar Observación'}
                       </button>
                       
-                      {imagePreview && (
-                        <div className="relative">
-                          <img 
-                            src={imagePreview} 
-                            alt="Vista previa" 
-                            className="w-full h-48 object-cover rounded-md border border-gray-300"
-                          />
-                          <button
-                            type="button"
-                            onClick={removeImage}
-                            className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {image?.name} ({(image?.size / 1024 / 1024).toFixed(2)} MB)
-                          </p>
-                        </div>
+                      {editandoObservacion && (
+                        <button
+                          type="button"
+                          onClick={cancelarEdicion}
+                          disabled={loading}
+                          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Cancelar
+                        </button>
                       )}
-                      
-                      <p className="text-xs text-gray-500">
-                        Formatos permitidos: JPEG, PNG, GIF, WebP. Tamaño máximo: 5MB
-                      </p>
                     </div>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Descripción de la observación *
-                    </label>
-                    <textarea
-                      name="descripcion"
-                      value={editandoObservacion ? editandoObservacion.descripcion : formData.descripcion}
-                      onChange={editandoObservacion ? handleEditInputChange : handleInputChange}
-                      rows="4"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Describa la falla encontrada, refacción necesaria, o observación del mantenimiento..."
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Cargo de la reparación
-                    </label>
-                    <select
-                      name="cargo_a"
-                      value={editandoObservacion ? editandoObservacion.cargo_a : formData.cargo_a}
-                      onChange={editandoObservacion ? handleEditInputChange : handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="empresa">Cargo a Empresa</option>
-                      <option value="cliente">Cargo a Cliente</option>
-                    </select>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? 'Guardando...' : editandoObservacion ? 'Actualizar' : 'Agregar Observación'}
-                    </button>
-                    
-                    {editandoObservacion && (
-                      <button
-                        type="button"
-                        onClick={cancelarEdicion}
-                        disabled={loading}
-                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Cancelar
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </form>
+                </form>
+              </div>
             ) : (
               <div className="text-center py-8">
                 <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
