@@ -6,51 +6,54 @@ const API_URL = process.env.REACT_APP_API_URL;
 export default function InversionInicial({ montacargasId }) {
   const id = montacargasId;
   
-  const [refacciones, setRefacciones] = useState([]);
-  const [totales, setTotales] = useState({ totalRefacciones: 0, costoTotal: 0 });
+  const [inversiones, setInversiones] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [refaccionAEliminar, setRefaccionAEliminar] = useState(null);
+  const [inversionAEliminar, setInversionAEliminar] = useState(null);
   const [formData, setFormData] = useState({
-    descripcion: '',
-    numero_parte: '',
-    cantidad: 1,
-    costo_unitario: ''
+    costo_equipo: '',
+    valor_factura: '',
+    importacion: '',
+    flete: ''
   });
 
   useEffect(() => {
     console.log('ID del montacargas recibido:', id);
-    console.log('Tipo de ID:', typeof id);
-  }, [id]);
-
-  useEffect(() => {
     if (id) {
-      console.log('Cargando refacciones para ID:', id);
-      cargarRefacciones();
+      console.log('Cargando inversión inicial para ID:', id);
+      cargarInversiones();
     }
   }, [id]);
 
-  const cargarRefacciones = async () => {
+  const cargarInversiones = async () => {
     try {
       setLoading(true);
-      console.log('Solicitando refacciones para:', id);
+      console.log('Solicitando inversión inicial para:', id);
       
-      const response = await axios.get(`${API_URL}/api/montacargas/${id}/refacciones`);
+      const response = await axios.get(`${API_URL}/api/montacargas/${id}/inversion-inicial`);
       
       if (response.data.success) {
-        setRefacciones(response.data.refacciones);
-        setTotales(response.data.totales);
-        console.log('Refacciones cargadas:', response.data.refacciones);
+        setInversiones(response.data.inversiones);
+        console.log('Inversión inicial cargada:', response.data.inversiones);
       }
     } catch (error) {
-      console.error('Error cargando refacciones:', error);
-      alert('Error al cargar las refacciones');
+      console.error('Error cargando inversión inicial:', error);
+      alert('Error al cargar la inversión inicial');
     } finally {
       setLoading(false);
     }
   };
 
-  const agregarRefaccion = async (e) => {
+  const calcularTotal = () => {
+    const costoEquipo = parseFloat(formData.costo_equipo) || 0;
+    const valorFactura = parseFloat(formData.valor_factura) || 0;
+    const importacion = parseFloat(formData.importacion) || 0;
+    const flete = parseFloat(formData.flete) || 0;
+    
+    return costoEquipo + valorFactura + importacion + flete;
+  };
+
+  const agregarInversion = async (e) => {
     e.preventDefault();
     try {
       if (!id || id === 'undefined') {
@@ -58,54 +61,63 @@ export default function InversionInicial({ montacargasId }) {
         return;
       }
 
-      console.log('Agregando refacción para montacargas ID:', id);
-      console.log('Datos a enviar:', formData);
+      const total = calcularTotal();
+      
+      console.log('Agregando inversión inicial para montacargas ID:', id);
+      console.log('Datos a enviar:', { ...formData, total });
 
       const response = await axios.post(
-        `${API_URL}/api/montacargas/${id}/refacciones`,
-        formData
+        `${API_URL}/api/montacargas/${id}/inversion-inicial`,
+        { ...formData, total }
       );
 
       if (response.data.success) {
-        setRefacciones([response.data.refaccion, ...refacciones]);
+        setInversiones([response.data.inversion, ...inversiones]);
         setFormData({ 
-          descripcion: '', 
-          numero_parte: '', 
-          cantidad: 1, 
-          costo_unitario: '' 
+          costo_equipo: '', 
+          valor_factura: '', 
+          importacion: '', 
+          flete: '' 
         });
         setShowForm(false);
-        cargarRefacciones();
-        alert('Refacción agregada correctamente');
+        cargarInversiones();
+        alert('Inversión inicial agregada correctamente');
       }
     } catch (error) {
-      console.error('Error agregando refacción:', error);
+      console.error('Error agregando inversión inicial:', error);
       console.error('Detalles del error:', error.response?.data);
-      alert('Error al agregar la refacción: ' + (error.response?.data?.error || error.message));
+      alert('Error al agregar la inversión inicial: ' + (error.response?.data?.error || error.message));
     }
   };
 
-  const eliminarRefaccion = async (refaccionId) => {
+  const eliminarInversion = async (inversionId) => {
     try {
-      const response = await axios.delete(`${API_URL}/api/montacargas/refacciones/${refaccionId}`);
+      const response = await axios.delete(`${API_URL}/api/montacargas/inversion-inicial/${inversionId}`);
       
       if (response.data.success) {
-        setRefacciones(refacciones.filter(ref => ref.id !== refaccionId));
-        cargarRefacciones();
-        setRefaccionAEliminar(null);
-        alert('Refacción eliminada correctamente');
+        setInversiones(inversiones.filter(inv => inv.id !== inversionId));
+        setInversionAEliminar(null);
+        alert('Inversión inicial eliminada correctamente');
       }
     } catch (error) {
-      console.error('Error eliminando refacción:', error);
-      alert('Error al eliminar la refacción');
+      console.error('Error eliminando inversión inicial:', error);
+      alert('Error al eliminar la inversión inicial');
     }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   if (!id) {
     return (
       <div className="p-4">
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
-          <p>Selecciona un montacargas para ver sus refacciones.</p>
+          <p>Selecciona un montacargas para ver su inversión inicial.</p>
         </div>
       </div>
     );
@@ -114,86 +126,109 @@ export default function InversionInicial({ montacargasId }) {
   return (
     <div className="p-4">
       <h1 className="text-xl font-bold mb-4 sm:text-2xl">
-        Control de Refacciones - Montacargas #{id}
+        Inversión Inicial - Montacargas #{id}
       </h1>
 
-      {/* Resumen de Totales - Mejorado para móvil */}
-      <div className="grid grid-cols-1 gap-3 mb-6 sm:grid-cols-2 sm:gap-4">
-        <div className="bg-blue-50 p-3 rounded-lg sm:p-4">
-          <h3 className="font-semibold text-blue-800 text-sm sm:text-base">Total Refacciones</h3>
-          <p className="text-xl font-bold sm:text-2xl">{totales.totalRefacciones}</p>
-        </div>
-        <div className="bg-green-50 p-3 rounded-lg sm:p-4">
-          <h3 className="font-semibold text-green-800 text-sm sm:text-base">Inversión Total</h3>
-          <p className="text-xl font-bold sm:text-2xl">${totales.costoTotal.toLocaleString()}</p>
+      {/* Resumen de Total - Mejorado para móvil */}
+      <div className="bg-blue-50 p-4 rounded-lg mb-6">
+        <h3 className="font-semibold text-blue-800 text-sm sm:text-base mb-2">Resumen de Inversión</h3>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div>
+            <p className="text-sm text-gray-600">Registros:</p>
+            <p className="text-lg font-bold">{inversiones.length}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Total General:</p>
+            <p className="text-lg font-bold text-green-600">
+              ${inversiones.reduce((sum, inv) => sum + parseFloat(inv.total), 0).toLocaleString()}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Botón para agregar nueva refacción */}
+      {/* Botón para agregar nueva inversión */}
       <button
         onClick={() => setShowForm(true)}
         className="bg-blue-600 text-white px-4 py-2 rounded mb-4 hover:bg-blue-700 w-full sm:w-auto text-sm sm:text-base"
       >
-        + Agregar Refacción
+        + Agregar Inversión Inicial
       </button>
 
-      {/* Formulario para agregar refacción */}
+      {/* Formulario para agregar inversión */}
       {showForm && (
         <div className="bg-white p-4 rounded-lg shadow-md mb-6 sm:p-6">
-          <h2 className="text-lg font-bold mb-4 sm:text-xl">Nueva Refacción</h2>
-          <form onSubmit={agregarRefaccion}>
+          <h2 className="text-lg font-bold mb-4 sm:text-xl">Nueva Inversión Inicial</h2>
+          <form onSubmit={agregarInversion}>
             <div className="grid grid-cols-1 gap-3 mb-4 sm:grid-cols-2 sm:gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descripción *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: Filtro de aceite, Batería, etc."
-                  value={formData.descripcion}
-                  onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
-                  className="border p-2 rounded w-full text-sm sm:text-base"
-                  required
-                />
-              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Número de Parte
-                </label>
-                <input
-                  type="text"
-                  placeholder="Opcional"
-                  value={formData.numero_parte}
-                  onChange={(e) => setFormData({...formData, numero_parte: e.target.value})}
-                  className="border p-2 rounded w-full text-sm sm:text-base"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cantidad
-                </label>
-                <input
-                  type="number"
-                  placeholder="Cantidad"
-                  value={formData.cantidad}
-                  onChange={(e) => setFormData({...formData, cantidad: parseInt(e.target.value) || 1})}
-                  className="border p-2 rounded w-full text-sm sm:text-base"
-                  min="1"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Costo Unitario *
+                  Costo Equipo *
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   placeholder="0.00"
-                  value={formData.costo_unitario}
-                  onChange={(e) => setFormData({...formData, costo_unitario: e.target.value})}
+                  name="costo_equipo"
+                  value={formData.costo_equipo}
+                  onChange={handleInputChange}
                   className="border p-2 rounded w-full text-sm sm:text-base"
                   required
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Valor Factura *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  name="valor_factura"
+                  value={formData.valor_factura}
+                  onChange={handleInputChange}
+                  className="border p-2 rounded w-full text-sm sm:text-base"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Importación *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  name="importacion"
+                  value={formData.importacion}
+                  onChange={handleInputChange}
+                  className="border p-2 rounded w-full text-sm sm:text-base"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Flete *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  name="flete"
+                  value={formData.flete}
+                  onChange={handleInputChange}
+                  className="border p-2 rounded w-full text-sm sm:text-base"
+                  required
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <div className="bg-gray-50 p-3 rounded">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Total Calculado
+                  </label>
+                  <p className="text-lg font-bold text-green-600">
+                    ${calcularTotal().toLocaleString()}
+                  </p>
+                </div>
               </div>
             </div>
             <div className="flex gap-2 flex-col sm:flex-row">
@@ -215,13 +250,13 @@ export default function InversionInicial({ montacargasId }) {
         </div>
       )}
 
-      {/* Tabla de refacciones - COMPLETAMENTE RESPONSIVA */}
+      {/* Tabla de inversiones - COMPLETAMENTE RESPONSIVA */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {loading ? (
-          <div className="p-4 text-center">Cargando refacciones...</div>
-        ) : refacciones.length === 0 ? (
+          <div className="p-4 text-center">Cargando inversión inicial...</div>
+        ) : inversiones.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
-            No hay refacciones registradas para este montacargas
+            No hay inversión inicial registrada para este montacargas
           </div>
         ) : (
           <>
@@ -230,27 +265,31 @@ export default function InversionInicial({ montacargasId }) {
               <table className="min-w-full">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="p-3 text-left text-sm">Descripción</th>
-                    <th className="p-3 text-left text-sm">N° Parte</th>
-                    <th className="p-3 text-left text-sm">Cantidad</th>
-                    <th className="p-3 text-left text-sm">Costo Unitario</th>
-                    <th className="p-3 text-left text-sm">Subtotal</th>
+                    <th className="p-3 text-left text-sm">Costo Equipo</th>
+                    <th className="p-3 text-left text-sm">Valor Factura</th>
+                    <th className="p-3 text-left text-sm">Importación</th>
+                    <th className="p-3 text-left text-sm">Flete</th>
+                    <th className="p-3 text-left text-sm">Total</th>
+                    <th className="p-3 text-left text-sm">Fecha</th>
                     <th className="p-3 text-left text-sm">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {refacciones.map((refaccion) => (
-                    <tr key={refaccion.id} className="border-b hover:bg-gray-50">
-                      <td className="p-3 text-sm">{refaccion.descripcion}</td>
-                      <td className="p-3 text-sm">{refaccion.numero_parte || 'N/A'}</td>
-                      <td className="p-3 text-sm">{refaccion.cantidad}</td>
-                      <td className="p-3 text-sm">${parseFloat(refaccion.costo_unitario).toLocaleString()}</td>
-                      <td className="p-3 text-sm font-semibold">
-                        ${(refaccion.cantidad * parseFloat(refaccion.costo_unitario)).toLocaleString()}
+                  {inversiones.map((inversion) => (
+                    <tr key={inversion.id} className="border-b hover:bg-gray-50">
+                      <td className="p-3 text-sm">${parseFloat(inversion.costo_equipo).toLocaleString()}</td>
+                      <td className="p-3 text-sm">${parseFloat(inversion.valor_factura).toLocaleString()}</td>
+                      <td className="p-3 text-sm">${parseFloat(inversion.importacion).toLocaleString()}</td>
+                      <td className="p-3 text-sm">${parseFloat(inversion.flete).toLocaleString()}</td>
+                      <td className="p-3 text-sm font-semibold text-green-600">
+                        ${parseFloat(inversion.total).toLocaleString()}
+                      </td>
+                      <td className="p-3 text-sm text-gray-500">
+                        {new Date(inversion.creado_en).toLocaleDateString('es-ES')}
                       </td>
                       <td className="p-3">
                         <button
-                          onClick={() => setRefaccionAEliminar(refaccion.id)}
+                          onClick={() => setInversionAEliminar(inversion.id)}
                           className="bg-red-600 text-white px-3 py-1 rounded text-xs hover:bg-red-700"
                         >
                           Eliminar
@@ -264,32 +303,37 @@ export default function InversionInicial({ montacargasId }) {
 
             {/* Vista de tarjetas para móvil */}
             <div className="sm:hidden">
-              {refacciones.map((refaccion) => (
-                <div key={refaccion.id} className="border-b p-4 hover:bg-gray-50">
+              {inversiones.map((inversion) => (
+                <div key={inversion.id} className="border-b p-4 hover:bg-gray-50">
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="font-semibold">Descripción:</div>
-                    <div>{refaccion.descripcion}</div>
+                    <div className="font-semibold">Costo Equipo:</div>
+                    <div>${parseFloat(inversion.costo_equipo).toLocaleString()}</div>
                     
-                    <div className="font-semibold">N° Parte:</div>
-                    <div>{refaccion.numero_parte || 'N/A'}</div>
+                    <div className="font-semibold">Valor Factura:</div>
+                    <div>${parseFloat(inversion.valor_factura).toLocaleString()}</div>
                     
-                    <div className="font-semibold">Cantidad:</div>
-                    <div>{refaccion.cantidad}</div>
+                    <div className="font-semibold">Importación:</div>
+                    <div>${parseFloat(inversion.importacion).toLocaleString()}</div>
                     
-                    <div className="font-semibold">Costo Unitario:</div>
-                    <div>${parseFloat(refaccion.costo_unitario).toLocaleString()}</div>
+                    <div className="font-semibold">Flete:</div>
+                    <div>${parseFloat(inversion.flete).toLocaleString()}</div>
                     
-                    <div className="font-semibold">Subtotal:</div>
-                    <div className="font-semibold">
-                      ${(refaccion.cantidad * parseFloat(refaccion.costo_unitario)).toLocaleString()}
+                    <div className="font-semibold">Total:</div>
+                    <div className="font-semibold text-green-600">
+                      ${parseFloat(inversion.total).toLocaleString()}
+                    </div>
+                    
+                    <div className="font-semibold">Fecha:</div>
+                    <div className="text-gray-500">
+                      {new Date(inversion.creado_en).toLocaleDateString('es-ES')}
                     </div>
                   </div>
                   <div className="mt-3">
                     <button
-                      onClick={() => setRefaccionAEliminar(refaccion.id)}
+                      onClick={() => setInversionAEliminar(inversion.id)}
                       className="bg-red-600 text-white px-3 py-1 rounded text-xs hover:bg-red-700 w-full"
                     >
-                      Eliminar Refacción
+                      Eliminar Inversión
                     </button>
                   </div>
                 </div>
@@ -300,20 +344,20 @@ export default function InversionInicial({ montacargasId }) {
       </div>
 
       {/* Modal de Confirmación */}
-      {refaccionAEliminar && (
+      {inversionAEliminar && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
             <h3 className="text-lg font-bold mb-4">Confirmar Eliminación</h3>
-            <p className="mb-6">¿Estás seguro de eliminar esta refacción?</p>
+            <p className="mb-6">¿Estás seguro de eliminar este registro de inversión inicial?</p>
             <div className="flex gap-2 justify-end flex-col sm:flex-row">
               <button
-                onClick={() => setRefaccionAEliminar(null)}
+                onClick={() => setInversionAEliminar(null)}
                 className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 text-sm sm:text-base order-2 sm:order-1"
               >
                 Cancelar
               </button>
               <button
-                onClick={() => eliminarRefaccion(refaccionAEliminar)}
+                onClick={() => eliminarInversion(inversionAEliminar)}
                 className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 text-sm sm:text-base order-1 sm:order-2"
               >
                 Eliminar
