@@ -15,8 +15,8 @@ import {
 
 import InformacionEquipo from "./views/InformacionEquipo";
 import ServiciosHistorial from "./views/ServiciosHistorial";
-import InversionInicial from "./views/InversionInicial";
-import InversionHabilitar from "./views/InversionHabilitar";
+import InversionInicial from "./views/InversionHabilitar";
+import InversionHabilitar from "./views/InversionInicial";
 import RefaccionesCargo from "./views/RefaccionesCargo";
 import ProgramasPreventivos from "./views/ProgramasPreventivos";
 import Perfil from "./views/Perfil";
@@ -554,7 +554,7 @@ export default function Inicio() {
                   "Información del equipo",
                   "Servicios Preventivos Historial",
                   "Inversión Habilitar",
-                  "Inversión Habilitar",
+                  "Inversión Inicial",
                   "Refacciones con Cargo",
                   "Programas Preventivos"
                 ].map((tab) => (
