@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 
-// URL base para API - usa variable de entorno en producción
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 
 export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) {
@@ -9,35 +8,28 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
   const [montacargasLocal, setMontacargasLocal] = useState(montacargas);
   const [showPedimentoOpcional, setShowPedimentoOpcional] = useState(false);
 
-  // ⭐⭐ TODOS LOS USEEFFECT DEBEN ESTAR ANTES DEL RETURN CONDICIONAL
-
-  // Actualizar el estado local cuando cambie el prop
   useEffect(() => {
     setMontacargasLocal(montacargas);
-    // Mostrar sección opcional de pedimento si ya existe un documento
+
     if (montacargas?.doc_ped_adicional) {
       setShowPedimentoOpcional(true);
     }
   }, [montacargas]);
 
-  // Debug useEffect
   useEffect(() => {
     console.log('🔄 montacargasLocal actualizado:', montacargasLocal);
   }, [montacargasLocal]);
 
-  // Debug useEffect para el prop
   useEffect(() => {
     console.log('📥 montacargas (prop) actualizado:', montacargas);
   }, [montacargas]);
 
-  // ⭐⭐ AHORA SÍ EL RETURN CONDICIONAL
   if (!montacargasLocal) return <p>No se seleccionó ningún montacargas.</p>;
 
   const handleFileUpload = async (event, tipo) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Validar tipo de archivo
     const allowedTypes = ['.pdf', '.doc', '.docx', '.txt'];
     const fileExt = '.' + file.name.split('.').pop().toLowerCase();
     if (!allowedTypes.includes(fileExt)) {
@@ -45,7 +37,6 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
       return;
     }
 
-    // Validar tamaño (10MB)
     if (file.size > 10 * 1024 * 1024) {
       alert('El archivo no debe exceder 10MB');
       return;
@@ -55,8 +46,7 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
 
     try {
       const formData = new FormData();
-      
-      // CORRECCIÓN: Usar los nombres correctos que espera el backend
+
       if (tipo === 'pedimento') {
         formData.append('documento_pedimento', file);
       } else if (tipo === 'adicional') {
@@ -64,14 +54,12 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
       } else if (tipo === 'ped_adicional') {
         formData.append('doc_ped_adicional', file);
       }
-      
-      // Asegurarse de que los valores numéricos se envíen correctamente
+
       formData.append('Marca', montacargasLocal.Marca || '');
       formData.append('Modelo', montacargasLocal.Modelo || '');
       formData.append('Serie', montacargasLocal.Serie || '');
       formData.append('Sistema', montacargasLocal.Sistema || '');
-      
-      // CORRECCIÓN: Convertir Capacidad a número, usar 0 si está vacío
+
       const capacidad = montacargasLocal.Capacidad ? parseInt(montacargasLocal.Capacidad) : 0;
       formData.append('Capacidad', capacidad.toString());
       
@@ -90,14 +78,12 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
 
       if (response.ok) {
         console.log('✅ Respuesta del servidor:', responseData);
-        
-        // ⭐⭐ ACTUALIZACIÓN CRÍTICA: Usar los datos que devuelve el servidor
+
         setMontacargasLocal(responseData);
         if (onMontacargasUpdate) {
           onMontacargasUpdate(responseData);
         }
-        
-        // Si es documento opcional de pedimento, mostrar la sección
+
         if (tipo === 'ped_adicional') {
           setShowPedimentoOpcional(true);
         }
@@ -123,21 +109,18 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
 
     console.log('📥 Iniciando descarga de:', fileUrl);
 
-    // ⭐⭐ SOLUCIÓN: Usar siempre el backend como proxy para descargas
     const encodedUrl = encodeURIComponent(fileUrl);
     const downloadUrl = `${API_URL}/api/montacargas/documento/${encodedUrl}`;
     
     console.log('🌐 Descargando a través del backend:', downloadUrl);
-    
-    // Crear un enlace temporal
+
     const a = document.createElement('a');
     a.style.display = 'none';
     a.href = downloadUrl;
-    
-    // Extraer nombre del archivo de forma más robusta
+
     let fileName = 'documento.pdf';
     try {
-      // Para URLs de Cloudinary, extraer del public_id
+
       if (fileUrl.includes('cloudinary')) {
         const urlParts = fileUrl.split('/');
         const publicIdPart = urlParts[urlParts.length - 1];
@@ -147,7 +130,6 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
           fileName = nameFromPublicId;
         }
       } else {
-        // Para archivos locales
         const urlParts = fileUrl.split('/');
         fileName = urlParts[urlParts.length - 1];
       }
@@ -185,15 +167,13 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
 
       if (response.ok) {
         console.log('✅ Respuesta de eliminación:', result);
-        
-        // ⭐⭐ ACTUALIZACIÓN CRÍTICA: Usar los datos que devuelve el servidor
+  
         if (result.montacargas) {
           setMontacargasLocal(result.montacargas);
           if (onMontacargasUpdate) {
             onMontacargasUpdate(result.montacargas);
           }
         } else {
-          // Fallback: recargar desde el servidor
           const refreshResponse = await fetch(`${API_URL}/api/montacargas/${montacargasLocal.numero}`);
           const refreshData = await refreshResponse.json();
           
@@ -204,8 +184,7 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
             }
           }
         }
-        
-        // Si es documento opcional de pedimento y se elimina, ocultar la sección
+
         if (tipo === 'ped_adicional') {
           setShowPedimentoOpcional(false);
         }
@@ -221,18 +200,14 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
     }
   };
 
-  // Función para obtener icono según tipo de archivo
   const getFileIcon = (fileUrl) => {
     if (!fileUrl) return '📄';
     
     let ext = '';
     
-    // Si es una URL de Cloudinary, intentar detectar la extensión
     if (fileUrl.includes('cloudinary')) {
-      // Cloudinary puede detectar el tipo automáticamente, pero por seguridad usar PDF
       ext = 'pdf';
     } else {
-      // Si es un archivo local
       ext = fileUrl.split('.').pop().toLowerCase();
     }
     
@@ -242,20 +217,16 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
     return '📄';
   };
 
-  // Función para formatear el nombre del archivo
   const formatFileName = (fileUrl) => {
     if (!fileUrl) return '';
     
-    // Si es una URL de Cloudinary, extraer el nombre del public_id
     if (fileUrl.includes('cloudinary')) {
       const parts = fileUrl.split('/');
       const publicId = parts[parts.length - 1];
       const fileName = publicId.split('.')[0];
-      // Remover el prefijo "montacargas-" si existe
       return fileName.replace(/^montacargas-/, '').substring(0, 20) + '...';
     }
     
-    // Si es un archivo local (antiguo)
     const cleanName = fileUrl.replace(/^montacargas-\d+-/, '');
     return cleanName.length > 20 ? cleanName.substring(0, 20) + '...' : cleanName;
   };

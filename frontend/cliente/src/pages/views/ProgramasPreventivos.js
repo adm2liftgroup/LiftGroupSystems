@@ -27,7 +27,6 @@ export default function ProgramasPreventivos({ id }) {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const isAdmin = user?.rol === "admin";
   
-  // Validación robusta del ID
   const montacargasId = React.useMemo(() => {
     const numId = Number(id);
     return isNaN(numId) || numId <= 0 ? null : numId;
@@ -47,7 +46,6 @@ export default function ProgramasPreventivos({ id }) {
   const [anioFiltro, setAnioFiltro] = useState("");
   const [fechaActual, setFechaActual] = useState(new Date());
   
-  // Estados para edición
   const [mostrarModalEdicion, setMostrarModalEdicion] = useState(false);
   const [mantenimientoEditando, setMantenimientoEditando] = useState(null);
   const [formEdicion, setFormEdicion] = useState({

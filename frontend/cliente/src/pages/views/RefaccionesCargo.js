@@ -14,12 +14,10 @@ export default function RefaccionesCargo({ montacargas }) {
   });
   const [editandoObservacion, setEditandoObservacion] = useState(null);
   
-  // NUEVOS ESTADOS PARA IMÁGENES
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
-  
-  // Estados para los filtros
+
   const [filtros, setFiltros] = useState({
     anio: new Date().getFullYear(),
     mes: '',
@@ -27,7 +25,6 @@ export default function RefaccionesCargo({ montacargas }) {
     status: ''
   });
 
-  // Obtener mantenimientos cuando el montacargas cambia
   useEffect(() => {
     if (montacargas && montacargas.numero) {
       fetchMantenimientos(montacargas.numero);
@@ -38,12 +35,10 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   }, [montacargas]);
 
-  // Aplicar filtros cuando cambien los filtros o los mantenimientos
   useEffect(() => {
     aplicarFiltros();
   }, [filtros, mantenimientos]);
 
-  // Obtener observaciones cuando se selecciona un mantenimiento
   useEffect(() => {
     if (mantenimientoSeleccionado) {
       fetchObservaciones(mantenimientoSeleccionado.id);
@@ -52,33 +47,29 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   }, [mantenimientoSeleccionado]);
 
-  // NUEVAS FUNCIONES PARA MANEJO DE IMÁGENES
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validar tipo de archivo
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
       if (!allowedTypes.includes(file.type)) {
         setError('Solo se permiten archivos de imagen (JPEG, PNG, GIF, WebP)');
         return;
       }
 
-      // Validar tamaño (5MB máximo)
       if (file.size > 5 * 1024 * 1024) {
         setError('La imagen no debe superar los 5MB');
         return;
       }
 
       setImage(file);
-      
-      // Crear preview
+
       const reader = new FileReader();
       reader.onload = (e) => {
         setImagePreview(e.target.result);
       };
       reader.readAsDataURL(file);
       
-      setError(''); // Limpiar error si todo está bien
+      setError(''); 
     }
   };
 
@@ -96,7 +87,6 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   };
 
-  // FUNCIÓN PARA ELIMINAR IMAGEN DE UNA OBSERVACIÓN EXISTENTE
   const handleEliminarImagen = async (observacionId) => {
     if (!window.confirm('¿Está seguro de que desea eliminar la imagen de esta observación?')) {
       return;
@@ -135,7 +125,6 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   };
 
-  // FUNCIONES EXISTENTES (MANTENIENDO LA LÓGICA ORIGINAL)
   const fetchMantenimientos = async (montacargasId) => {
     setLoading(true);
     setError('');
@@ -263,7 +252,6 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   };
 
-  // CORREGIDA: Maneja correctamente el mantenimiento_id
   const handleSubmitObservacion = async (e) => {
     e.preventDefault();
     
@@ -284,8 +272,7 @@ export default function RefaccionesCargo({ montacargas }) {
     try {
       const token = localStorage.getItem("token");
       const formDataToSend = new FormData();
-      
-      // AGREGAR TODOS LOS CAMPOS NECESARIOS
+
       formDataToSend.append('mantenimiento_id', mantenimientoSeleccionado.id);
       formDataToSend.append('descripcion', formData.descripcion.trim());
       formDataToSend.append('cargo_a', formData.cargo_a);
@@ -295,7 +282,6 @@ export default function RefaccionesCargo({ montacargas }) {
       console.log('Cargo a:', formData.cargo_a);
       console.log('Imagen:', image ? 'Sí' : 'No');
 
-      // Agregar imagen si existe
       if (image) {
         formDataToSend.append('imagen', image);
       }
@@ -306,7 +292,6 @@ export default function RefaccionesCargo({ montacargas }) {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
-            // NO incluir 'Content-Type' - el navegador lo establece automáticamente con el boundary correcto
           },
           body: formDataToSend
         }
@@ -320,7 +305,7 @@ export default function RefaccionesCargo({ montacargas }) {
           descripcion: '',
           cargo_a: 'empresa'
         });
-        removeImage(); // Limpiar imagen después de enviar
+        removeImage(); 
         fetchObservaciones(mantenimientoSeleccionado.id);
       } else {
         throw new Error(data.error || 'Error al agregar observación');
@@ -333,7 +318,6 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   };
 
-  // CORREGIDA: Maneja correctamente la edición con imágenes
   const handleEditarObservacion = async (e) => {
     e.preventDefault();
     
@@ -354,8 +338,6 @@ export default function RefaccionesCargo({ montacargas }) {
     try {
       const token = localStorage.getItem("token");
       const formDataToSend = new FormData();
-      
-      // AGREGAR TODOS LOS CAMPOS NECESARIOS
       formDataToSend.append('descripcion', editandoObservacion.descripcion.trim());
       formDataToSend.append('cargo_a', editandoObservacion.cargo_a);
       formDataToSend.append('estado_resolucion', editandoObservacion.estado_resolucion || 'pendiente');
@@ -366,7 +348,6 @@ export default function RefaccionesCargo({ montacargas }) {
       console.log('Nuevo estado:', editandoObservacion.estado_resolucion || 'pendiente');
       console.log('Nueva imagen:', image ? 'Sí' : 'No');
 
-      // Agregar nueva imagen si existe
       if (image) {
         formDataToSend.append('imagen', image);
       }
@@ -494,7 +475,6 @@ export default function RefaccionesCargo({ montacargas }) {
     }));
   };
 
-  // MODIFICADA: Limpia imagen al iniciar edición
   const iniciarEdicion = (observacion) => {
     setEditandoObservacion({ ...observacion });
     setImage(null);

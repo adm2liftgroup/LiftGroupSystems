@@ -25,7 +25,6 @@ const API_URL = process.env.REACT_APP_API_URL;
 
 // BLOQUE 1: Componente principal Inicio
 export default function Inicio() {
-  // Estados principales
   const [montacargas, setMontacargas] = useState([]);
   const [filteredMontacargas, setFilteredMontacargas] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -48,7 +47,6 @@ export default function Inicio() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // Usuario autenticado
   const [user, setUser] = useState(null);
 
   // BLOQUE 2: Cargar usuario desde localStorage
@@ -88,8 +86,7 @@ export default function Inicio() {
       m.Modelo.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredMontacargas(filtered);
-    
-    // Solo resetear a primera página cuando el searchTerm cambie explícitamente
+
     if (searchTerm) {
       setCurrentPage(1);
     }
@@ -128,7 +125,6 @@ export default function Inicio() {
  const handleSubmit = async (e) => {
   e.preventDefault();
 
-  // Guardar el estado actual antes de la actualización
   const currentSelected = selectedMontacargas;
   const currentActiveTab = activeTab;
   const currentPageBeforeEdit = currentPage;
@@ -597,7 +593,16 @@ export default function Inicio() {
                 </div>
                 )
               )}
-              {activeTab === "Inversión Habilitar" && <InversionHabilitar />}
+              {activeTab === "Inversión Habilitar" && (
+                selectedMontacargas ? (
+                <InversionHabilitar montacargasId={selectedMontacargas.numero} />
+                ) : (
+                <div className="p-6 text-center text-gray-500">
+                No se ha seleccionado un montacargas
+                </div>
+                )
+              )}
+              
               {activeTab === "Refacciones con Cargo" && (
                 <RefaccionesCargo montacargas={selectedMontacargas}/>
               )}

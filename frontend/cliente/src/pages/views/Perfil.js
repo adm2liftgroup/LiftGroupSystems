@@ -319,7 +319,7 @@ const AsignacionTecnicosPanel = ({
   );
 };
 
-// BLOQUE 1.7: Panel de Técnico (ACTUALIZADO con manejo mejorado de estado)
+// BLOQUE 1.7: Panel de Técnico 
 const PanelTecnico = ({ 
   mantenimientos, 
   loading, 
@@ -332,12 +332,10 @@ const PanelTecnico = ({
   const [touchStart, setTouchStart] = useState(null);
   const [localMantenimientos, setLocalMantenimientos] = useState(mantenimientos);
 
-  // Sincronizar con los mantenimientos prop
   useEffect(() => {
     setLocalMantenimientos(mantenimientos);
   }, [mantenimientos]);
 
-  // Efecto para limpiar estado al desmontar
   useEffect(() => {
     return () => {
       setCompletando(null);
@@ -362,7 +360,6 @@ const PanelTecnico = ({
   const mesActual = new Date().getMonth() + 1;
   const anioActual = new Date().getFullYear();
 
-  // Manejo mejorado de eventos táctiles
   const handleTouchStart = (e) => {
     setTouchStart(e.touches[0].clientX);
   };
@@ -373,7 +370,6 @@ const PanelTecnico = ({
     const touchEnd = e.changedTouches[0].clientX;
     const diff = touchStart - touchEnd;
 
-    // Solo ejecutar si no fue un deslizamiento significativo
     if (Math.abs(diff) < 10) {
       callback(...args);
     }
@@ -381,14 +377,13 @@ const PanelTecnico = ({
     setTouchStart(null);
   };
 
-  // Función mejorada para marcar completado
   const handleMarcarCompletado = async (mantenimientoId) => {
     if (completando) return;
     
     setCompletando(mantenimientoId);
     
     try {
-      // Actualización optimista del estado local
+      
       setLocalMantenimientos(prev => 
         prev.map(m => 
           m.id === mantenimientoId 
@@ -401,16 +396,13 @@ const PanelTecnico = ({
         )
       );
 
-      // Pequeño delay para permitir que la UI se actualice
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Llamar a la función principal
       await onMarcarCompletado(mantenimientoId);
       
     } catch (error) {
       console.error('Error en handleMarcarCompletado:', error);
-      
-      // Revertir la actualización optimista en caso de error
+     
       setLocalMantenimientos(prev => 
         prev.map(m => 
           m.id === mantenimientoId 
@@ -423,7 +415,7 @@ const PanelTecnico = ({
         )
       );
     } finally {
-      // Delay más largo para evitar conflictos de renderizado
+      
       setTimeout(() => {
         setCompletando(null);
       }, 1000);
@@ -560,7 +552,7 @@ const PanelTecnico = ({
 
 // BLOQUE 2: Componente Principal Perfil
 const Perfil = () => {
-  // Estados principales
+
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -570,29 +562,24 @@ const Perfil = () => {
   const [shouldRedirect, setShouldRedirect] = useState(false);
   const [success, setSuccess] = useState("");
 
-  // Estados para mantenimientos
   const [mantenimientosMes, setMantenimientosMes] = useState([]);
   const [loadingMantenimientos, setLoadingMantenimientos] = useState(false);
   const [errorMantenimientos, setErrorMantenimientos] = useState("");
   const [mesActual, setMesActual] = useState(new Date().getMonth() + 1);
   const [anioActual, setAnioActual] = useState(new Date().getFullYear());
 
-  // Estados para técnicos
   const [tecnicos, setTecnicos] = useState([]);
   const [loadingTecnicos, setLoadingTecnicos] = useState(false);
   const [errorTecnicos, setErrorTecnicos] = useState("");
 
-  // Estados para panel de técnico
   const [misMantenimientos, setMisMantenimientos] = useState([]);
   const [loadingMisMantenimientos, setLoadingMisMantenimientos] = useState(false);
   const [errorMisMantenimientos, setErrorMisMantenimientos] = useState("");
 
-  // Estados para admin
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [errorUsers, setErrorUsers] = useState("");
 
-  // NUEVO: Estado para manejo seguro de UI
   const [uiState, setUiState] = useState({
     loading: false,
     error: '',
@@ -604,23 +591,18 @@ const Perfil = () => {
   const isAdmin = userData?.rol === "admin";
   const isTecnico = userData?.rol === "user";
 
-  // NUEVO: Effect para manejar desmontaje seguro
   useEffect(() => {
     return () => {
       setUiState(prev => ({ ...prev, isMounted: false }));
     };
   }, []);
 
-  // NUEVO: Función para actualizaciones seguras de estado
   const setSafeState = (setter, newState) => {
     if (uiState.isMounted) {
       setter(newState);
     }
   };
 
-  // === AGREGAR ESTAS DOS FUNCIONES DENTRO DEL COMPONENTE PERFIL ===
-
-  // Función auxiliar para obtener descripciones del checklist
   const getDescripcionChecklist = (numero) => {
   const descripciones = {
     1: "Revision visual de ruedas, chasis, mastil, etc.",
@@ -712,9 +694,8 @@ const Perfil = () => {
   return descripciones[numero] || `Revisión ${numero}`;
 };
 
-  // Función para generar el documento Word de checklist de mantenimiento
   const generarChecklistWord = (mantenimiento) => {
-  // Crear contenido HTML con el formato específico similar al Excel
+
   const contenido = `
     <!DOCTYPE html>
     <html>
@@ -836,8 +817,7 @@ const Perfil = () => {
         ${Array.from({length: 41}, (_, i) => {
           const num = i + 1;
           const num2 = i + 42;
-          
-          // Solo mostrar filas hasta el número 41 en la primera columna
+      
           if (num <= 41) {
             return `
               <tr>
@@ -917,7 +897,6 @@ const Perfil = () => {
     </html>
   `;
 
-  // Crear blob y descargar
   const blob = new Blob([contenido], { type: 'application/msword' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -929,7 +908,6 @@ const Perfil = () => {
   URL.revokeObjectURL(url);
 };
 
-// BLOQUE 2.1: Función mejorada para marcar mantenimiento como completado
 const marcarComoCompletado = async (mantenimientoId) => {
   try {
     const token = localStorage.getItem("token");
@@ -940,7 +918,6 @@ const marcarComoCompletado = async (mantenimientoId) => {
 
     console.log('Marcando mantenimiento como completado:', mantenimientoId);
 
-    // Usar AbortController para evitar llamadas duplicadas
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -1187,7 +1164,6 @@ const marcarComoCompletado = async (mantenimientoId) => {
     }
   }, []);
 
-  // Hooks para cargar datos según la pestaña activa
   useEffect(() => {
     if (activeTab === "admin-panel" && isAdmin) {
       fetchUsers();
@@ -1376,8 +1352,7 @@ return (
   onMarcarCompletado={async (mantenimientoId) => {
     try {
       await marcarComoCompletado(mantenimientoId);
-      
-      // Actualizar el estado global después del éxito
+  
       setMisMantenimientos(prev => 
         prev.map(m => 
           m.id === mantenimientoId 

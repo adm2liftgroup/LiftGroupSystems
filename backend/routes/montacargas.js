@@ -613,4 +613,116 @@ router.delete("/refacciones/:refaccionId", async (req, res) => {
   }
 });
 
+// BLOQUE 9: Rutas para inversión inicial del montacargas
+
+// GET - Obtener inversión inicial de un montacargas
+router.get("/:id/inversion-inicial", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const montacargasId = parseInt(id);
+    if (isNaN(montacargasId)) {
+      return res.status(400).json({ 
+        error: "ID de montacargas inválido" 
+      });
+    }
+
+    console.log('Buscando inversión inicial para montacargas ID:', montacargasId);
+    
+    const result = await pool.query(
+      `SELECT * FROM inversion_inicial 
+       WHERE montacargas_id = $1 
+       ORDER BY creado_en DESC`,
+      [montacargasId]
+    );
+
+    res.json({
+      success: true,
+      inversiones: result.rows
+    });
+  } catch (error) {
+    console.error("Error obteniendo inversión inicial:", error);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
+// POST - Agregar nueva inversión inicial
+router.post("/:id/inversion-inicial", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { costo_equipo, valor_factura, importacion, flete, total } = req.body;
+
+    const montacargasId = parseInt(id);
+    if (isNaN(montacargasId)) {
+      return res.status(400).json({ 
+        error: "ID de montacargas inválido" 
+      });
+    }
+
+    // Validaciones de campos requeridos
+    if (!costo_equipo || !valor_factura || !importacion || !flete || !total) {
+      return res.status(400).json({ error: "Todos los campos son requeridos" });
+    }
+
+    // Validar que los valores sean números
+    const costoEquipo = parseFloat(costo_equipo);
+    const valorFactura = parseFloat(valor_factura);
+    const importacionVal = parseFloat(importacion);
+    const fleteVal = parseFloat(flete);
+    const totalVal = parseFloat(total);
+
+    if (isNaN(costoEquipo) || isNaN(valorFactura) || isNaN(importacionVal) || isNaN(fleteVal) || isNaN(totalVal)) {
+      return res.status(400).json({ error: "Todos los valores deben ser números válidos" });
+    }
+
+    console.log('Agregando inversión inicial para montacargas ID:', montacargasId);
+    console.log('Datos recibidos:', { costo_equipo: costoEquipo, valor_factura: valorFactura, importacion: importacionVal, flete: fleteVal, total: totalVal });
+
+    const result = await pool.query(
+      `INSERT INTO inversion_inicial 
+       (montacargas_id, costo_equipo, valor_factura, importacion, flete, total) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
+       RETURNING *`,
+      [montacargasId, costoEquipo, valorFactura, importacionVal, fleteVal, totalVal]
+    );
+
+    res.json({
+      success: true,
+      message: "Inversión inicial agregada correctamente",
+      inversion: result.rows[0]
+    });
+  } catch (error) {
+    console.error("Error agregando inversión inicial:", error);
+    console.error("Detalles del error:", error.message);
+    res.status(500).json({ 
+      error: "Error del servidor",
+      details: error.message 
+    });
+  }
+});
+
+// DELETE - Eliminar inversión inicial
+router.delete("/inversion-inicial/:inversionId", async (req, res) => {
+  try {
+    const { inversionId } = req.params;
+
+    const result = await pool.query(
+      "DELETE FROM inversion_inicial WHERE id = $1 RETURNING *",
+      [inversionId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Inversión inicial no encontrada" });
+    }
+
+    res.json({
+      success: true,
+      message: "Inversión inicial eliminada correctamente"
+    });
+  } catch (error) {
+    console.error("Error eliminando inversión inicial:", error);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
 module.exports = router;

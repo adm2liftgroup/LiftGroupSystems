@@ -5,7 +5,6 @@ export default function HistorialMantenimientos({ montacargas }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Obtener historial cuando el montacargas cambia
   useEffect(() => {
     if (montacargas && montacargas.numero) {
       fetchHistorial(montacargas.numero);
@@ -33,7 +32,6 @@ export default function HistorialMantenimientos({ montacargas }) {
         const data = await response.json();
         
         if (data.success) {
-          // Filtrar solo los mantenimientos completados y ordenar por fecha
           const mantenimientosCompletados = (data.mantenimientos || [])
             .filter(m => m.status === 'completado')
             .sort((a, b) => new Date(b.completado_en) - new Date(a.completado_en));

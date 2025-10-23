@@ -18,13 +18,11 @@ export default function InversionInicial({ montacargasId }) {
     costo_unitario: ''
   });
 
-  // DEBUG: Verificar el ID
   useEffect(() => {
     console.log('ID del montacargas recibido:', id);
     console.log('Tipo de ID:', typeof id);
   }, [id]);
 
-  // Cargar refacciones cuando cambie el ID
   useEffect(() => {
     if (id) {
       console.log('Cargando refacciones para ID:', id);
@@ -103,7 +101,6 @@ export default function InversionInicial({ montacargasId }) {
     }
   };
 
-  // Si no hay ID, mostrar mensaje
   if (!id) {
     return (
       <div className="p-4">
