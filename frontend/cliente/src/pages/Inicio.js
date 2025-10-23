@@ -553,8 +553,8 @@ export default function Inicio() {
                 {[
                   "Información del equipo",
                   "Servicios Preventivos Historial",
-                  "Inversión Inicial",
                   "Inversión Habilitar",
+                  "Inversión Inicial",
                   "Refacciones con Cargo",
                   "Programas Preventivos"
                 ].map((tab) => (
