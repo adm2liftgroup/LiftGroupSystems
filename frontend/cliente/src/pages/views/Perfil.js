@@ -319,13 +319,13 @@ const AsignacionTecnicosPanel = ({
   );
 };
 
-// BLOQUE 1.7: Panel de Técnico 
+// BLOQUE 1.7: Panel de Técnico - CORREGIDO
 const PanelTecnico = ({ 
   mantenimientos, 
   loading, 
   error, 
   tecnico, 
-  onDescargarChecklist,
+  onAbrirChecklist,  // CAMBIADO: onDescargarChecklist -> onAbrirChecklist
   onMarcarCompletado 
 }) => {
   const [completando, setCompletando] = useState(null);
@@ -476,8 +476,9 @@ const PanelTecnico = ({
                 </div>
                 
                 <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
+                  {/* BOTÓN CORREGIDO: Ahora abre el checklist móvil */}
                   <button 
-                    onClick={() => onDescargarChecklist(mantenimiento)}
+                    onClick={() => onAbrirChecklist(mantenimiento)}
                     className="w-full bg-green-600 text-white py-3 px-4 rounded text-sm font-medium hover:bg-green-700 flex items-center justify-center transition-colors"
                     style={{ 
                       minHeight: '44px',
@@ -485,9 +486,9 @@ const PanelTecnico = ({
                     }}
                   >
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    Descargar Checklist
+                    Completar Checklist
                   </button>
                   
                   {/* BOTÓN MEJORADO PARA MÓVILES */}
@@ -549,8 +550,542 @@ const PanelTecnico = ({
   );
 };
 
+// BLOQUE 1.8: Componente de Checklist Móvil
+const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
+  const [checklistData, setChecklistData] = useState({});
+  const [observaciones, setObservaciones] = useState("");
+  const [actividadesPendientes, setActividadesPendientes] = useState("");
+  const [horaInicio, setHoraInicio] = useState("");
+  const [horaTermino, setHoraTermino] = useState("");
+  const [partesFaltantes, setPartesFaltantes] = useState("");
+  const [golpesUnidad, setGolpesUnidad] = useState("");
+  const [condicionesPintura, setCondicionesPintura] = useState("Bueno");
+  const [currentSection, setCurrentSection] = useState(0);
+  
 
-// BLOQUE 2: Componente Principal Perfil
+  const sections = [
+    { title: "Información General", range: [1, 10] },
+    { title: "Inspección Visual", range: [11, 20] },
+    { title: "Revisión Mecánica", range: [21, 30] },
+    { title: "Sistema Eléctrico", range: [31, 40] },
+    { title: "Motor y Transmisión", range: [41, 50] },
+    { title: "Hidráulica", range: [51, 60] },
+    { title: "Pruebas Finales", range: [61, 70] },
+    { title: "Limpieza y Lubricación", range: [71, 84] },
+    { title: "Observaciones y Firmas" }
+  ];
+
+  const getDescripcionChecklist = (numero) => {
+    const descripciones = {
+      1: "Revisión visual de ruedas, chasis, mástil, etc.",
+      2: "Revisar alarma de reversa",
+      3: "Revisar funcionamiento de claxón",
+      4: "Revisar extintor y base",
+      5: "Revisar seguros de cuchillas",
+      6: "Revisar mofle y tubo de escape",
+      7: "Inspeccionar cilindros de inclinación y mangueras",
+      8: "Inspeccionar manguera principal y poleas",
+      9: "Revisar y engrasar cilindros, ejes y soportes",
+      10: "Revisar tapas de masas de llantas traseras",
+      11: "Revisar tornillos de parrilla y barra",
+      12: "Inspeccionar cilindros de desplazador y mangueras",
+      13: "Engrasar carro desplazador con aguja",
+      14: "Revisar mangueras, abrazaderas y tapón de radiador",
+      15: "Abrir cofre y revisar pistón",
+      16: "Retirar tapa lateral izquierda",
+      17: "Retirar tapete y piso y revisar estado",
+      18: "Revisar estado de pedales",
+      19: "Limpiar terminales, bornes y protector de batería",
+      20: "Revisar ruido y carga de alternador",
+      21: "Revisar estado físico de batería",
+      22: "Revisión de nivel de líquido de frenos",
+      23: "Revisar tornillo de contrapeso",
+      24: "Drenar aceite de motor y quitar filtro",
+      25: "Reemplazar filtro y aceite de transmisión cuando aplique",
+      26: "Revisar conectores del sistema de gas",
+      27: "Revisar tapa(s) de caja(s) de fusibles y fusibles",
+      28: "Cambiar cables y bujías de motor",
+      29: "Cambiar tapa de distribuidor y rotor cuando aplique",
+      30: "Revisar arnés eléctrico, grapas y/o bases de sujeción",
+      31: "Colocar filtro y aceite de motor",
+      32: "Colocar tapa lateral izquierda",
+      33: "Revisar fugas en líneas de gas utilizando swipe",
+      34: "Cerrar cofre y colocar tapa de radiador",
+      35: "Revisar luces: Traseras - Delanteras - Reversa - Torreta",
+      36: "Sopletear equipo en general",
+      37: "Colocar tapete y piso",
+      38: "Recoger material de desecho (filtros, aceite usado y trapos)",
+      39: "Partes o piezas faltantes",
+      40: "Revisión de nivel de aceite hidráulico - agregar si es necesario",
+      41: "Asegurar que no se encuentre con fugas el equipo",
+      42: "Revisar switch de arranque",
+      43: "Revisar switch de asiento",
+      44: "Revisar y accionar palanca de cambios",
+      45: "Revisar estado de cinturón de seguridad",
+      46: "Revisar ajuste de freno de estacionamiento",
+      47: "Revisar asiento y su riel",
+      48: "Accionar inclinación y retracción de mástil",
+      49: "Subir mástil, girar volante derecha e izquierda (identificar anomalías)",
+      50: "Medir altura de llantas (mm)",
+      51: "Asegurar ajuste de muelas del carro en mástil",
+      52: "Revisar tuercas y birlos",
+      53: "Accionar desplazador lateral",
+      54: "Desmontar y revisar muelas del carro desplazador",
+      55: "Revisar cuchillas y sus condiciones",
+      56: "Abrir cofre y revisar empaque",
+      57: "Retirar tapa lateral derecha",
+      58: "Revisar condiciones de guarda de operador",
+      59: "Revisar y purgar el vaporizador",
+      60: "Cerrar válvula de gas y dejar APAGARSE el motor",
+      61: "Revisar seguro y válvulas de tanque de gas",
+      62: "Revisar ruido y funcionamiento de marcha",
+      63: "Retirar materiales extraños de llantas y ejes",
+      64: "Cambiar filtro y aceite hidráulico cuando aplique",
+      65: "Cambiar filtro de aire",
+      66: "Revisar nivel de aceite de diferencial",
+      67: "Cambiar bujías de motor",
+      68: "Revisar ajuste de cadenas",
+      69: "Lubricar cadenas",
+      70: "Revisar juego en ruedas y balatas",
+      71: "Engrasar cruceta cuando aplique",
+      72: "Revisar estado de banda y bomba de agua",
+      73: "Revisar fugas de aceite o fluidos en el motor",
+      74: "Colocar tapa lateral derecha",
+      75: "Abrir válvula de gas y revisar línea principal",
+      76: "Revisar ajuste de pedales (Neutralizador, freno, acelerador)",
+      77: "Cerrar cofre y colocar tapa de radiador",
+      78: "Revisar y limpiar retrovisores",
+      79: "Realizar limpieza general de la unidad",
+      80: "Lubricar y engrasar todos los puntos de movimiento",
+      81: "Revisión y engrasado de eje de dirección",
+      82: "Golpes en la unidad",
+      83: "Revisar condiciones de la pintura",
+      84: "Hora en la que se terminó el servicio"
+    };
+    
+    return descripciones[numero] || `Revisión ${numero}`;
+  };
+
+  const handleCheckboxChange = (itemNumber, value) => {
+    setChecklistData(prev => ({
+      ...prev,
+      [itemNumber]: value
+    }));
+  };
+
+  const handleTextInputChange = (itemNumber, value) => {
+    setChecklistData(prev => ({
+      ...prev,
+      [itemNumber]: value
+    }));
+  };
+
+  const renderCheckboxItem = (numero) => {
+    const descripcion = getDescripcionChecklist(numero);
+    
+    // Items que necesitan selección Bueno/Reemplazo
+    const buenoReemplazoItems = [2, 3, 4, 10, 11, 15, 17, 19, 21, 27, 33, 35, 54, 55, 56, 61, 64, 65, 66, 67, 70, 72, 75, 78];
+    
+    // Items que son solo efectuado
+    const efectuadoItems = [1, 5, 6, 7, 8, 9, 12, 13, 14, 16, 18, 20, 22, 23, 24, 25, 26, 28, 29, 30, 31, 32, 34, 36, 37, 38, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 51, 52, 53, 57, 58, 59, 60, 62, 63, 68, 69, 76, 77, 79, 80, 81];
+
+    if (buenoReemplazoItems.includes(numero)) {
+      return (
+        <div key={numero} className="bg-white p-4 rounded-lg border border-gray-200 mb-3">
+          <p className="font-medium text-gray-800 mb-3">{numero}. {descripcion}</p>
+          <div className="flex space-x-4">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name={`item-${numero}`}
+                value="Bueno"
+                checked={checklistData[numero] === "Bueno"}
+                onChange={() => handleCheckboxChange(numero, "Bueno")}
+                className="w-4 h-4 text-blue-600"
+              />
+              <span className="ml-2 text-sm">Bueno</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name={`item-${numero}`}
+                value="Reemplazo"
+                checked={checklistData[numero] === "Reemplazo"}
+                onChange={() => handleCheckboxChange(numero, "Reemplazo")}
+                className="w-4 h-4 text-blue-600"
+              />
+              <span className="ml-2 text-sm">Reemplazo</span>
+            </label>
+          </div>
+        </div>
+      );
+    } else if (efectuadoItems.includes(numero)) {
+      return (
+        <div key={numero} className="bg-white p-4 rounded-lg border border-gray-200 mb-3">
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-gray-800">{numero}. {descripcion}</p>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={checklistData[numero] === true}
+                onChange={(e) => handleCheckboxChange(numero, e.target.checked)}
+                className="w-5 h-5 text-blue-600 rounded"
+              />
+              <span className="ml-2 text-sm text-gray-600">Efectuado</span>
+            </label>
+          </div>
+        </div>
+      );
+    } else if (numero === 50) {
+      // Medición de llantas
+      return (
+        <div key={numero} className="bg-white p-4 rounded-lg border border-gray-200 mb-3">
+          <p className="font-medium text-gray-800 mb-3">{numero}. {descripcion}</p>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <label className="block text-gray-600 mb-1">FD (mm)</label>
+              <input
+                type="number"
+                value={checklistData[`${numero}_FD`] || ""}
+                onChange={(e) => handleTextInputChange(`${numero}_FD`, e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded"
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-600 mb-1">FI (mm)</label>
+              <input
+                type="number"
+                value={checklistData[`${numero}_FI`] || ""}
+                onChange={(e) => handleTextInputChange(`${numero}_FI`, e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded"
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-600 mb-1">TD (mm)</label>
+              <input
+                type="number"
+                value={checklistData[`${numero}_TD`] || ""}
+                onChange={(e) => handleTextInputChange(`${numero}_TD`, e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded"
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-600 mb-1">TI (mm)</label>
+              <input
+                type="number"
+                value={checklistData[`${numero}_TI`] || ""}
+                onChange={(e) => handleTextInputChange(`${numero}_TI`, e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded"
+                placeholder="0"
+              />
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    return null;
+  };
+
+  const renderSpecialItems = () => {
+    const currentSectionData = sections[currentSection];
+    if (!currentSectionData.range) return null;
+
+    const items = [];
+    for (let i = currentSectionData.range[0]; i <= currentSectionData.range[1]; i++) {
+      items.push(renderCheckboxItem(i));
+    }
+    return items;
+  };
+
+  const renderObservacionesSection = () => {
+    return (
+      <div className="space-y-4">
+        {/* Información del equipo */}
+        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <h3 className="font-bold text-blue-800 mb-2">Información del Equipo</h3>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div><strong>No. Económico:</strong> #{mantenimiento.montacargas_numero}</div>
+            <div><strong>Marca:</strong> {mantenimiento.montacargas_marca}</div>
+            <div><strong>Modelo:</strong> {mantenimiento.montacargas_modelo}</div>
+            <div><strong>Serie:</strong> {mantenimiento.montacargas_serie}</div>
+            <div><strong>Ubicación:</strong> {mantenimiento.montacargas_ubicacion}</div>
+            <div><strong>Planta:</strong> {mantenimiento.montacargas_planta}</div>
+          </div>
+        </div>
+
+        {/* Partes faltantes y golpes */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white p-4 rounded-lg border border-gray-200">
+            <label className="block font-medium text-gray-800 mb-2">39. Partes o piezas faltantes</label>
+            <div className="flex space-x-4 mb-3">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="partesFaltantes"
+                  value="No"
+                  checked={checklistData[39] === "No"}
+                  onChange={() => handleCheckboxChange(39, "No")}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="ml-2 text-sm">No</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="partesFaltantes"
+                  value="Si"
+                  checked={checklistData[39] === "Si"}
+                  onChange={() => handleCheckboxChange(39, "Si")}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="ml-2 text-sm">Sí</span>
+              </label>
+            </div>
+            <textarea
+              value={partesFaltantes}
+              onChange={(e) => setPartesFaltantes(e.target.value)}
+              placeholder="Especificar cuáles..."
+              className="w-full p-2 border border-gray-300 rounded text-sm"
+              rows="3"
+            />
+          </div>
+
+          <div className="bg-white p-4 rounded-lg border border-gray-200">
+            <label className="block font-medium text-gray-800 mb-2">82. Golpes en la unidad</label>
+            <div className="flex space-x-4 mb-3">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="golpesUnidad"
+                  value="No"
+                  checked={checklistData[82] === "No"}
+                  onChange={() => handleCheckboxChange(82, "No")}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="ml-2 text-sm">No</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="golpesUnidad"
+                  value="Si"
+                  checked={checklistData[82] === "Si"}
+                  onChange={() => handleCheckboxChange(82, "Si")}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="ml-2 text-sm">Sí</span>
+              </label>
+            </div>
+            <textarea
+              value={golpesUnidad}
+              onChange={(e) => setGolpesUnidad(e.target.value)}
+              placeholder="Especificar dónde..."
+              className="w-full p-2 border border-gray-300 rounded text-sm"
+              rows="3"
+            />
+          </div>
+        </div>
+
+        {/* Condiciones de pintura */}
+        <div className="bg-white p-4 rounded-lg border border-gray-200">
+          <label className="block font-medium text-gray-800 mb-2">83. Condiciones de la pintura</label>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {["Bueno", "Retoque", "Parcial", "General"].map((opcion) => (
+              <label key={opcion} className="flex items-center">
+                <input
+                  type="radio"
+                  name="condicionesPintura"
+                  value={opcion}
+                  checked={condicionesPintura === opcion}
+                  onChange={() => setCondicionesPintura(opcion)}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="ml-2 text-sm">{opcion}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Horas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white p-4 rounded-lg border border-gray-200">
+            <label className="block font-medium text-gray-800 mb-2">Hora de inicio</label>
+            <input
+              type="time"
+              value={horaInicio}
+              onChange={(e) => setHoraInicio(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded"
+            />
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-gray-200">
+            <label className="block font-medium text-gray-800 mb-2">84. Hora de término</label>
+            <input
+              type="time"
+              value={horaTermino}
+              onChange={(e) => setHoraTermino(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded"
+            />
+          </div>
+        </div>
+
+        {/* Observaciones y actividades pendientes */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white p-4 rounded-lg border border-gray-200">
+            <label className="block font-medium text-gray-800 mb-2">Observaciones</label>
+            <textarea
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              placeholder="Escriba sus observaciones aquí..."
+              className="w-full p-2 border border-gray-300 rounded text-sm"
+              rows="4"
+            />
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-gray-200">
+            <label className="block font-medium text-gray-800 mb-2">Actividades pendientes</label>
+            <textarea
+              value={actividadesPendientes}
+              onChange={(e) => setActividadesPendientes(e.target.value)}
+              placeholder="Actividades que quedaron pendientes..."
+              className="w-full p-2 border border-gray-300 rounded text-sm"
+              rows="4"
+            />
+          </div>
+        </div>
+
+        {/* Firma del técnico */}
+        <div className="bg-white p-4 rounded-lg border border-gray-200">
+          <label className="block font-medium text-gray-800 mb-2">Firma del Técnico</label>
+          <div className="border-2 border-dashed border-gray-300 rounded p-4 text-center">
+            <p className="text-gray-600 mb-2">Espacio para firma digital</p>
+            <p className="text-sm text-gray-500">Técnico: {tecnico?.nombre || "N/A"}</p>
+            <p className="text-sm text-gray-500">Fecha: {new Date().toLocaleDateString('es-ES')}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const handleSubmitChecklist = () => {
+    const checklistCompleto = {
+      ...checklistData,
+      observaciones,
+      actividadesPendientes,
+      horaInicio,
+      horaTermino,
+      partesFaltantes,
+      golpesUnidad,
+      condicionesPintura,
+      tecnico: tecnico?.nombre,
+      fecha: new Date().toISOString(),
+      mantenimientoId: mantenimiento.id
+    };
+
+    onCompletarChecklist(checklistCompleto);
+  };
+
+  const progress = ((currentSection + 1) / sections.length) * 100;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-lg w-full max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="bg-blue-600 text-white p-4 rounded-t-2xl">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-bold">Checklist de Mantenimiento</h2>
+          <span className="bg-blue-800 px-3 py-1 rounded-full text-sm">
+            #{mantenimiento.montacargas_numero}
+          </span>
+        </div>
+        <p className="text-blue-100 text-sm mt-1">
+          {mantenimiento.montacargas_marca} {mantenimiento.montacargas_modelo} - {mantenimiento.tipo}
+        </p>
+        
+        {/* Progress bar */}
+        <div className="mt-3 bg-blue-700 rounded-full h-2">
+          <div 
+            className="bg-white rounded-full h-2 transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
+        <div className="flex justify-between text-xs text-blue-200 mt-1">
+          <span>Progreso</span>
+          <span>{Math.round(progress)}%</span>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className="bg-gray-50 p-4 border-b">
+        <div className="flex overflow-x-auto pb-2 space-x-2">
+          {sections.map((section, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentSection(index)}
+              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
+                currentSection === index
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              {section.title}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-4 max-h-[60vh] overflow-y-auto">
+        {currentSection < sections.length - 1 ? (
+          <div className="space-y-3">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">
+              {sections[currentSection].title}
+            </h3>
+            {renderSpecialItems()}
+          </div>
+        ) : (
+          renderObservacionesSection()
+        )}
+      </div>
+
+      {/* Footer Navigation */}
+      <div className="bg-gray-50 p-4 border-t rounded-b-2xl">
+        <div className="flex justify-between">
+          <button
+            onClick={() => setCurrentSection(Math.max(0, currentSection - 1))}
+            disabled={currentSection === 0}
+            className={`px-6 py-3 rounded-lg font-medium ${
+              currentSection === 0
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-gray-600 text-white hover:bg-gray-700'
+            }`}
+          >
+            Anterior
+          </button>
+
+          {currentSection < sections.length - 1 ? (
+            <button
+              onClick={() => setCurrentSection(currentSection + 1)}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+            >
+              Siguiente
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmitChecklist}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
+            >
+              Completar Checklist
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// BLOQUE 2: Componente Principal Perfil - CORREGIDO
 const Perfil = () => {
 
   const [userData, setUserData] = useState(null);
@@ -580,6 +1115,9 @@ const Perfil = () => {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [errorUsers, setErrorUsers] = useState("");
 
+  const [mostrarChecklist, setMostrarChecklist] = useState(false);
+  const [mantenimientoSeleccionado, setMantenimientoSeleccionado] = useState(null);
+
   const [uiState, setUiState] = useState({
     loading: false,
     error: '',
@@ -603,626 +1141,358 @@ const Perfil = () => {
     }
   };
 
-  const getDescripcionChecklist = (numero) => {
-  const descripciones = {
-    1: "Revision visual de ruedas, chasis, mastil, etc.",
-    2: "Revisar alarma de reversa",
-    3: "Revisar funcionamiento de claxón",
-    4: "Revisar extintor y base",
-    5: "Revisar seguros de cuchillas",
-    6: "Revisar mofle y tubo de escape",
-    7: "Inspeccionar cilindros de inclinación y mangueras",
-    8: "Inspeccionar manguera principal y poleas",
-    9: "Revisar y engrasar cilindros, ejes y soportes",
-    10: "Revisar tapas de masas de llantas traseras",
-    11: "Revisar tornillos de parrilla y barra",
-    12: "Inspeccionar cilindros de desplazador y mangueras",
-    13: "Engrasar carro desplazador con aguja",
-    14: "Revisar mangueras, abrazaderas y tapón de radiador",
-    15: "Abrir cofre y revisar pistón",
-    16: "Retirar tapa lateral izquierda",
-    17: "Retirar tapete y piso y revisar estado",
-    18: "Revisar estado de pedales",
-    19: "Limpiar terminales, bornes y protector de batería",
-    20: "Revisar ruido y carga de alternador",
-    21: "Revisar estado físico de batería",
-    22: "Revision de nivel de líquido de frenos",
-    23: "Revisar tornillo de contrapeso",
-    24: "Drenar aceite de motor y quitar filtro",
-    25: "Resmplace filtro yaceite de trasmision cuando aplique",
-    26: "Revisar conectrores del sistema de gs",
-    27: "Revisar tapa(s) de caja(s) de fusibles y fusibles",
-    28: "Cambiar cables y bujías de motor",
-    29: "Cambiar tapa de distribuidor y rotor cuando aplique",
-    30: "Revisar de arnés eléctricos grapas y/o bases de sujeción",
-    31: "Colocar filtro y aceite de motor",
-    32: "Colocar tapa lateral izquierda",
-    33: "Revisar fugas en lineas de gas utilizando swipe",
-    34: "Cerrar cofre y colocar tapa de radiador",
-    35: "Revisar luces: Traseras: Buenas □ Reemplazo □ Reversa: Buena □ Reemplazo □ Delanteras: Buenas □ Reemplazo □ Torreta: Buena □ Reemplazo □",
-    36: "Sopletear equipo en general",
-    37: "Colocar tapete y piso",
-    38: "Recoger material de desecho (filtros, aceite usado y trapos)",
-    39: "Partes o piezas faltantes:",
-    40: "Revision de nivel de aceite hidraulico agregar si es necesario",
-    41: "Asegurar que no se encuentre con fugas el equipo",
-    42: "Revisar switch de arranque",
-    43: "Revisar switch de asiento",
-    44: "Revisar y accionar palanca de cambios",
-    45: "Revisar estado de cinturón de seguridad",
-    46: "Revisar ajuste de freno de estacionamiento",
-    47: "Revisar asiento y su riel",
-    48: "Accionar inclinación y retracción de mástil",
-    49: "Subir mástil, girar volante derecha e izquierda (identificar anomalias)",
-    50: "Medir altura de llantas (mm) FD________ FI________ TD________TI________",
-    51: "Asegurar ajuste demuelas del carro en mastil",
-    52: "Revisar tuercas y birlos",
-    53: "Accionar desplazador lateral",
-    54: "Desmontar y revisar muelas del carro desplazador",
-    55: "Revisar cuchillas y sus condiciones",
-    56: "Abrir cofre y revisar empaque",
-    57: "Retirar tapa lateral derecha",
-    58: "Revisar condiciones de guarda de operador",
-    59: "Revisar y purgar el vaporizador",
-    60: "Cerrar válvula de gas y dejar APAGARSE el motor",
-    61: "Revisar seguro y válvulas de tanque de gas",
-    62: "Revisar ruido y funcionamiento de marcha",
-    63: "Retirar materiales extraños de llantas y ejes",
-    64: "Cambiar filtro y aceite hidráulico cuando aplique",
-    65: "Cambiar filtro de aire",
-    66: "Revisar nivel de aceite de diferecial",
-    67: "Cambair bujias de motor",
-    68: "Revisar ajuste de cadenas",
-    69: "Lubricar cadenas",
-    70: "Revisar juego en ruedas y balatas",
-    71: "engrasar cruceta cuando aplique",
-    72: "Revisar estado de banda y bomba de agua",
-    73: "Revisar fugas de aceite ó fluidos en el motor",
-    74: "Colocar tapa lateral derecha",
-    75: "Abrir válvula de gas y revisar línea principal",
-    76: "Revisar ajuste de pedales (Neutralizador,freno, acelerador)",
-    77: "Cerrar cofre y colocar tapa de radiador",
-    78: "Revisar y limpiar retrovisores",
-    79: "Realizar limpieza general de la unidad",
-    80: "Lubricar y engrasar todos los pntos de movimiento",
-    81: "Revision y engrasado de eje de direccion",
-    82: "Golpes en la unidad:",
-    83: "Revisar condiciones de la pintura",
-    84: "Hora en la que se terminó el servicio:_______________________"
+  const manejarChecklistCompletado = async (checklistData) => {
+    try {
+      console.log('Checklist completado:', checklistData);
+      
+      // Marcar el mantenimiento como completado
+      await marcarComoCompletado(checklistData.mantenimientoId);
+      
+      // Actualizar la lista de mantenimientos
+      setMisMantenimientos(prev => 
+        prev.map(m => 
+          m.id === checklistData.mantenimientoId 
+            ? { 
+                ...m, 
+                status: 'completado', 
+                completado_en: new Date().toISOString(),
+                tecnico_id: userData?.id,
+                tecnico_nombre: userData?.nombre
+              }
+            : m
+        )
+      );
+      
+      setSuccess('Checklist completado y mantenimiento marcado como finalizado');
+      setTimeout(() => setSuccess(''), 3000);
+      
+      // Cerrar el modal del checklist
+      setMostrarChecklist(false);
+      setMantenimientoSeleccionado(null);
+      
+    } catch (err) {
+      console.error('Error al completar checklist:', err);
+      setErrorMisMantenimientos(err.message || 'Error al completar checklist');
+      setTimeout(() => setErrorMisMantenimientos(''), 5000);
+    }
   };
-  
-  return descripciones[numero] || `Revisión ${numero}`;
-};
 
-  const generarChecklistWord = (mantenimiento) => {
-
-  const contenido = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Checklist Mantenimiento Montacargas #${mantenimiento.montacargas_numero}</title>
-      <style>
-        body { 
-          font-family: Arial, sans-serif; 
-          margin: 10px; 
-          font-size: 10pt;
-        }
-        table { 
-          width: 100%; 
-          border-collapse: collapse; 
-        }
-        td { 
-          border: 1px solid black; 
-          padding: 4px; 
-          vertical-align: top;
-        }
-        .header-table {
-          margin-bottom: 15px;
-        }
-        .header-table td {
-          border: none;
-          padding: 2px 5px;
-        }
-        .check-column {
-          width: 20px;
-          text-align: center;
-        }
-        .desc-column {
-          width: 65%;
-        }
-        .status-column {
-          width: 30%;
-        }
-        .section-title {
-          background-color: #f0f0f0;
-          font-weight: bold;
-          padding: 5px;
-        }
-        .checkbox {
-          font-family: "Segoe UI Symbol";
-        }
-      </style>
-    </head>
-    <body>
-      
-      <!-- Información del encabezado -->
-      <table class="header-table">
-        <tr>
-          <td><strong>No. Económico:</strong></td>
-          <td>${mantenimiento.montacargas_numero || ''}</td>
-          <td><strong>Fecha:</strong></td>
-          <td>${new Date().toLocaleDateString('es-ES')}</td>
-          <td><strong>Cliente:</strong></td>
-          <td>${mantenimiento.montacargas_ubicacion || 'N/A'}</td>
-          <td><strong>FOLIO:</strong></td>
-          <td>${mantenimiento.id || ''}</td>
-        </tr>
-        <tr>
-          <td><strong>Marca:</strong></td>
-          <td>${mantenimiento.montacargas_marca || ''}</td>
-          <td></td>
-          <td><strong>Equipo de:</strong></td>
-          <td>Renta</td>
-          <td><strong>Planta:</strong></td>
-          <td>${mantenimiento.montacargas_planta || 'N/A'}</td>
-          <td></td>
-        </tr>
-        <tr>
-          <td><strong>Modelo:</strong></td>
-          <td>${mantenimiento.montacargas_modelo || ''}</td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td><strong>Hora de inicio:</strong></td>
-          <td></td>
-        </tr>
-        <tr>
-          <td><strong>Serie:</strong></td>
-          <td>${mantenimiento.montacargas_serie || ''}</td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td><strong>Hora de termino:</strong></td>
-          <td></td>
-        </tr>
-        <tr>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td><strong>Tiempo de reparaciones:</strong></td>
-          <td></td>
-          <td></td>
-        </tr>
-        <tr>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td><strong>Tiempo utilizado:</strong></td>
-          <td></td>
-          <td></td>
-        </tr>
-      </table>
-
-      <h2>Checklist de Mantenimiento - ${mantenimiento.tipo}</h2>
-      
-      <!-- Tabla de checklist en dos columnas -->
-      <table>
-        ${Array.from({length: 41}, (_, i) => {
-          const num = i + 1;
-          const num2 = i + 42;
-      
-          if (num <= 41) {
-            return `
-              <tr>
-                <!-- Primera columna -->
-                <td class="desc-column">${num}. ${getDescripcionChecklist(num)}</td>
-                <td class="check-column">${num === 2 || num === 3 || num === 4 || num === 10 || num === 11 || num === 15 || num === 17 || num === 19 || num === 21 || num === 27 || num === 33 || num === 35 ? 'Bueno □ Reemplazo □' : ''}</td>
-                <td class="check-column">${num === 1 || num === 5 || num === 6 || num === 7 || num === 8 || num === 9 || num === 12 || num === 13 || num === 14 || num === 16 || num === 18 || num === 20 || num === 22 || num === 23 || num === 24 || num === 25 || num === 26 || num === 28 || num === 29 || num === 30 || num === 31 || num === 32 || num === 34 || num === 36 || num === 37 || num === 38 || num === 40 || num === 41 ? 'Efectuado □' : ''}</td>
-                
-                <!-- Segunda columna (solo si existe el item) -->
-                <td class="desc-column">${num2 <= 83 ? `${num2}. ${getDescripcionChecklist(num2)}` : ''}</td>
-                <td class="check-column">${num2 === 42 || num2 === 43 || num2 === 44 || num2 === 45 || num2 === 46 || num2 === 47 || num2 === 48 || num2 === 49 || num2 === 51 || num2 === 52 || num2 === 53 || num2 === 57 || num2 === 58 || num2 === 59 || num2 === 60 || num2 === 62 || num2 === 63 || num2 === 68 || num2 === 69 || num2 === 76 || num2 === 77 || num2 === 79 || num2 === 80 || num2 === 81 ? 'Efectuado □' : ''}</td>
-                <td class="check-column">${num2 === 54 || num2 === 55 || num2 === 56 || num2 === 61 || num2 === 64 || num2 === 65 || num2 === 66 || num2 === 67 || num2 === 70 || num2 === 72 || num2 === 75 || num2 === 78 ? 'Bueno □ Reemplazo □' : ''}</td>
-              </tr>
-            `;
-          }
-          return '';
-        }).join('')}
-        
-        <!-- Fila para "Partes o piezas faltantes" -->
-        <tr>
-          <td class="desc-column">39. Partes o piezas faltantes:</td>
-          <td class="check-column">NO □ SI □</td>
-          <td class="check-column"></td>
-          <td class="desc-column">82. Golpes en la unidad:</td>
-          <td class="check-column">NO □ SI □</td>
-          <td class="check-column"></td>
-        </tr>
-        
-        <!-- Fila para "Cuales" -->
-        <tr>
-          <td class="desc-column">Cuales:</td>
-          <td class="check-column"></td>
-          <td class="check-column"></td>
-          <td class="desc-column">Donde:</td>
-          <td class="check-column"></td>
-          <td class="check-column"></td>
-        </tr>
-        
-        <!-- Fila para "Revisar condiciones de la pintura" -->
-        <tr>
-          <td class="desc-column"></td>
-          <td class="check-column"></td>
-          <td class="check-column"></td>
-          <td class="desc-column">83. Revisar condiciones de la pintura:</td>
-          <td class="check-column">Retoque □ Parcial □ General □ Bueno □</td>
-          <td class="check-column"></td>
-        </tr>
-        
-        <!-- Fila para "Hora en la que se terminó el servicio" -->
-        <tr>
-          <td class="desc-column"></td>
-          <td class="check-column"></td>
-          <td class="check-column"></td>
-          <td class="desc-column">84. Hora en la que se terminó el servicio:</td>
-          <td class="check-column"></td>
-          <td class="check-column"></td>
-        </tr>
-      </table>
-
-      <!-- Observaciones y actividades pendientes -->
-      <table style="margin-top: 20px;">
-        <tr>
-          <td style="width: 50%;"><strong>Observaciones:</strong></td>
-          <td style="width: 50%;"><strong>Actividades pendientes:</strong></td>
-        </tr>
-        <tr>
-          <td style="height: 80px; vertical-align: top;"></td>
-          <td style="height: 80px; vertical-align: top;"></td>
-        </tr>
-      </table>
-
-      <div style="margin-top: 30px;">
-        <p><strong>Técnico asignado:</strong> ${userData?.nombre || 'N/A'}</p>
-        <p><strong>Fecha de mantenimiento:</strong> ${new Date(mantenimiento.fecha).toLocaleDateString('es-ES')}</p>
-      </div>
-    </body>
-    </html>
-  `;
-
-  const blob = new Blob([contenido], { type: 'application/msword' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `checklist-montacargas-${mantenimiento.montacargas_numero}-${new Date().toISOString().split('T')[0]}.doc`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-};
-
-const marcarComoCompletado = async (mantenimientoId) => {
-  try {
-    const token = localStorage.getItem("token");
-    
-    if (!token) {
-      throw new Error('No hay sesión activa');
-    }
-
-    console.log('Marcando mantenimiento como completado:', mantenimientoId);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/mantenimientos/${mantenimientoId}/estado`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        status: 'completado',
-        tecnico_id: userData?.id,
-        tecnico_nombre: userData?.nombre,
-        observaciones: 'Mantenimiento completado exitosamente'
-      }),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      let errorMessage = `Error ${response.status}: ${response.statusText}`;
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.error || errorMessage;
-      } catch (parseError) {
-        console.error('Error parsing error response:', parseError);
-      }
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    
-    if (data.success) {
-      return { success: true, data };
-    } else {
-      throw new Error(data.error || 'Error al completar el mantenimiento');
-    }
-  } catch (err) {
-    console.error('Error marcando mantenimiento como completado:', err);
-    throw err;
-  }
-};
-
-  // BLOQUE 3: Fetch de datos de usuario
-  const fetchUserData = useCallback(async () => {
-    setLoading(true);
+  const marcarComoCompletado = async (mantenimientoId) => {
     try {
       const token = localStorage.getItem("token");
       
-      if (!token || token === "null") {
-        console.error("❌ No hay token válido en localStorage");
-        setIsLoggedIn(false);
-        setLoading(false);
-        setShouldRedirect(true);
-        return;
+      if (!token) {
+        throw new Error('No hay sesión activa');
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
+      console.log('Marcando mantenimiento como completado:', mantenimientoId);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/mantenimientos/${mantenimientoId}/estado`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: 'completado',
+          tecnico_id: userData?.id,
+          tecnico_nombre: userData?.nombre,
+          observaciones: 'Mantenimiento completado exitosamente'
+        }),
+        signal: controller.signal
       });
 
-      const data = await response.json();
-      console.log("Datos de /auth/me:", data);
+      clearTimeout(timeoutId);
 
-      if (response.ok) {
-        setUserData(data);
-        setIsLoggedIn(true);
-        localStorage.setItem("user", JSON.stringify(data));
-        setActiveTab("perfil");
+      if (!response.ok) {
+        let errorMessage = `Error ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        return { success: true, data };
       } else {
-        console.error("Token inválido o expirado");
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        setIsLoggedIn(false);
-        setShouldRedirect(true);
+        throw new Error(data.error || 'Error al completar el mantenimiento');
       }
     } catch (err) {
-      console.error("Error fetching /auth/me:", err);
+      console.error('Error marcando mantenimiento como completado:', err);
+      throw err;
+    }
+  };
+
+  // BLOQUE 3: Fetch de datos de usuario
+const fetchUserData = useCallback(async () => {
+  setLoading(true);
+  try {
+    const token = localStorage.getItem("token");
+    
+    if (!token || token === "null") {
+      console.error("❌ No hay token válido en localStorage");
+      setIsLoggedIn(false);
+      setLoading(false);
+      setShouldRedirect(true);
+      return;
+    }
+
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await response.json();
+    console.log("Datos de /auth/me:", data);
+
+    if (response.ok) {
+      setUserData(data);
+      setIsLoggedIn(true);
+      localStorage.setItem("user", JSON.stringify(data));
+      setActiveTab("perfil");
+    } else {
+      console.error("Token inválido o expirado");
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       setIsLoggedIn(false);
       setShouldRedirect(true);
-    } finally {
-      setLoading(false);
     }
-  }, []);
-
-  // BLOQUE 4: Logout
-  const handleLogout = () => {
+  } catch (err) {
+    console.error("Error fetching /auth/me:", err);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    setRedirecting(true);
-    setTimeout(() => {
-      window.location.href = "/";
-    }, 1500);
-  };
-
-  // BLOQUE 5: useEffect cargar datos
-  useEffect(() => {
-    fetchUserData();
-  }, [fetchUserData]);
-
-  // BLOQUE 6: Redirección si no hay login
-  useEffect(() => {
-    if (shouldRedirect) {
-      window.location.href = "/";
-    }
-  }, [shouldRedirect]);
-
-  // BLOQUE 7: Fetch de usuarios (solo admin)
-  const fetchUsers = useCallback(async () => {
-    if (!isAdmin) return;
-
-    setLoadingUsers(true);
-    setErrorUsers("");
-
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setUsers(data.users || []);
-      } else {
-        setErrorUsers(data.error || "Error al cargar usuarios");
-      }
-    } catch (err) {
-      console.error("Error fetching users:", err);
-      setErrorUsers("Error de conexión");
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, [isAdmin]);
-
-  // BLOQUE 7.5: Fetch de mantenimientos del mes (solo admin)
-  const fetchMantenimientosMes = useCallback(async () => {
-    if (!isAdmin) return;
-
-    setLoadingMantenimientos(true);
-    setErrorMantenimientos("");
-
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/mantenimientos-mes-actual`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setMantenimientosMes(data.mantenimientos || []);
-        setMesActual(data.mes);
-        setAnioActual(data.anio);
-      } else {
-        setErrorMantenimientos(data.error || "Error al cargar mantenimientos del mes");
-      }
-    } catch (err) {
-      console.error("Error fetching mantenimientos del mes:", err);
-      setErrorMantenimientos("Error de conexión al cargar mantenimientos");
-    } finally {
-      setLoadingMantenimientos(false);
-    }
-  }, [isAdmin]);
-
-  // BLOQUE 7.6: Fetch de técnicos (solo admin)
-  const fetchTecnicos = useCallback(async () => {
-    if (!isAdmin) return;
-
-    setLoadingTecnicos(true);
-    setErrorTecnicos("");
-
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/tecnicos`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setTecnicos(data.tecnicos || []);
-      } else {
-        setErrorTecnicos(data.error || "Error al cargar técnicos");
-      }
-    } catch (err) {
-      console.error("Error fetching técnicos:", err);
-      setErrorTecnicos("Error de conexión al cargar técnicos");
-    } finally {
-      setLoadingTecnicos(false);
-    }
-  }, [isAdmin]);
-
-  // BLOQUE 7.7: Asignar técnico a mantenimiento
-  const handleAsignarTecnico = async (mantenimientoId, tecnicoId) => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/asignar-tecnico`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ mantenimientoId, tecnicoId }),
-      });
-
-      const data = await response.json();
-      
-      if (response.ok && data.success) {
-        fetchMantenimientosMes();
-        setSuccess("Técnico asignado correctamente. Se envió notificación por correo.");
-        setTimeout(() => setSuccess(""), 5000);
-      } else {
-        setErrorMantenimientos(data.error || "Error al asignar técnico");
-      }
-    } catch (err) {
-      console.error("Error asignando técnico:", err);
-      setErrorMantenimientos("Error de conexión al asignar técnico");
-    }
-  };
-
-  // BLOQUE 7.8: Fetch de mis mantenimientos (para técnicos)
-  const fetchMisMantenimientos = useCallback(async () => {
-    setLoadingMisMantenimientos(true);
-    setErrorMisMantenimientos("");
-
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/mis-mantenimientos`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setMisMantenimientos(data.mantenimientos || []);
-      } else {
-        setErrorMisMantenimientos(data.error || "No tienes mantenimientos asignados");
-      }
-    } catch (err) {
-      console.error("Error fetching mis mantenimientos:", err);
-      setErrorMisMantenimientos("Error de conexión");
-    } finally {
-      setLoadingMisMantenimientos(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === "admin-panel" && isAdmin) {
-      fetchUsers();
-    }
-  }, [activeTab, isAdmin, fetchUsers]);
-
-  useEffect(() => {
-    if (activeTab === "mantenimientos-mes" && isAdmin) {
-      fetchMantenimientosMes();
-    }
-  }, [activeTab, isAdmin, fetchMantenimientosMes]);
-
-  useEffect(() => {
-    if (activeTab === "asignacion-tecnicos" && isAdmin) {
-      fetchMantenimientosMes();
-      fetchTecnicos();
-    }
-  }, [activeTab, isAdmin, fetchMantenimientosMes, fetchTecnicos]);
-
-  useEffect(() => {
-    if (activeTab === "mis-mantenimientos" && isTecnico) {
-      fetchMisMantenimientos();
-    }
-  }, [activeTab, isTecnico, fetchMisMantenimientos]);
-
-  // BLOQUE 8: Renderizado de carga/redirección
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm text-center">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Cargando...</h2>
-          <p className="text-gray-500 mb-6">Cargando información del perfil.</p>
-        </div>
-      </div>
-    );
+    setIsLoggedIn(false);
+    setShouldRedirect(true);
+  } finally {
+    setLoading(false);
   }
+}, []);
 
-  if (redirecting) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm text-center">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Cerrando sesión...</h2>
-          <p className="text-gray-500 mb-6">Redirigiendo al inicio.</p>
-        </div>
-      </div>
-    );
-  }
+// BLOQUE 4: Logout
+const handleLogout = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  setRedirecting(true);
+  setTimeout(() => {
+    window.location.href = "/";
+  }, 1500);
+};
 
+// BLOQUE 5: useEffect cargar datos
+useEffect(() => {
+  fetchUserData();
+}, [fetchUserData]);
+
+// BLOQUE 6: Redirección si no hay login
+useEffect(() => {
   if (shouldRedirect) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm text-center">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Redirigiendo...</h2>
-          <p className="text-gray-500 mb-6">Serás redirigido al inicio.</p>
-        </div>
-      </div>
-    );
+    window.location.href = "/";
   }
-  // BLOQUE 9: Return UI principal
+}, [shouldRedirect]);
+
+// BLOQUE 7: Fetch de usuarios (solo admin)
+const fetchUsers = useCallback(async () => {
+  if (!isAdmin) return;
+
+  setLoadingUsers(true);
+  setErrorUsers("");
+
+  try {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await response.json();
+    if (response.ok && data.success) {
+      setUsers(data.users || []);
+    } else {
+      setErrorUsers(data.error || "Error al cargar usuarios");
+    }
+  } catch (err) {
+    console.error("Error fetching users:", err);
+    setErrorUsers("Error de conexión");
+  } finally {
+    setLoadingUsers(false);
+  }
+}, [isAdmin]);
+
+// BLOQUE 7.5: Fetch de mantenimientos del mes (solo admin)
+const fetchMantenimientosMes = useCallback(async () => {
+  if (!isAdmin) return;
+
+  setLoadingMantenimientos(true);
+  setErrorMantenimientos("");
+
+  try {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/mantenimientos-mes-actual`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await response.json();
+    if (response.ok && data.success) {
+      setMantenimientosMes(data.mantenimientos || []);
+      setMesActual(data.mes);
+      setAnioActual(data.anio);
+    } else {
+      setErrorMantenimientos(data.error || "Error al cargar mantenimientos del mes");
+    }
+  } catch (err) {
+    console.error("Error fetching mantenimientos del mes:", err);
+    setErrorMantenimientos("Error de conexión al cargar mantenimientos");
+  } finally {
+    setLoadingMantenimientos(false);
+  }
+}, [isAdmin]);
+
+// BLOQUE 7.6: Fetch de técnicos (solo admin)
+const fetchTecnicos = useCallback(async () => {
+  if (!isAdmin) return;
+
+  setLoadingTecnicos(true);
+  setErrorTecnicos("");
+
+  try {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/tecnicos`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await response.json();
+    if (response.ok && data.success) {
+      setTecnicos(data.tecnicos || []);
+    } else {
+      setErrorTecnicos(data.error || "Error al cargar técnicos");
+    }
+  } catch (err) {
+    console.error("Error fetching técnicos:", err);
+    setErrorTecnicos("Error de conexión al cargar técnicos");
+  } finally {
+    setLoadingTecnicos(false);
+  }
+}, [isAdmin]);
+
+// BLOQUE 7.7: Asignar técnico a mantenimiento
+const handleAsignarTecnico = async (mantenimientoId, tecnicoId) => {
+  try {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/asignar-tecnico`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ mantenimientoId, tecnicoId }),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      fetchMantenimientosMes();
+      setSuccess("Técnico asignado correctamente. Se envió notificación por correo.");
+      setTimeout(() => setSuccess(""), 5000);
+    } else {
+      setErrorMantenimientos(data.error || "Error al asignar técnico");
+    }
+  } catch (err) {
+    console.error("Error asignando técnico:", err);
+    setErrorMantenimientos("Error de conexión al asignar técnico");
+  }
+};
+
+// BLOQUE 7.8: Fetch de mis mantenimientos (para técnicos)
+const fetchMisMantenimientos = useCallback(async () => {
+  setLoadingMisMantenimientos(true);
+  setErrorMisMantenimientos("");
+
+  try {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/mis-mantenimientos`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await response.json();
+    if (response.ok && data.success) {
+      setMisMantenimientos(data.mantenimientos || []);
+    } else {
+      setErrorMisMantenimientos(data.error || "No tienes mantenimientos asignados");
+    }
+  } catch (err) {
+    console.error("Error fetching mis mantenimientos:", err);
+    setErrorMisMantenimientos("Error de conexión");
+  } finally {
+    setLoadingMisMantenimientos(false);
+  }
+}, []);
+
+useEffect(() => {
+  if (activeTab === "admin-panel" && isAdmin) {
+    fetchUsers();
+  }
+}, [activeTab, isAdmin, fetchUsers]);
+
+useEffect(() => {
+  if (activeTab === "mantenimientos-mes" && isAdmin) {
+    fetchMantenimientosMes();
+  }
+}, [activeTab, isAdmin, fetchMantenimientosMes]);
+
+useEffect(() => {
+  if (activeTab === "asignacion-tecnicos" && isAdmin) {
+    fetchMantenimientosMes();
+    fetchTecnicos();
+  }
+}, [activeTab, isAdmin, fetchMantenimientosMes, fetchTecnicos]);
+
+useEffect(() => {
+  if (activeTab === "mis-mantenimientos" && isTecnico) {
+    fetchMisMantenimientos();
+  }
+}, [activeTab, isTecnico, fetchMisMantenimientos]);
+
+// BLOQUE 8: Renderizado de carga/redirección
+if (loading) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm text-center">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Cargando...</h2>
+        <p className="text-gray-500 mb-6">Cargando información del perfil.</p>
+      </div>
+    </div>
+  );
+}
+
+if (redirecting) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm text-center">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Cerrando sesión...</h2>
+        <p className="text-gray-500 mb-6">Redirigiendo al inicio.</p>
+      </div>
+    </div>
+  );
+}
+
+if (shouldRedirect) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm text-center">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Redirigiendo...</h2>
+        <p className="text-gray-500 mb-6">Serás redirigido al inicio.</p>
+      </div>
+    </div>
+  );
+}
+
+// BLOQUE 9: Return UI principal
 return (
   <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
     {/* Mobile Menu Button */}
@@ -1344,39 +1614,39 @@ return (
           <div>
             <h1 className="text-2xl font-bold text-gray-800 mb-4">Mis Mantenimientos Asignados</h1>
             <PanelTecnico 
-  mantenimientos={misMantenimientos}
-  loading={loadingMisMantenimientos}
-  error={errorMisMantenimientos}
-  tecnico={userData}
-  onDescargarChecklist={generarChecklistWord} 
-  onMarcarCompletado={async (mantenimientoId) => {
-    try {
-      await marcarComoCompletado(mantenimientoId);
-  
-      setMisMantenimientos(prev => 
-        prev.map(m => 
-          m.id === mantenimientoId 
-            ? { 
-                ...m, 
-                status: 'completado', 
-                completado_en: new Date().toISOString(),
-                tecnico_id: userData?.id,
-                tecnico_nombre: userData?.nombre
-              }
-            : m
-        )
-      );
-      
-      setSuccess('Mantenimiento marcado como completado correctamente');
-      setTimeout(() => setSuccess(''), 3000);
-      
-    } catch (err) {
-      console.error('Error en onMarcarCompletado:', err);
-      setErrorMisMantenimientos(err.message || 'Error al completar mantenimiento');
-      setTimeout(() => setErrorMisMantenimientos(''), 5000);
-    }
-  }}
-/>
+              mantenimientos={misMantenimientos}
+              loading={loadingMisMantenimientos}
+              error={errorMisMantenimientos}
+              tecnico={userData}
+              onAbrirChecklist={(mantenimiento) => {
+                setMantenimientoSeleccionado(mantenimiento);
+                setMostrarChecklist(true);
+              }}
+              onMarcarCompletado={async (mantenimientoId) => {
+                try {
+                  await marcarComoCompletado(mantenimientoId);
+                  setMisMantenimientos(prev => 
+                    prev.map(m => 
+                      m.id === mantenimientoId 
+                        ? { 
+                            ...m, 
+                            status: 'completado', 
+                            completado_en: new Date().toISOString(),
+                            tecnico_id: userData?.id,
+                            tecnico_nombre: userData?.nombre
+                          }
+                        : m
+                    )
+                  );
+                  setSuccess('Mantenimiento marcado como completado correctamente');
+                  setTimeout(() => setSuccess(''), 3000);
+                } catch (err) {
+                  console.error('Error en onMarcarCompletado:', err);
+                  setErrorMisMantenimientos(err.message || 'Error al completar mantenimiento');
+                  setTimeout(() => setErrorMisMantenimientos(''), 5000);
+                }
+              }}
+            />
           </div>
         ) : (
           // Perfil normal del técnico
@@ -1485,6 +1755,28 @@ return (
         </div>
       )}
     </main>
+
+    {/* MODAL DEL CHECKLIST MÓVIL */}
+    {mostrarChecklist && mantenimientoSeleccionado && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="w-full max-w-2xl max-h-[90vh] overflow-hidden">
+          <ChecklistMovil 
+            mantenimiento={mantenimientoSeleccionado}
+            tecnico={userData}
+            onCompletarChecklist={manejarChecklistCompletado}
+          />
+          <button
+            onClick={() => {
+              setMostrarChecklist(false);
+              setMantenimientoSeleccionado(null);
+            }}
+            className="mt-4 w-full bg-gray-600 text-white py-3 rounded-lg font-medium hover:bg-gray-700"
+          >
+            Cerrar Checklist
+          </button>
+        </div>
+      </div>
+    )}
   </div> 
 );
 };
