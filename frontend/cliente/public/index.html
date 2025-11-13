@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#7c3aed" />
+    <meta
+      name="description"
+      content="Sistema de gestión y mantenimiento de montacargas LiftGroup Systems"
+    />
+    
+    <!-- ========== NUEVO CÓDIGO DE FAVICON ========== -->
+    <link rel="icon" type="image/png" href="%PUBLIC_URL%/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="%PUBLIC_URL%/favicon.svg" />
+    <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="LiftGroupSystems" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <!-- ========== FIN NUEVO CÓDIGO ========== -->
+    
+    <title>LiftGroup Systems - Gestión de Montacargas</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('/sw.js')
+        .then(function(registration) {
+          console.log('Service Worker registrado: ', registration.scope);
+        })
+        .catch(function(error) {
+          console.log('Error registrando Service Worker: ', error);
+        });
+    });
+  }
+</script>
+  </body>
+</html>

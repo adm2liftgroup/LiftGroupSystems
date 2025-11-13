@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.local
+.env.production
+uploads/
+*.log
+.DS_Store
+dist/
+build/
+*.tmp
+*.temp
+
+*.pdf
+*.doc
+*.docx
+*.txt
