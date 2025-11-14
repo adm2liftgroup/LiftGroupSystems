@@ -50,7 +50,7 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   }, [mantenimientoSeleccionado]);
 
-  // FUNCIÓN: Manejar selección de imágenes para observación
+  // FUNCIÓN: Manejar selección de imágenes para observación - CORREGIDA
   const handleImagenesSelect = (e) => {
     const files = Array.from(e.target.files);
     
@@ -60,13 +60,14 @@ export default function RefaccionesCargo({ montacargas }) {
       return;
     }
 
-    // Validar cada archivo
+    // Validar cada archivo - CORREGIDO: usar file.type en lugar de file.mimetype
     const nuevasImagenes = [];
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 
     files.forEach(file => {
-      if (!allowedTypes.includes(file.mimetype)) {
-        setError(`El archivo ${file.name} no es una imagen válida`);
+      // CORRECCIÓN: Usar file.type en el frontend
+      if (!allowedTypes.includes(file.type)) {
+        setError(`El archivo ${file.name} no es una imagen válida (${file.type})`);
         return;
       }
 
@@ -97,7 +98,7 @@ export default function RefaccionesCargo({ montacargas }) {
     setImagenesObservacion(prev => prev.filter((_, i) => i !== index));
   };
 
-  // FUNCIÓN: Subir observación con imágenes
+  // FUNCIÓN: Subir observación con imágenes - MEJORADA
   const subirObservacionConImagenes = async () => {
     if (!observacionConImagenes) {
       setError('No hay observación seleccionada');
@@ -116,16 +117,33 @@ export default function RefaccionesCargo({ montacargas }) {
       const token = localStorage.getItem("token");
       const formData = new FormData();
       
-      formData.append('mantenimiento_id', observacionConImagenes.mantenimiento_id);
+      // Agregar campos como strings
+      formData.append('mantenimiento_id', observacionConImagenes.mantenimiento_id.toString());
       formData.append('descripcion', observacionConImagenes.descripcion);
       formData.append('cargo_a', observacionConImagenes.cargo_a);
       formData.append('es_evidencia', 'true');
       formData.append('estado_resolucion', 'resuelto');
 
+      // DEBUG: Mostrar información de las imágenes
+      console.log('📤 Enviando imágenes:', imagenesObservacion.map(img => ({
+        name: img.file.name,
+        type: img.file.type,
+        size: img.file.size
+      })));
+
       // Agregar todas las imágenes al FormData
       imagenesObservacion.forEach((imagen, index) => {
         formData.append('imagenes', imagen.file);
       });
+
+      // DEBUG: Verificar FormData
+      for (let [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(`📁 FormData - ${key}:`, value.name, value.type, value.size);
+        } else {
+          console.log(`📋 FormData - ${key}:`, value);
+        }
+      }
 
       const response = await fetch(
         `${process.env.REACT_APP_API_URL}/api/refacciones`,
@@ -133,6 +151,7 @@ export default function RefaccionesCargo({ montacargas }) {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
+            // NO incluir 'Content-Type': FormData lo establece automáticamente con boundary
           },
           body: formData
         }
