@@ -14,10 +14,10 @@ export default function RefaccionesCargo({ montacargas }) {
   });
   const [editandoObservacion, setEditandoObservacion] = useState(null);
   
-  // Estados para evidencias en observaciones individuales
-  const [evidenciasObservacion, setEvidenciasObservacion] = useState([]);
-  const [observacionConEvidencias, setObservacionConEvidencias] = useState(null);
-  const [subiendoEvidencias, setSubiendoEvidencias] = useState(false);
+  // Estados para manejo de múltiples imágenes
+  const [imagenesObservacion, setImagenesObservacion] = useState([]);
+  const [observacionConImagenes, setObservacionConImagenes] = useState(null);
+  const [subiendoImagenes, setSubiendoImagenes] = useState(false);
 
   const [filtros, setFiltros] = useState({
     anio: new Date().getFullYear(),
@@ -25,6 +25,8 @@ export default function RefaccionesCargo({ montacargas }) {
     tipo: '',
     status: ''
   });
+
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (montacargas && montacargas.numero) {
@@ -48,22 +50,22 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   }, [mantenimientoSeleccionado]);
 
-  // FUNCIÓN: Manejar selección de evidencias para observación individual
-  const handleEvidenciasSelect = (e) => {
+  // FUNCIÓN: Manejar selección de imágenes para observación
+  const handleImagenesSelect = (e) => {
     const files = Array.from(e.target.files);
     
     // Validar cantidad máxima (3)
-    if (evidenciasObservacion.length + files.length > 3) {
+    if (imagenesObservacion.length + files.length > 3) {
       setError('Máximo 3 imágenes permitidas');
       return;
     }
 
     // Validar cada archivo
-    const nuevasEvidencias = [];
+    const nuevasImagenes = [];
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 
     files.forEach(file => {
-      if (!allowedTypes.includes(file.type)) {
+      if (!allowedTypes.includes(file.mimetype)) {
         setError(`El archivo ${file.name} no es una imagen válida`);
         return;
       }
@@ -73,88 +75,97 @@ export default function RefaccionesCargo({ montacargas }) {
         return;
       }
 
-      nuevasEvidencias.push({
+      nuevasImagenes.push({
         file,
         preview: URL.createObjectURL(file),
-        name: file.name
+        name: file.name,
+        type: file.type
       });
     });
 
-    setEvidenciasObservacion(prev => [...prev, ...nuevasEvidencias]);
+    setImagenesObservacion(prev => [...prev, ...nuevasImagenes]);
     setError('');
+    
+    // Limpiar input file
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
-  // FUNCIÓN: Eliminar evidencia de observación
-  const removeEvidencia = (index) => {
-    setEvidenciasObservacion(prev => prev.filter((_, i) => i !== index));
+  // FUNCIÓN: Eliminar imagen específica
+  const removeImagen = (index) => {
+    setImagenesObservacion(prev => prev.filter((_, i) => i !== index));
   };
 
-  // FUNCIÓN: Subir evidencias para una observación específica
-  const subirEvidenciasObservacion = async () => {
-    if (!observacionConEvidencias) {
+  // FUNCIÓN: Subir observación con imágenes
+  const subirObservacionConImagenes = async () => {
+    if (!observacionConImagenes) {
       setError('No hay observación seleccionada');
       return;
     }
 
-    if (evidenciasObservacion.length === 0) {
-      setError('Debe agregar al menos una imagen como evidencia');
+    if (imagenesObservacion.length === 0) {
+      setError('Debe agregar al menos una imagen');
       return;
     }
 
-    setSubiendoEvidencias(true);
+    setSubiendoImagenes(true);
     setError('');
 
     try {
       const token = localStorage.getItem("token");
+      const formData = new FormData();
       
-      for (const evidencia of evidenciasObservacion) {
-        const formData = new FormData();
-        formData.append('mantenimiento_id', observacionConEvidencias.mantenimiento_id);
-        formData.append('descripcion', observacionConEvidencias.descripcion);
-        formData.append('cargo_a', observacionConEvidencias.cargo_a);
-        formData.append('es_evidencia', 'true');
-        formData.append('estado_resolucion', 'resuelto');
-        formData.append('imagen', evidencia.file);
+      formData.append('mantenimiento_id', observacionConImagenes.mantenimiento_id);
+      formData.append('descripcion', observacionConImagenes.descripcion);
+      formData.append('cargo_a', observacionConImagenes.cargo_a);
+      formData.append('es_evidencia', 'true');
+      formData.append('estado_resolucion', 'resuelto');
 
-        const response = await fetch(
-          `${process.env.REACT_APP_API_URL}/api/refacciones`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`
-            },
-            body: formData
-          }
-        );
+      // Agregar todas las imágenes al FormData
+      imagenesObservacion.forEach((imagen, index) => {
+        formData.append('imagenes', imagen.file);
+      });
 
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-          throw new Error(data.error || 'Error al subir evidencia');
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/api/refacciones`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
         }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Error al subir observación con imágenes');
       }
 
-      setSuccess(`Observación completada con ${evidenciasObservacion.length} evidencia(s)`);
-      setEvidenciasObservacion([]);
-      setObservacionConEvidencias(null);
+      setSuccess(`Observación completada con ${imagenesObservacion.length} imagen(es)`);
+      setImagenesObservacion([]);
+      setObservacionConImagenes(null);
       fetchObservaciones(mantenimientoSeleccionado.id);
       
     } catch (err) {
-      console.error('Error al subir evidencias:', err);
+      console.error('Error al subir observación con imágenes:', err);
       setError(err.message);
     } finally {
-      setSubiendoEvidencias(false);
+      setSubiendoImagenes(false);
     }
   };
 
-  // FUNCIÓN: Completar observación con evidencias
-  const completarObservacionConEvidencias = (observacion) => {
-    setObservacionConEvidencias(observacion);
-    setEvidenciasObservacion([]);
+  // FUNCIÓN: Agregar imágenes a observación existente
+  const agregarImagenesAObservacion = (observacion) => {
+    setObservacionConImagenes(observacion);
+    setImagenesObservacion([]);
   };
 
-  const handleEliminarImagen = async (observacionId) => {
-    if (!window.confirm('¿Está seguro de que desea eliminar la imagen de esta observación?')) {
+  // FUNCIÓN: Eliminar imagen específica de una observación
+  const handleEliminarImagen = async (observacionId, numeroImagen) => {
+    if (!window.confirm('¿Está seguro de que desea eliminar esta imagen?')) {
       return;
     }
 
@@ -165,7 +176,7 @@ export default function RefaccionesCargo({ montacargas }) {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/api/refacciones/${observacionId}/imagen`,
+        `${process.env.REACT_APP_API_URL}/api/refacciones/${observacionId}/imagen/${numeroImagen}`,
         {
           method: 'DELETE',
           headers: {
@@ -188,6 +199,23 @@ export default function RefaccionesCargo({ montacargas }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // FUNCIÓN: Obtener URLs de imágenes de una observación
+  const obtenerImagenesObservacion = (observacion) => {
+    const imagenes = [];
+    for (let i = 1; i <= 3; i++) {
+      const url = observacion[`imagen_url_${i}`];
+      const nombre = observacion[`imagen_nombre_${i}`];
+      if (url) {
+        imagenes.push({
+          url,
+          nombre,
+          numero: i
+        });
+      }
+    }
+    return imagenes;
   };
 
   const fetchMantenimientos = async (montacargasId) => {
@@ -553,8 +581,7 @@ export default function RefaccionesCargo({ montacargas }) {
   const getEstadoColor = (estado) => {
     switch (estado) {
       case "pendiente": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "completado": return "bg-green-100 text-green-800 border-green-200";
-      case "cancelado": return "bg-red-100 text-red-800 border-red-200";
+      case "resuelto": return "bg-green-100 text-green-800 border-green-200";
       default: return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
@@ -759,7 +786,7 @@ export default function RefaccionesCargo({ montacargas }) {
             </div>
           </div>
 
-          {/* Lista de Mantenimientos Filtrados - SIN BOTÓN DE COMPLETAR */}
+          {/* Lista de Mantenimientos Filtrados */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-800">
@@ -805,8 +832,6 @@ export default function RefaccionesCargo({ montacargas }) {
                         Técnico: <span className="font-medium">{mantenimiento.tecnico_nombre}</span>
                       </p>
                     )}
-                    
-                    {/* BOTÓN ELIMINADO: No mostrar botón de completar mantenimiento aquí */}
                   </div>
                 ))}
               </div>
@@ -949,105 +974,112 @@ export default function RefaccionesCargo({ montacargas }) {
             {mantenimientoSeleccionado ? (
               observaciones.length > 0 ? (
                 <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {observaciones.map((observacion) => (
-                    <div
-                      key={observacion.id}
-                      className="p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex gap-2 flex-wrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getEstadoColor(observacion.estado_resolucion)}`}>
-                            {observacion.estado_resolucion || 'pendiente'}
-                          </span>
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getCargoColor(observacion.cargo_a)}`}>
-                            {getCargoText(observacion.cargo_a)}
-                          </span>
-                          {(observacion.es_evidencia === 'true' || observacion.es_evidencia === true) && (
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getEvidenciaBadge(observacion.es_evidencia)}`}>
-                              📷 Evidencia
+                  {observaciones.map((observacion) => {
+                    const imagenes = obtenerImagenesObservacion(observacion);
+                    return (
+                      <div
+                        key={observacion.id}
+                        className="p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex gap-2 flex-wrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getEstadoColor(observacion.estado_resolucion)}`}>
+                              {observacion.estado_resolucion || 'pendiente'}
                             </span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* MOSTRAR IMAGEN SI EXISTE */}
-                      {observacion.imagen_url && (
-                        <div className="mb-3">
-                          <div className="relative inline-block">
-                            <img 
-                              src={observacion.imagen_url} 
-                              alt="Observación"
-                              className="h-32 w-auto rounded-md border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
-                              onClick={() => window.open(observacion.imagen_url, '_blank')}
-                            />
-                            <button
-                              onClick={() => handleEliminarImagen(observacion.id)}
-                              className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                              title="Eliminar imagen"
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getCargoColor(observacion.cargo_a)}`}>
+                              {getCargoText(observacion.cargo_a)}
+                            </span>
+                            {(observacion.es_evidencia === 'true' || observacion.es_evidencia === true) && (
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getEvidenciaBadge(observacion.es_evidencia)}`}>
+                                📷 Evidencia
+                              </span>
+                            )}
                           </div>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {observacion.imagen_nombre}
-                          </p>
                         </div>
-                      )}
-                      
-                      <p className="text-gray-800 mb-3 whitespace-pre-wrap text-sm">
-                        {observacion.descripcion}
-                      </p>
-                      
-                      <div className="text-xs text-gray-500 border-t pt-2 space-y-1">
-                        <p>
-                          Creado: {formatDate(observacion.creado_en)}
-                          {observacion.tecnico_nombre && ` por ${observacion.tecnico_nombre}`}
+                        
+                        {/* MOSTRAR MÚLTIPLES IMÁGENES SI EXISTEN */}
+                        {imagenes.length > 0 && (
+                          <div className="mb-3">
+                            <div className="grid grid-cols-2 gap-2">
+                              {imagenes.map((imagen) => (
+                                <div key={imagen.numero} className="relative">
+                                  <img 
+                                    src={imagen.url} 
+                                    alt={`Observación ${imagen.numero}`}
+                                    className="h-24 w-full object-cover rounded-md border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
+                                    onClick={() => window.open(imagen.url, '_blank')}
+                                  />
+                                  <button
+                                    onClick={() => handleEliminarImagen(observacion.id, imagen.numero)}
+                                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                    title="Eliminar imagen"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                  <p className="text-xs text-gray-500 mt-1 truncate">
+                                    {imagen.nombre}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <p className="text-gray-800 mb-3 whitespace-pre-wrap text-sm">
+                          {observacion.descripcion}
                         </p>
                         
-                        {observacion.fecha_resolucion && (
+                        <div className="text-xs text-gray-500 border-t pt-2 space-y-1">
                           <p>
-                            Resuelto: {formatDate(observacion.fecha_resolucion)}
-                            {observacion.resuelto_por_nombre && ` por ${observacion.resuelto_por_nombre}`}
+                            Creado: {formatDate(observacion.creado_en)}
+                            {observacion.tecnico_nombre && ` por ${observacion.tecnico_nombre}`}
                           </p>
-                        )}
-                      </div>
+                          
+                          {observacion.fecha_resolucion && (
+                            <p>
+                              Resuelto: {formatDate(observacion.fecha_resolucion)}
+                              {observacion.resuelto_por_nombre && ` por ${observacion.resuelto_por_nombre}`}
+                            </p>
+                          )}
+                        </div>
 
-                      <div className="flex justify-end gap-2 mt-3 pt-2 border-t">
-                        {/* BOTÓN NUEVO: Completar con evidencias - solo para observaciones pendientes */}
-                        {observacion.estado_resolucion !== 'resuelto' && (
+                        <div className="flex justify-end gap-2 mt-3 pt-2 border-t">
+                          {/* BOTÓN: Agregar imágenes a observación existente */}
+                          {observacion.estado_resolucion !== 'resuelto' && imagenes.length < 3 && (
+                            <button
+                              onClick={() => agregarImagenesAObservacion(observacion)}
+                              className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700"
+                            >
+                              📷 Agregar Imágenes
+                            </button>
+                          )}
+                          
+                          {observacion.estado_resolucion !== 'resuelto' && (
+                            <button
+                              onClick={() => handleResolverObservacion(observacion.id)}
+                              className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                            >
+                              Resolver
+                            </button>
+                          )}
                           <button
-                            onClick={() => completarObservacionConEvidencias(observacion)}
-                            className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                            onClick={() => iniciarEdicion(observacion)}
+                            className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
                           >
-                            📷 Completar
+                            Editar
                           </button>
-                        )}
-                        
-                        {observacion.estado_resolucion !== 'resuelto' && (
                           <button
-                            onClick={() => handleResolverObservacion(observacion.id)}
-                            className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                            onClick={() => handleEliminarObservacion(observacion.id)}
+                            className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
                           >
-                            Resolver
+                            Eliminar
                           </button>
-                        )}
-                        <button
-                          onClick={() => iniciarEdicion(observacion)}
-                          className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleEliminarObservacion(observacion.id)}
-                          className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
-                        >
-                          Eliminar
-                        </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8">
@@ -1074,21 +1106,21 @@ export default function RefaccionesCargo({ montacargas }) {
         </div>
       </div>
 
-      {/* Modal para subir evidencias de observación individual */}
-      {observacionConEvidencias && (
+      {/* Modal para agregar imágenes a observación existente */}
+      {observacionConImagenes && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-800">
-                📷 Completar Observación con Evidencias
+                📷 Agregar Imágenes a Observación
               </h3>
               <button
                 onClick={() => {
-                  setObservacionConEvidencias(null);
-                  setEvidenciasObservacion([]);
+                  setObservacionConImagenes(null);
+                  setImagenesObservacion([]);
                 }}
                 className="text-gray-400 hover:text-gray-600"
-                disabled={subiendoEvidencias}
+                disabled={subiendoImagenes}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1098,61 +1130,62 @@ export default function RefaccionesCargo({ montacargas }) {
             
             <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
               <p className="text-sm text-blue-800">
-                <strong>Observación:</strong> {observacionConEvidencias.descripcion}
+                <strong>Observación:</strong> {observacionConImagenes.descripcion}
               </p>
             </div>
 
             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
               <p className="text-sm text-yellow-800">
-                <strong>Importante:</strong> Suba fotos como evidencia de que esta observación ha sido completada.
-                {evidenciasObservacion.length === 0 && ' Mínimo 1 imagen, máximo 3.'}
+                <strong>Importante:</strong> Puede agregar hasta {3 - imagenesObservacion.length} imagen(es) más.
+                {imagenesObservacion.length === 0 && ' Mínimo 1 imagen, máximo 3 por observación.'}
               </p>
             </div>
 
-            {/* Selector de evidencias */}
+            {/* Selector de imágenes */}
             <div className="mb-4">
               <input
                 type="file"
                 multiple
                 accept="image/*"
-                onChange={handleEvidenciasSelect}
+                onChange={handleImagenesSelect}
                 className="hidden"
-                id="evidencias-observacion-input"
-                disabled={subiendoEvidencias || evidenciasObservacion.length >= 3}
+                id="imagenes-observacion-input"
+                ref={fileInputRef}
+                disabled={subiendoImagenes || imagenesObservacion.length >= 3}
               />
               
               <label
-                htmlFor="evidencias-observacion-input"
+                htmlFor="imagenes-observacion-input"
                 className={`block w-full border border-gray-300 rounded-md py-3 px-4 text-center cursor-pointer mb-3 ${
-                  subiendoEvidencias || evidenciasObservacion.length >= 3
+                  subiendoImagenes || imagenesObservacion.length >= 3
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                {evidenciasObservacion.length >= 3 ? '✅ Máximo alcanzado (3)' : '📸 Seleccionar Imágenes (Máx. 3)'}
+                {imagenesObservacion.length >= 3 ? '✅ Máximo alcanzado (3)' : '📸 Seleccionar Imágenes (Máx. 3)'}
               </label>
 
-              {/* Vista previa de evidencias */}
+              {/* Vista previa de imágenes */}
               <div className="space-y-3 max-h-60 overflow-y-auto">
-                {evidenciasObservacion.map((evidencia, index) => (
+                {imagenesObservacion.map((imagen, index) => (
                   <div key={index} className="relative border border-gray-200 rounded-md p-3 bg-gray-50">
                     <div className="flex items-center space-x-3">
                       <img 
-                        src={evidencia.preview} 
-                        alt={`Evidencia ${index + 1}`}
+                        src={imagen.preview} 
+                        alt={`Imagen ${index + 1}`}
                         className="h-16 w-16 object-cover rounded border"
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">
-                          {evidencia.name}
+                          {imagen.name}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {(evidencia.file.size / 1024 / 1024).toFixed(2)} MB
+                          {(imagen.file.size / 1024 / 1024).toFixed(2)} MB
                         </p>
                       </div>
                       <button
-                        onClick={() => removeEvidencia(index)}
-                        disabled={subiendoEvidencias}
+                        onClick={() => removeImagen(index)}
+                        disabled={subiendoImagenes}
                         className="bg-red-100 text-red-600 rounded-full p-1 hover:bg-red-200 disabled:opacity-50"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1166,12 +1199,12 @@ export default function RefaccionesCargo({ montacargas }) {
 
               <div className="flex justify-between items-center mt-2">
                 <p className="text-xs text-gray-500">
-                  {evidenciasObservacion.length}/3 imágenes seleccionadas
+                  {imagenesObservacion.length}/3 imágenes seleccionadas
                 </p>
-                {evidenciasObservacion.length > 0 && (
+                {imagenesObservacion.length > 0 && (
                   <button
-                    onClick={() => setEvidenciasObservacion([])}
-                    disabled={subiendoEvidencias}
+                    onClick={() => setImagenesObservacion([])}
+                    disabled={subiendoImagenes}
                     className="text-xs text-red-600 hover:text-red-800 disabled:opacity-50"
                   >
                     Limpiar todas
@@ -1182,17 +1215,17 @@ export default function RefaccionesCargo({ montacargas }) {
 
             <div className="flex gap-3 pt-4 border-t">
               <button
-                onClick={subirEvidenciasObservacion}
-                disabled={subiendoEvidencias || evidenciasObservacion.length === 0}
+                onClick={subirObservacionConImagenes}
+                disabled={subiendoImagenes || imagenesObservacion.length === 0}
                 className="flex-1 bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
-                {subiendoEvidencias ? (
+                {subiendoImagenes ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                     Subiendo...
                   </div>
                 ) : (
-                  `Completar con ${evidenciasObservacion.length} Evidencia${evidenciasObservacion.length !== 1 ? 's' : ''}`
+                  `Agregar ${imagenesObservacion.length} Imagen${imagenesObservacion.length !== 1 ? 'es' : ''}`
                 )}
               </button>
             </div>

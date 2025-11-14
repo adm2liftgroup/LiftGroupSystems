@@ -4,7 +4,7 @@ const pool = require("../db");
 const multer = require('multer');
 const { uploadImageToS3, deleteFromS3 } = require('../aws-s3');
 
-// Configurar multer para imágenes
+// Configurar multer para MÚLTIPLES imágenes
 const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
@@ -87,14 +87,13 @@ router.get("/mantenimiento/:mantenimientoId", async (req, res) => {
   }
 });
 
-// BLOQUE 3: Agregar nueva observación/refacción CON IMAGEN - CORREGIDO PARA AWS S3
-router.post("/", upload.single('imagen'), async (req, res) => {
+// BLOQUE 3: Agregar nueva observación con hasta 3 imágenes
+router.post("/", upload.array('imagenes', 3), async (req, res) => {
   try {
     console.log('📥 POST /api/refacciones recibido');
     console.log('📋 Body fields:', req.body);
-    console.log('📁 File:', req.file ? `Sí - ${req.file.originalname}` : 'No');
+    console.log('📁 Files:', req.files ? `${req.files.length} archivos` : 'Ninguno');
 
-    // Campos del body
     const { 
       mantenimiento_id, 
       descripcion,
@@ -102,14 +101,6 @@ router.post("/", upload.single('imagen'), async (req, res) => {
       estado_resolucion = 'pendiente',
       es_evidencia = 'false'
     } = req.body;
-
-    console.log('🔍 Campos recibidos:', {
-      mantenimiento_id,
-      descripcion,
-      cargo_a,
-      estado_resolucion,
-      es_evidencia
-    });
 
     // Validaciones
     if (!mantenimiento_id) {
@@ -145,23 +136,39 @@ router.post("/", upload.single('imagen'), async (req, res) => {
       });
     }
 
-    let imagen_url = null;
-    let imagen_nombre = null;
+    // Inicializar campos de imágenes
+    let imagen_url_1 = null, imagen_nombre_1 = null;
+    let imagen_url_2 = null, imagen_nombre_2 = null;
+    let imagen_url_3 = null, imagen_nombre_3 = null;
 
-    // Subir imagen si se proporcionó - CORREGIDO PARA AWS S3
-    if (req.file) {
-      try {
-        console.log('📤 Subiendo imagen a AWS S3...');
-        imagen_url = await uploadImageToS3(
-          req.file.buffer,
-          req.file.originalname,
-          req.file.mimetype
-        );
-        imagen_nombre = req.file.originalname;
-        console.log('✅ Imagen subida a S3:', imagen_url);
-      } catch (imageError) {
-        console.error('❌ Error subiendo imagen a S3:', imageError);
-        // Continuar sin la imagen
+    // Subir hasta 3 imágenes
+    if (req.files && req.files.length > 0) {
+      for (let i = 0; i < Math.min(req.files.length, 3); i++) {
+        const file = req.files[i];
+        try {
+          console.log(`📤 Subiendo imagen ${i+1}/${req.files.length} a AWS S3...`);
+          const imagen_url = await uploadImageToS3(
+            file.buffer,
+            file.originalname,
+            file.mimetype
+          );
+
+          // Asignar a los campos correspondientes
+          if (i === 0) {
+            imagen_url_1 = imagen_url;
+            imagen_nombre_1 = file.originalname;
+          } else if (i === 1) {
+            imagen_url_2 = imagen_url;
+            imagen_nombre_2 = file.originalname;
+          } else if (i === 2) {
+            imagen_url_3 = imagen_url;
+            imagen_nombre_3 = file.originalname;
+          }
+
+          console.log('✅ Imagen subida a S3:', imagen_url);
+        } catch (imageError) {
+          console.error('❌ Error subiendo imagen a S3:', imageError);
+        }
       }
     }
 
@@ -172,8 +179,9 @@ router.post("/", upload.single('imagen'), async (req, res) => {
     
     const result = await pool.query(
       `INSERT INTO observaciones_mantenimiento 
-       (mantenimiento_id, descripcion, cargo_a, estado_resolucion, creado_por, imagen_url, imagen_nombre, es_evidencia)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       (mantenimiento_id, descripcion, cargo_a, estado_resolucion, creado_por, 
+        imagen_url_1, imagen_nombre_1, imagen_url_2, imagen_nombre_2, imagen_url_3, imagen_nombre_3, es_evidencia)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         mantenimiento_id, 
@@ -181,17 +189,21 @@ router.post("/", upload.single('imagen'), async (req, res) => {
         cargo_a, 
         estado_resolucion,
         req.user?.id || null, 
-        imagen_url, 
-        imagen_nombre,
+        imagen_url_1, 
+        imagen_nombre_1,
+        imagen_url_2,
+        imagen_nombre_2,
+        imagen_url_3,
+        imagen_nombre_3,
         esEvidenciaBool
       ]
     );
 
-    console.log('✅ Observación guardada correctamente');
+    console.log('✅ Observación guardada correctamente con', req.files?.length || 0, 'imágenes');
     res.json({
       success: true,
       refaccion: result.rows[0],
-      message: "Observación/refacción agregada correctamente" + (imagen_url ? " con imagen" : "")
+      message: `Observación agregada correctamente${req.files?.length > 0 ? ` con ${req.files.length} imagen(es)` : ''}`
     });
   } catch (err) {
     console.error("❌ Error agregando refacción:", err);
@@ -202,19 +214,18 @@ router.post("/", upload.single('imagen'), async (req, res) => {
   }
 });
 
-// BLOQUE 4: Actualizar observación/refacción CON IMAGEN - CORREGIDO PARA AWS S3
-router.put("/:id", upload.single('imagen'), async (req, res) => {
+// BLOQUE 4: Actualizar observación/refacción
+router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { descripcion, cargo_a, estado_resolucion, es_evidencia } = req.body;
 
     console.log('📥 PUT /api/refacciones/' + id + ' recibido');
     console.log('📋 Body fields:', req.body);
-    console.log('📁 File:', req.file ? `Sí - ${req.file.originalname}` : 'No');
 
     // Verificar que la observación existe
     const observacionCheck = await pool.query(
-      'SELECT id, imagen_url, imagen_nombre FROM observaciones_mantenimiento WHERE id = $1',
+      'SELECT id FROM observaciones_mantenimiento WHERE id = $1',
       [id]
     );
 
@@ -225,44 +236,16 @@ router.put("/:id", upload.single('imagen'), async (req, res) => {
       });
     }
 
-    let imagen_url = observacionCheck.rows[0].imagen_url;
-    let imagen_nombre = observacionCheck.rows[0].imagen_nombre;
-
-    // Si se sube una nueva imagen - CORREGIDO PARA AWS S3
-    if (req.file) {
-      try {
-        // Eliminar imagen anterior si existe - CORREGIDO PARA AWS S3
-        if (imagen_url && imagen_url.includes('amazonaws.com')) {
-          await deleteFromS3(imagen_url);
-          console.log('✅ Imagen anterior eliminada de S3');
-        }
-
-        // Subir nueva imagen - CORREGIDO PARA AWS S3
-        console.log('📤 Subiendo nueva imagen a AWS S3...');
-        imagen_url = await uploadImageToS3(
-          req.file.buffer,
-          req.file.originalname,
-          req.file.mimetype
-        );
-        imagen_nombre = req.file.originalname;
-        console.log('✅ Nueva imagen subida a S3:', imagen_url);
-      } catch (imageError) {
-        console.error('❌ Error actualizando imagen en S3:', imageError);
-        // Mantener la imagen anterior si hay error
-      }
-    }
-
     // Convertir es_evidencia a boolean
     const esEvidenciaBool = es_evidencia === 'true' || es_evidencia === true;
 
     let query = `UPDATE observaciones_mantenimiento 
-                 SET descripcion = $1, cargo_a = $2, estado_resolucion = $3,
-                     imagen_url = $4, imagen_nombre = $5, es_evidencia = $6`;
-    let params = [descripcion, cargo_a, estado_resolucion, imagen_url, imagen_nombre, esEvidenciaBool];
+                 SET descripcion = $1, cargo_a = $2, estado_resolucion = $3, es_evidencia = $4`;
+    let params = [descripcion, cargo_a, estado_resolucion, esEvidenciaBool];
 
     // Si se marca como resuelto, agregar fecha y usuario
     if (estado_resolucion === 'resuelto') {
-      query += `, fecha_resolucion = NOW(), resuelto_por = $7`;
+      query += `, fecha_resolucion = NOW(), resuelto_por = $5`;
       params.push(req.user?.id || null);
     } else if (estado_resolucion === 'pendiente') {
       query += `, fecha_resolucion = NULL, resuelto_por = NULL`;
@@ -287,14 +270,14 @@ router.put("/:id", upload.single('imagen'), async (req, res) => {
   }
 });
 
-// BLOQUE 5: Eliminar observación/refacción - CORREGIDO PARA AWS S3
+// BLOQUE 5: Eliminar observación/refacción - ACTUALIZADO PARA 3 IMÁGENES
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Primero obtener la información para eliminar la imagen
+    // Primero obtener la información para eliminar las imágenes
     const observacion = await pool.query(
-      'SELECT imagen_url FROM observaciones_mantenimiento WHERE id = $1',
+      'SELECT imagen_url_1, imagen_url_2, imagen_url_3 FROM observaciones_mantenimiento WHERE id = $1',
       [id]
     );
 
@@ -310,10 +293,21 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    // Eliminar imagen de AWS S3 si existe - CORREGIDO PARA AWS S3
-    if (observacion.rows.length > 0 && observacion.rows[0].imagen_url) {
-      await deleteFromS3(observacion.rows[0].imagen_url);
-      console.log('✅ Imagen eliminada de AWS S3');
+    // Eliminar TODAS las imágenes de AWS S3 si existen
+    if (observacion.rows.length > 0) {
+      const obs = observacion.rows[0];
+      const imagenes = [obs.imagen_url_1, obs.imagen_url_2, obs.imagen_url_3];
+      
+      for (const imagenUrl of imagenes) {
+        if (imagenUrl && imagenUrl.includes('amazonaws.com')) {
+          try {
+            await deleteFromS3(imagenUrl);
+            console.log('✅ Imagen eliminada de AWS S3:', imagenUrl);
+          } catch (error) {
+            console.error('❌ Error eliminando imagen de S3:', error);
+          }
+        }
+      }
     }
 
     res.json({
@@ -329,14 +323,23 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// BLOQUE 6: Eliminar solo la imagen de una observación - CORREGIDO PARA AWS S3
-router.delete("/:id/imagen", async (req, res) => {
+// BLOQUE 6: Eliminar imagen específica (1, 2 o 3) - NUEVO
+router.delete("/:id/imagen/:numero", async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id, numero } = req.params;
+    const imagenNum = parseInt(numero);
+
+    if (imagenNum < 1 || imagenNum > 3) {
+      return res.status(400).json({ 
+        success: false,
+        error: "Número de imagen debe ser 1, 2 o 3" 
+      });
+    }
 
     // Obtener la observación
     const observacion = await pool.query(
-      'SELECT imagen_url FROM observaciones_mantenimiento WHERE id = $1',
+      `SELECT imagen_url_1, imagen_url_2, imagen_url_3 
+       FROM observaciones_mantenimiento WHERE id = $1`,
       [id]
     );
 
@@ -347,28 +350,32 @@ router.delete("/:id/imagen", async (req, res) => {
       });
     }
 
-    const imagen_url = observacion.rows[0].imagen_url;
+    const campoImagen = `imagen_url_${imagenNum}`;
+    const campoNombre = `imagen_nombre_${imagenNum}`;
+    const imagenUrl = observacion.rows[0][campoImagen];
 
-    if (!imagen_url) {
+    if (!imagenUrl) {
       return res.status(400).json({ 
         success: false,
         error: "No hay imagen para eliminar" 
       });
     }
 
-    // Eliminar imagen de AWS S3 - CORREGIDO PARA AWS S3
-    await deleteFromS3(imagen_url);
+    // Eliminar imagen de AWS S3
+    await deleteFromS3(imagenUrl);
+    console.log('✅ Imagen eliminada de AWS S3:', imagenUrl);
 
-    // Actualizar la observación para quitar la imagen
-    const result = await pool.query(
-      'UPDATE observaciones_mantenimiento SET imagen_url = NULL, imagen_nombre = NULL WHERE id = $1 RETURNING *',
-      [id]
-    );
+    // Actualizar la observación para quitar la imagen específica
+    const query = `UPDATE observaciones_mantenimiento 
+                   SET ${campoImagen} = NULL, ${campoNombre} = NULL 
+                   WHERE id = $1 RETURNING *`;
+
+    const result = await pool.query(query, [id]);
 
     res.json({
       success: true,
       refaccion: result.rows[0],
-      message: "Imagen eliminada correctamente"
+      message: `Imagen ${imagenNum} eliminada correctamente`
     });
   } catch (err) {
     console.error("Error eliminando imagen:", err);
