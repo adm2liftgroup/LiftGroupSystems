@@ -1374,6 +1374,253 @@ const ChecklistsCompletadosPanel = ({ checklists, loading, error }) => {
   );
 };
 
+// BLOQUE 1.10: Panel de Observaciones Resueltas del Mes
+const ObservacionesResueltasPanel = ({ observaciones, loading, error, mes, anio }) => {
+  const [observacionDetalle, setObservacionDetalle] = useState(null);
+
+  const getNombreMes = (mesNum) => {
+    const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    return meses[mesNum - 1] || "Mes desconocido";
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getEstadoColor = (estado) => {
+    switch (estado) {
+      case "resuelto": return "bg-green-100 text-green-800 border border-green-200";
+      case "pendiente": return "bg-yellow-100 text-yellow-800 border border-yellow-200";
+      default: return "bg-gray-100 text-gray-800 border border-gray-200";
+    }
+  };
+
+  const getCargoColor = (cargo) => {
+    switch (cargo) {
+      case "empresa": return "bg-blue-100 text-blue-800 border border-blue-200";
+      case "cliente": return "bg-orange-100 text-orange-800 border border-orange-200";
+      default: return "bg-gray-100 text-gray-800 border border-gray-200";
+    }
+  };
+
+  const obtenerImagenesObservacion = (observacion) => {
+    const imagenes = [];
+    for (let i = 1; i <= 3; i++) {
+      const url = observacion[`imagen_url_${i}`];
+      const nombre = observacion[`imagen_nombre_${i}`];
+      if (url) {
+        imagenes.push({
+          url,
+          nombre,
+          numero: i
+        });
+      }
+    }
+    return imagenes;
+  };
+
+  return (
+    <div className="p-4 md:p-8 bg-white rounded-2xl shadow-lg w-full max-w-6xl mx-auto">
+      <h2 className="text-2xl font-bold mb-2 text-gray-800">Observaciones Resueltas - {getNombreMes(mes)} {anio}</h2>
+      <p className="text-gray-600 mb-6">
+        Total de observaciones resueltas: {observaciones.length}
+      </p>
+      
+      {loading ? (
+        <div className="text-center py-8">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="mt-2 text-gray-600">Cargando observaciones...</p>
+        </div>
+      ) : error ? (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
+      ) : (
+        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+          {observaciones.length > 0 ? (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">MONTACARGAS</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">DESCRIPCIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">CARGO</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">TÉCNICO</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">FECHA RESOLUCIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">IMÁGENES</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ACCIONES</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {observaciones.map((observacion) => {
+                  const imagenes = obtenerImagenesObservacion(observacion);
+                  return (
+                    <tr key={observacion.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold mr-3">
+                            #{observacion.montacargas_numero}
+                          </div>
+                          <div>
+                            <strong>#{observacion.montacargas_numero}</strong>
+                            <div className="text-sm text-gray-600">{observacion.montacargas_marca}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-600 max-w-xs">
+                        <div className="line-clamp-2">{observacion.descripcion}</div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getCargoColor(observacion.cargo_a)}`}>
+                          {observacion.cargo_a === "empresa" ? "Cargo Empresa" : "Cargo Cliente"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {observacion.resuelto_por_nombre || observacion.tecnico_nombre || "N/A"}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {formatDate(observacion.fecha_resolucion)}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {imagenes.length > 0 ? (
+                          <span className="text-green-600 font-medium">{imagenes.length} imagen(es)</span>
+                        ) : (
+                          <span className="text-gray-400">Sin imágenes</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm">
+                        <button
+                          onClick={() => setObservacionDetalle(observacion)}
+                          className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                        >
+                          Ver Detalle
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <div className="text-center py-8">
+              <div className="text-gray-500 text-lg mb-2">✅</div>
+              <p className="text-gray-600">No hay observaciones resueltas para este mes.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MODAL DE DETALLE DE OBSERVACIÓN */}
+      {observacionDetalle && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Detalle de Observación Resuelta</h3>
+              <button
+                onClick={() => setObservacionDetalle(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="font-semibold text-blue-800 mb-2">Información del Equipo</h4>
+                <div className="space-y-1 text-sm">
+                  <p><strong>No. Económico:</strong> #{observacionDetalle.montacargas_numero}</p>
+                  <p><strong>Marca/Modelo:</strong> {observacionDetalle.montacargas_marca} {observacionDetalle.montacargas_modelo}</p>
+                  <p><strong>Serie:</strong> {observacionDetalle.montacargas_serie}</p>
+                  <p><strong>Ubicación:</strong> {observacionDetalle.montacargas_ubicacion}</p>
+                </div>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <h4 className="font-semibold text-green-800 mb-2">Información de la Observación</h4>
+                <div className="space-y-1 text-sm">
+                  <p><strong>Estado:</strong> 
+                    <span className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${getEstadoColor(observacionDetalle.estado_resolucion)}`}>
+                      {observacionDetalle.estado_resolucion}
+                    </span>
+                  </p>
+                  <p><strong>Cargo:</strong> 
+                    <span className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${getCargoColor(observacionDetalle.cargo_a)}`}>
+                      {observacionDetalle.cargo_a === "empresa" ? "Cargo a Empresa" : "Cargo a Cliente"}
+                    </span>
+                  </p>
+                  <p><strong>Técnico:</strong> {observacionDetalle.resuelto_por_nombre || observacionDetalle.tecnico_nombre || "N/A"}</p>
+                  <p><strong>Fecha Resolución:</strong> {formatDate(observacionDetalle.fecha_resolucion)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <h4 className="font-semibold mb-2">Descripción de la Observación</h4>
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <p className="text-gray-800 whitespace-pre-wrap">{observacionDetalle.descripcion}</p>
+              </div>
+            </div>
+
+            {/* IMÁGENES DE LA OBSERVACIÓN */}
+            {obtenerImagenesObservacion(observacionDetalle).length > 0 && (
+              <div className="mb-4">
+                <h4 className="font-semibold mb-3">Evidencias Fotográficas</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {obtenerImagenesObservacion(observacionDetalle).map((imagen) => (
+                    <div key={imagen.numero} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <img 
+                        src={imagen.url} 
+                        alt={`Evidencia ${imagen.numero}`}
+                        className="w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => window.open(imagen.url, '_blank')}
+                      />
+                      <div className="p-2 bg-gray-50">
+                        <p className="text-xs text-gray-600 truncate">{imagen.nombre}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
+                <h4 className="font-semibold text-yellow-800 mb-1">Fecha de Creación</h4>
+                <p className="text-sm">{formatDate(observacionDetalle.creado_en)}</p>
+                {observacionDetalle.tecnico_nombre && (
+                  <p className="text-xs text-gray-600 mt-1">Creado por: {observacionDetalle.tecnico_nombre}</p>
+                )}
+              </div>
+              
+              <div className="bg-green-50 p-3 rounded border border-green-200">
+                <h4 className="font-semibold text-green-800 mb-1">Fecha de Resolución</h4>
+                <p className="text-sm">{formatDate(observacionDetalle.fecha_resolucion)}</p>
+                {observacionDetalle.resuelto_por_nombre && (
+                  <p className="text-xs text-gray-600 mt-1">Resuelto por: {observacionDetalle.resuelto_por_nombre}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setObservacionDetalle(null)}
+                className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 // BLOQUE 2: Componente Principal Perfil - CORREGIDO
 const Perfil = () => {
 
@@ -1409,6 +1656,10 @@ const Perfil = () => {
 
   const [mostrarChecklist, setMostrarChecklist] = useState(false);
   const [mantenimientoSeleccionado, setMantenimientoSeleccionado] = useState(null);
+
+  const [observacionesResueltas, setObservacionesResueltas] = useState([]);
+  const [loadingObservaciones, setLoadingObservaciones] = useState(false);
+  const [errorObservaciones, setErrorObservaciones] = useState("");
 
   const [uiState, setUiState] = useState({
     loading: false,
@@ -1843,6 +2094,43 @@ useEffect(() => {
   }
 }, [activeTab, isAdmin, fetchChecklistsCompletados]);
 
+// BLOQUE 7.11: Función para cargar observaciones resueltas del mes
+  const fetchObservacionesResueltas = useCallback(async () => {
+    if (!isAdmin) return;
+
+    setLoadingObservaciones(true);
+    setErrorObservaciones("");
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/api/refacciones/observaciones-resueltas-mes?mes=${mesActual}&anio=${anioActual}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setObservacionesResueltas(data.observaciones || []);
+      } else {
+        setErrorObservaciones(data.error || "Error al cargar observaciones resueltas");
+      }
+    } catch (err) {
+      console.error("Error fetching observaciones resueltas:", err);
+      setErrorObservaciones("Error de conexión al cargar observaciones");
+    } finally {
+      setLoadingObservaciones(false);
+    }
+  }, [isAdmin, mesActual, anioActual]);
+
+  // BLOQUE 7.12: Cargar observaciones cuando se active la pestaña
+  useEffect(() => {
+    if (activeTab === "observaciones-resueltas" && isAdmin) {
+      fetchObservacionesResueltas();
+    }
+  }, [activeTab, isAdmin, fetchObservacionesResueltas]);
+
 // BLOQUE 8: Renderizado de carga/redirección
 if (loading) {
   return (
@@ -1896,7 +2184,7 @@ return (
       </div>
     </div>
 
-    {/* Mobile Menu */}
+    {/* Mobile Menu - ACTUALIZADO */}
     {mobileMenuOpen && (
       <div className="md:hidden bg-slate-800 text-white p-4">
         <nav className="space-y-2">
@@ -1923,12 +2211,19 @@ return (
                 <span>Asignación de Técnicos</span>
               </button>
 
-              {/* NUEVO BOTÓN PARA CHECKLISTS */}
               <button onClick={() => { setActiveTab("checklists-completados"); setMobileMenuOpen(false); }}
                 className={`w-full text-left flex items-center space-x-3 p-3 rounded-xl font-medium transition-colors duration-200 ${
                   activeTab === "checklists-completados" ? "bg-slate-700 text-white" : "text-gray-300 hover:bg-slate-700"
                 }`}>
                 <span>Checklists Completados</span>
+              </button>
+
+              {/* NUEVO BOTÓN PARA OBSERVACIONES RESUELTAS */}
+              <button onClick={() => { setActiveTab("observaciones-resueltas"); setMobileMenuOpen(false); }}
+                className={`w-full text-left flex items-center space-x-3 p-3 rounded-xl font-medium transition-colors duration-200 ${
+                  activeTab === "observaciones-resueltas" ? "bg-slate-700 text-white" : "text-gray-300 hover:bg-slate-700"
+                }`}>
+                <span>Observaciones Resueltas</span>
               </button>
             </>
           )}
@@ -1945,7 +2240,7 @@ return (
       </div>
     )}
 
-    {/* Sidebar Desktop */}
+    {/* Sidebar Desktop - ACTUALIZADO */}
     <div className="hidden md:flex flex-col bg-slate-900 text-white w-64 p-6 shadow-xl">
       <h1 className="text-xl font-bold mb-8">Panel de Usuario</h1>
       <nav className="flex-1 space-y-4">
@@ -1972,12 +2267,19 @@ return (
               <span>Asignación de Técnicos</span>
             </button>
 
-            {/* NUEVO BOTÓN PARA CHECKLISTS */}
             <button onClick={() => setActiveTab("checklists-completados")}
               className={`w-full text-left flex items-center space-x-3 p-3 rounded-xl font-medium transition-colors duration-200 ${
                 activeTab === "checklists-completados" ? "bg-slate-700 text-white" : "text-gray-300 hover:bg-slate-800"
               }`}>
               <span>Checklists Completados</span>
+            </button>
+
+            {/* NUEVO BOTÓN PARA OBSERVACIONES RESUELTAS */}
+            <button onClick={() => setActiveTab("observaciones-resueltas")}
+              className={`w-full text-left flex items-center space-x-3 p-3 rounded-xl font-medium transition-colors duration-200 ${
+                activeTab === "observaciones-resueltas" ? "bg-slate-700 text-white" : "text-gray-300 hover:bg-slate-800"
+              }`}>
+              <span>Observaciones Resueltas</span>
             </button>
           </>
         )}
@@ -1993,23 +2295,23 @@ return (
       </nav>
     </div>
 
-    {/* Contenido Principal */}
+    {/* Contenido Principal - ACTUALIZADO */}
     <main className="flex-1 p-4 md:p-6">
-      {/* Mensajes de éxito y error */}
+      {/* Mensajes de éxito y error - ACTUALIZADO */}
       {success && (
         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
           {success}
         </div>
       )}
       
-      {/* ACTUALIZADO: Incluir errorChecklists */}
-      {(errorMantenimientos || errorTecnicos || errorUsers || errorMisMantenimientos || errorChecklists) && (
+      {/* ACTUALIZADO: Incluir errorObservaciones */}
+      {(errorMantenimientos || errorTecnicos || errorUsers || errorMisMantenimientos || errorChecklists || errorObservaciones) && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {errorMantenimientos || errorTecnicos || errorUsers || errorMisMantenimientos || errorChecklists}
+          {errorMantenimientos || errorTecnicos || errorUsers || errorMisMantenimientos || errorChecklists || errorObservaciones}
         </div>
       )}
 
-      {/* Contenido según el tipo de usuario y pestaña activa */}
+      {/* Contenido según el tipo de usuario y pestaña activa - ACTUALIZADO */}
       {isTecnico ? (
         // USUARIO TÉCNICO
         activeTab === "mis-mantenimientos" ? (
@@ -2079,7 +2381,7 @@ return (
           </div>
         )
       ) : isAdmin ? (
-        // ADMINISTRADOR
+        // ADMINISTRADOR - ACTUALIZADO
         <>
           {activeTab === "perfil" ? (
             <div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -2128,13 +2430,26 @@ return (
             </div>
 
           ) : activeTab === "checklists-completados" ? (
-            // NUEVO PANEL PARA CHECKLISTS COMPLETADOS
+            // PANEL PARA CHECKLISTS COMPLETADOS
             <div>
               <h1 className="text-2xl font-bold text-gray-800 mb-4">Checklists Completados</h1>
               <ChecklistsCompletadosPanel 
                 checklists={checklistsCompletados}
                 loading={loadingChecklists}
                 error={errorChecklists}
+              />
+            </div>
+
+          ) : activeTab === "observaciones-resueltas" ? (
+            // NUEVO PANEL PARA OBSERVACIONES RESUELTAS
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800 mb-4">Observaciones Resueltas del Mes</h1>
+              <ObservacionesResueltasPanel 
+                observaciones={observacionesResueltas}
+                loading={loadingObservaciones}
+                error={errorObservaciones}
+                mes={mesActual}
+                anio={anioActual}
               />
             </div>
           ) : null}
