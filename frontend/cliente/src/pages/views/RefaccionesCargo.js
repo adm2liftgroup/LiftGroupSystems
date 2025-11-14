@@ -63,6 +63,7 @@ export default function RefaccionesCargo({ montacargas }) {
   const isTecnico = () => userRole === 'tecnico';
   const isAdmin = () => userRole === 'admin';
   const canAddRefacciones = () => isTecnico();
+  const canDeleteImages = () => isTecnico() || isAdmin(); // Técnicos Y administradores pueden eliminar imágenes
 
   // FUNCIÓN: Manejar selección de imágenes para observación
   const handleImagenesSelect = (e) => {
@@ -187,9 +188,9 @@ export default function RefaccionesCargo({ montacargas }) {
     setImagenesObservacion([]);
   };
 
-  // FUNCIÓN: Eliminar imagen específica de una observación - SOLO TÉCNICOS
+  // FUNCIÓN: Eliminar imagen específica de una observación - TÉCNICOS Y ADMINS
   const handleEliminarImagen = async (observacionId, numeroImagen) => {
-    if (!canAddRefacciones()) {
+    if (!canDeleteImages()) {
       setError('❌ No tienes permisos para eliminar imágenes');
       return;
     }
@@ -733,7 +734,7 @@ export default function RefaccionesCargo({ montacargas }) {
       {isAdmin() && (
         <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-6">
           <p className="text-sm">
-            <strong>Modo de solo lectura:</strong> Como administrador, puedes visualizar todas las observaciones pero no modificarlas.
+            <strong>Modo de solo lectura:</strong> Como administrador, puedes visualizar todas las observaciones y eliminar imágenes, pero no puedes modificar las observaciones.
           </p>
         </div>
       )}
@@ -1086,8 +1087,8 @@ export default function RefaccionesCargo({ montacargas }) {
                                     className="h-24 w-full object-cover rounded-md border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
                                     onClick={() => window.open(imagen.url, '_blank')}
                                   />
-                                  {/* Botón eliminar imagen solo para técnicos */}
-                                  {canAddRefacciones() && (
+                                  {/* Botón eliminar imagen para TÉCNICOS Y ADMINS */}
+                                  {canDeleteImages() && (
                                     <button
                                       onClick={() => handleEliminarImagen(observacion.id, imagen.numero)}
                                       className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
