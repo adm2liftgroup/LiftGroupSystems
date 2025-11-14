@@ -486,4 +486,57 @@ router.get("/estadisticas", async (req, res) => {
   }
 });
 
+// BLOQUE 9: Obtener observaciones resueltas del mes actual - NUEVA RUTA
+router.get("/observaciones-resueltas-mes", async (req, res) => {
+  try {
+    const { mes, anio } = req.query;
+    
+    // Si no se proporcionan mes y año, usar el mes actual
+    const mesActual = mes ? parseInt(mes) : new Date().getMonth() + 1;
+    const anioActual = anio ? parseInt(anio) : new Date().getFullYear();
+
+    console.log(`📊 Buscando observaciones resueltas para mes: ${mesActual}, año: ${anioActual}`);
+
+    const q = await pool.query(
+      `SELECT 
+        om.*,
+        mp.tipo as mantenimiento_tipo,
+        mp.fecha as mantenimiento_fecha,
+        m.numero as montacargas_numero,
+        m."Marca" as montacargas_marca,
+        m."Modelo" as montacargas_modelo,
+        m."Serie" as montacargas_serie,
+        m."Ubicacion" as montacargas_ubicacion,
+        u1.nombre as tecnico_nombre,
+        u2.nombre as resuelto_por_nombre
+       FROM observaciones_mantenimiento om
+       JOIN mantenimientos_programados mp ON om.mantenimiento_id = mp.id
+       JOIN "Montacargas" m ON mp.montacargas_id = m.numero
+       LEFT JOIN "Usuarios" u1 ON om.creado_por = u1.id
+       LEFT JOIN "Usuarios" u2 ON om.resuelto_por = u2.id
+       WHERE om.estado_resolucion = 'resuelto'
+         AND EXTRACT(MONTH FROM om.fecha_resolucion) = $1
+         AND EXTRACT(YEAR FROM om.fecha_resolucion) = $2
+       ORDER BY om.fecha_resolucion DESC`,
+      [mesActual, anioActual]
+    );
+
+    console.log(`✅ Encontradas ${q.rows.length} observaciones resueltas`);
+
+    res.json({
+      success: true,
+      observaciones: q.rows,
+      mes: mesActual,
+      anio: anioActual,
+      total: q.rows.length
+    });
+  } catch (err) {
+    console.error("❌ Error obteniendo observaciones resueltas:", err);
+    res.status(500).json({ 
+      success: false,
+      error: "Error al obtener observaciones resueltas" 
+    });
+  }
+});
+
 module.exports = router;
