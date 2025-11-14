@@ -26,7 +26,16 @@ export default function RefaccionesCargo({ montacargas }) {
     status: ''
   });
 
+  // Estado para el rol del usuario
+  const [userRole, setUserRole] = useState('user');
+
   const fileInputRef = useRef(null);
+
+  // Obtener el rol del usuario al cargar el componente
+  useEffect(() => {
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    setUserRole(userData.rol || 'user');
+  }, []);
 
   useEffect(() => {
     if (montacargas && montacargas.numero) {
@@ -50,7 +59,12 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   }, [mantenimientoSeleccionado]);
 
-  // FUNCIÓN: Manejar selección de imágenes para observación - CORREGIDA
+  // FUNCIONES PARA VERIFICAR ROLES
+  const isTecnico = () => userRole === 'tecnico';
+  const isAdmin = () => userRole === 'admin';
+  const canAddRefacciones = () => isTecnico();
+
+  // FUNCIÓN: Manejar selección de imágenes para observación
   const handleImagenesSelect = (e) => {
     const files = Array.from(e.target.files);
     
@@ -60,12 +74,11 @@ export default function RefaccionesCargo({ montacargas }) {
       return;
     }
 
-    // Validar cada archivo - CORREGIDO: usar file.type en lugar de file.mimetype
+    // Validar cada archivo
     const nuevasImagenes = [];
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 
     files.forEach(file => {
-      // CORRECCIÓN: Usar file.type en el frontend
       if (!allowedTypes.includes(file.type)) {
         setError(`El archivo ${file.name} no es una imagen válida (${file.type})`);
         return;
@@ -98,8 +111,13 @@ export default function RefaccionesCargo({ montacargas }) {
     setImagenesObservacion(prev => prev.filter((_, i) => i !== index));
   };
 
-  // FUNCIÓN: Subir observación con imágenes - MEJORADA
+  // FUNCIÓN: Subir observación con imágenes - SOLO TÉCNICOS
   const subirObservacionConImagenes = async () => {
+    if (!canAddRefacciones()) {
+      setError('❌ No tienes permisos para agregar observaciones');
+      return;
+    }
+
     if (!observacionConImagenes) {
       setError('No hay observación seleccionada');
       return;
@@ -124,26 +142,10 @@ export default function RefaccionesCargo({ montacargas }) {
       formData.append('es_evidencia', 'true');
       formData.append('estado_resolucion', 'resuelto');
 
-      // DEBUG: Mostrar información de las imágenes
-      console.log('📤 Enviando imágenes:', imagenesObservacion.map(img => ({
-        name: img.file.name,
-        type: img.file.type,
-        size: img.file.size
-      })));
-
       // Agregar todas las imágenes al FormData
       imagenesObservacion.forEach((imagen, index) => {
         formData.append('imagenes', imagen.file);
       });
-
-      // DEBUG: Verificar FormData
-      for (let [key, value] of formData.entries()) {
-        if (value instanceof File) {
-          console.log(`📁 FormData - ${key}:`, value.name, value.type, value.size);
-        } else {
-          console.log(`📋 FormData - ${key}:`, value);
-        }
-      }
 
       const response = await fetch(
         `${process.env.REACT_APP_API_URL}/api/refacciones`,
@@ -151,7 +153,6 @@ export default function RefaccionesCargo({ montacargas }) {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
-            // NO incluir 'Content-Type': FormData lo establece automáticamente con boundary
           },
           body: formData
         }
@@ -176,14 +177,23 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   };
 
-  // FUNCIÓN: Agregar imágenes a observación existente
+  // FUNCIÓN: Agregar imágenes a observación existente - SOLO TÉCNICOS
   const agregarImagenesAObservacion = (observacion) => {
+    if (!canAddRefacciones()) {
+      setError('❌ No tienes permisos para agregar imágenes');
+      return;
+    }
     setObservacionConImagenes(observacion);
     setImagenesObservacion([]);
   };
 
-  // FUNCIÓN: Eliminar imagen específica de una observación
+  // FUNCIÓN: Eliminar imagen específica de una observación - SOLO TÉCNICOS
   const handleEliminarImagen = async (observacionId, numeroImagen) => {
+    if (!canAddRefacciones()) {
+      setError('❌ No tienes permisos para eliminar imágenes');
+      return;
+    }
+
     if (!window.confirm('¿Está seguro de que desea eliminar esta imagen?')) {
       return;
     }
@@ -367,6 +377,11 @@ export default function RefaccionesCargo({ montacargas }) {
   const handleSubmitObservacion = async (e) => {
     e.preventDefault();
     
+    if (!canAddRefacciones()) {
+      setError('❌ No tienes permisos para agregar observaciones');
+      return;
+    }
+
     if (!mantenimientoSeleccionado) {
       setError('Debe seleccionar un mantenimiento primero');
       return;
@@ -428,6 +443,11 @@ export default function RefaccionesCargo({ montacargas }) {
   const handleEditarObservacion = async (e) => {
     e.preventDefault();
     
+    if (!canAddRefacciones()) {
+      setError('❌ No tienes permisos para editar observaciones');
+      return;
+    }
+    
     if (!editandoObservacion || !editandoObservacion.descripcion.trim()) {
       setError('La descripción es requerida');
       return;
@@ -482,6 +502,11 @@ export default function RefaccionesCargo({ montacargas }) {
   };
 
   const handleEliminarObservacion = async (observacionId) => {
+    if (!canAddRefacciones()) {
+      setError('❌ No tienes permisos para eliminar observaciones');
+      return;
+    }
+
     if (!window.confirm('¿Está seguro de que desea eliminar esta observación?')) {
       return;
     }
@@ -519,6 +544,11 @@ export default function RefaccionesCargo({ montacargas }) {
   };
 
   const handleResolverObservacion = async (observacionId) => {
+    if (!canAddRefacciones()) {
+      setError('❌ No tienes permisos para resolver observaciones');
+      return;
+    }
+
     setLoading(true);
     setError('');
     setSuccess('');
@@ -577,6 +607,10 @@ export default function RefaccionesCargo({ montacargas }) {
   };
 
   const iniciarEdicion = (observacion) => {
+    if (!canAddRefacciones()) {
+      setError('❌ No tienes permisos para editar observaciones');
+      return;
+    }
     setEditandoObservacion({ ...observacion });
     setError('');
     setSuccess('');
@@ -672,15 +706,37 @@ export default function RefaccionesCargo({ montacargas }) {
 
   return (
     <div className="p-6">
-      {/* Encabezado */}
+      {/* Encabezado con indicador de rol */}
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">
-          Gestión de Observaciones - Montacargas #{montacargas.numero}
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2 sm:mb-0">
+            Gestión de Observaciones - Montacargas #{montacargas.numero}
+          </h2>
+          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+            isAdmin() 
+              ? 'bg-green-100 text-green-800 border border-green-200' 
+              : isTecnico()
+              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+              : 'bg-gray-100 text-gray-800 border border-gray-200'
+          }`}>
+            {isAdmin() ? 'Administrador' : isTecnico() ? 'Técnico' : 'Usuario'}
+          </div>
+        </div>
         <p className="text-gray-600">
-          Registre y gestione las observaciones, fallas y refacciones necesarias encontradas durante los mantenimientos.
+          {isAdmin() 
+            ? 'Visualización de observaciones, fallas y refacciones de mantenimientos.' 
+            : 'Registre y gestione las observaciones, fallas y refacciones necesarias encontradas durante los mantenimientos.'}
         </p>
       </div>
+
+      {/* Mensaje informativo para administradores */}
+      {isAdmin() && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-6">
+          <p className="text-sm">
+            <strong>Modo de solo lectura:</strong> Como administrador, puedes visualizar todas las observaciones pero no modificarlas.
+          </p>
+        </div>
+      )}
 
       {/* Mensajes de estado */}
       {error && (
@@ -869,115 +925,117 @@ export default function RefaccionesCargo({ montacargas }) {
           </div>
         </div>
 
-        {/* Columna 2: Formulario para agregar observación (SIN IMÁGENES) */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              {editandoObservacion ? 'Editar Observación' : 'Nueva Observación'}
-            </h3>
-            
-            {mantenimientoSeleccionado ? (
-              <div>
-                {/* Información del mantenimiento seleccionado */}
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-sm font-medium text-blue-800">
-                    Mantenimiento seleccionado:
-                  </p>
-                  <p className="text-sm text-blue-700">
-                    {nombresMeses[mantenimientoSeleccionado.mes]} {mantenimientoSeleccionado.anio} - {mantenimientoSeleccionado.tipo}
-                  </p>
-                  <p className={`text-sm font-medium ${getEstadoColor(mantenimientoSeleccionado.status)} px-2 py-1 rounded-full inline-block mt-1`}>
-                    Estado: {mantenimientoSeleccionado.status}
-                  </p>
-                </div>
+        {/* Columna 2: Formulario para agregar observación (SOLO TÉCNICOS) */}
+        {canAddRefacciones() && (
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                {editandoObservacion ? 'Editar Observación' : 'Nueva Observación'}
+              </h3>
+              
+              {mantenimientoSeleccionado ? (
+                <div>
+                  {/* Información del mantenimiento seleccionado */}
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm font-medium text-blue-800">
+                      Mantenimiento seleccionado:
+                    </p>
+                    <p className="text-sm text-blue-700">
+                      {nombresMeses[mantenimientoSeleccionado.mes]} {mantenimientoSeleccionado.anio} - {mantenimientoSeleccionado.tipo}
+                    </p>
+                    <p className={`text-sm font-medium ${getEstadoColor(mantenimientoSeleccionado.status)} px-2 py-1 rounded-full inline-block mt-1`}>
+                      Estado: {mantenimientoSeleccionado.status}
+                    </p>
+                  </div>
 
-                <form onSubmit={editandoObservacion ? handleEditarObservacion : handleSubmitObservacion}>
-                  <div className="space-y-4">
-                    {editandoObservacion && (
+                  <form onSubmit={editandoObservacion ? handleEditarObservacion : handleSubmitObservacion}>
+                    <div className="space-y-4">
+                      {editandoObservacion && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Estado
+                          </label>
+                          <select
+                            name="estado_resolucion"
+                            value={editandoObservacion.estado_resolucion || 'pendiente'}
+                            onChange={handleEditInputChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value="pendiente">Pendiente</option>
+                            <option value="resuelto">Resuelto</option>
+                          </select>
+                        </div>
+                      )}
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Estado
+                          Descripción de la observación *
+                        </label>
+                        <textarea
+                          name="descripcion"
+                          value={editandoObservacion ? editandoObservacion.descripcion : formData.descripcion}
+                          onChange={editandoObservacion ? handleEditInputChange : handleInputChange}
+                          rows="4"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="Describa la falla encontrada, refacción necesaria, o observación del mantenimiento..."
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Cargo de la reparación
                         </label>
                         <select
-                          name="estado_resolucion"
-                          value={editandoObservacion.estado_resolucion || 'pendiente'}
-                          onChange={handleEditInputChange}
+                          name="cargo_a"
+                          value={editandoObservacion ? editandoObservacion.cargo_a : formData.cargo_a}
+                          onChange={editandoObservacion ? handleEditInputChange : handleInputChange}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                         >
-                          <option value="pendiente">Pendiente</option>
-                          <option value="resuelto">Resuelto</option>
+                          <option value="empresa">Cargo a Empresa</option>
+                          <option value="cliente">Cargo a Cliente</option>
                         </select>
                       </div>
-                    )}
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Descripción de la observación *
-                      </label>
-                      <textarea
-                        name="descripcion"
-                        value={editandoObservacion ? editandoObservacion.descripcion : formData.descripcion}
-                        onChange={editandoObservacion ? handleEditInputChange : handleInputChange}
-                        rows="4"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Describa la falla encontrada, refacción necesaria, o observación del mantenimiento..."
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Cargo de la reparación
-                      </label>
-                      <select
-                        name="cargo_a"
-                        value={editandoObservacion ? editandoObservacion.cargo_a : formData.cargo_a}
-                        onChange={editandoObservacion ? handleEditInputChange : handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="empresa">Cargo a Empresa</option>
-                        <option value="cliente">Cargo a Cliente</option>
-                      </select>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {loading ? 'Guardando...' : editandoObservacion ? 'Actualizar' : 'Agregar Observación'}
-                      </button>
-                      
-                      {editandoObservacion && (
+                      <div className="flex gap-3">
                         <button
-                          type="button"
-                          onClick={cancelarEdicion}
+                          type="submit"
                           disabled={loading}
-                          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Cancelar
+                          {loading ? 'Guardando...' : editandoObservacion ? 'Actualizar' : 'Agregar Observación'}
                         </button>
-                      )}
+                        
+                        {editandoObservacion && (
+                          <button
+                            type="button"
+                            onClick={cancelarEdicion}
+                            disabled={loading}
+                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Cancelar
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </form>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <p className="text-gray-500">
-                  Seleccione un mantenimiento para agregar observaciones.
-                </p>
-              </div>
-            )}
+                  </form>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <p className="text-gray-500">
+                    Seleccione un mantenimiento para agregar observaciones.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Columna 3: Lista de observaciones existentes */}
-        <div className="lg:col-span-1">
+        <div className={`${canAddRefacciones() ? 'lg:col-span-1' : 'lg:col-span-2'}`}>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-800">
@@ -1028,15 +1086,18 @@ export default function RefaccionesCargo({ montacargas }) {
                                     className="h-24 w-full object-cover rounded-md border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
                                     onClick={() => window.open(imagen.url, '_blank')}
                                   />
-                                  <button
-                                    onClick={() => handleEliminarImagen(observacion.id, imagen.numero)}
-                                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                                    title="Eliminar imagen"
-                                  >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                  </button>
+                                  {/* Botón eliminar imagen solo para técnicos */}
+                                  {canAddRefacciones() && (
+                                    <button
+                                      onClick={() => handleEliminarImagen(observacion.id, imagen.numero)}
+                                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                      title="Eliminar imagen"
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                  )}
                                   <p className="text-xs text-gray-500 mt-1 truncate">
                                     {imagen.nombre}
                                   </p>
@@ -1064,38 +1125,41 @@ export default function RefaccionesCargo({ montacargas }) {
                           )}
                         </div>
 
-                        <div className="flex justify-end gap-2 mt-3 pt-2 border-t">
-                          {/* BOTÓN: Agregar imágenes a observación existente */}
-                          {observacion.estado_resolucion !== 'resuelto' && imagenes.length < 3 && (
+                        {/* BOTONES DE ACCIÓN SOLO PARA TÉCNICOS */}
+                        {canAddRefacciones() && (
+                          <div className="flex justify-end gap-2 mt-3 pt-2 border-t">
+                            {/* BOTÓN: Agregar imágenes a observación existente */}
+                            {observacion.estado_resolucion !== 'resuelto' && imagenes.length < 3 && (
+                              <button
+                                onClick={() => agregarImagenesAObservacion(observacion)}
+                                className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700"
+                              >
+                                📷 Agregar Imágenes
+                              </button>
+                            )}
+                            
+                            {observacion.estado_resolucion !== 'resuelto' && (
+                              <button
+                                onClick={() => handleResolverObservacion(observacion.id)}
+                                className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                              >
+                                Resolver
+                              </button>
+                            )}
                             <button
-                              onClick={() => agregarImagenesAObservacion(observacion)}
-                              className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700"
+                              onClick={() => iniciarEdicion(observacion)}
+                              className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
                             >
-                              📷 Agregar Imágenes
+                              Editar
                             </button>
-                          )}
-                          
-                          {observacion.estado_resolucion !== 'resuelto' && (
                             <button
-                              onClick={() => handleResolverObservacion(observacion.id)}
-                              className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                              onClick={() => handleEliminarObservacion(observacion.id)}
+                              className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
                             >
-                              Resolver
+                              Eliminar
                             </button>
-                          )}
-                          <button
-                            onClick={() => iniciarEdicion(observacion)}
-                            className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleEliminarObservacion(observacion.id)}
-                            className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
-                          >
-                            Eliminar
-                          </button>
-                        </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1125,8 +1189,8 @@ export default function RefaccionesCargo({ montacargas }) {
         </div>
       </div>
 
-      {/* Modal para agregar imágenes a observación existente */}
-      {observacionConImagenes && (
+      {/* Modal para agregar imágenes a observación existente (SOLO TÉCNICOS) */}
+      {observacionConImagenes && canAddRefacciones() && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
