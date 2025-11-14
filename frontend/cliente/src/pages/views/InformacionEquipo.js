@@ -125,10 +125,12 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
 
       console.log('📥 Iniciando descarga de:', fileUrl);
 
-      const encodedUrl = encodeURIComponent(fileUrl);
-      const downloadUrl = `${API_URL}/api/montacargas/documento/${encodedUrl}`;
-      
-      console.log('🌐 Descargando a través del backend:', downloadUrl);
+      // Para AWS S3, podemos descargar directamente sin pasar por el backend
+      const downloadUrl = fileUrl.includes('amazonaws.com') 
+        ? fileUrl // Descarga directa desde S3
+        : `${API_URL}/api/montacargas/documento/${encodeURIComponent(fileUrl)}`; // Para URLs antiguas
+        
+      console.log('🌐 Descargando desde:', downloadUrl);
 
       const a = document.createElement('a');
       a.style.display = 'none';
@@ -136,7 +138,13 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
 
       let fileName = 'documento.pdf';
       try {
-        if (fileUrl.includes('cloudinary')) {
+        if (fileUrl.includes('amazonaws.com')) {
+          // Extraer nombre de archivo de URL de S3
+          const urlParts = fileUrl.split('/');
+          const s3FileName = urlParts[urlParts.length - 1];
+          // Remover timestamp del nombre
+          fileName = s3FileName.replace(/^\d+-/, '');
+        } else if (fileUrl.includes('cloudinary')) {
           const urlParts = fileUrl.split('/');
           const publicIdPart = urlParts[urlParts.length - 1];
           const publicId = decodeURIComponent(publicIdPart.split('?')[0]);
@@ -226,7 +234,12 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
     
     let ext = '';
     
-    if (fileUrl.includes('cloudinary')) {
+    // Detectar si es URL de AWS S3
+    if (fileUrl.includes('amazonaws.com')) {
+      const urlParts = fileUrl.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      ext = fileName.split('.').pop().toLowerCase();
+    } else if (fileUrl.includes('cloudinary')) {
       ext = 'pdf';
     } else {
       ext = fileUrl.split('.').pop().toLowerCase();
@@ -241,7 +254,13 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
   const formatFileName = (fileUrl) => {
     if (!fileUrl) return '';
     
-    if (fileUrl.includes('cloudinary')) {
+    if (fileUrl.includes('amazonaws.com')) {
+      const urlParts = fileUrl.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      // Remover el timestamp y hash del nombre
+      const cleanName = fileName.replace(/^\d+-/, '').replace(/[_-]/g, ' ');
+      return cleanName.length > 25 ? cleanName.substring(0, 25) + '...' : cleanName;
+    } else if (fileUrl.includes('cloudinary')) {
       const parts = fileUrl.split('/');
       const publicId = parts[parts.length - 1];
       const fileName = publicId.split('.')[0];
@@ -249,7 +268,7 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
     }
     
     const cleanName = fileUrl.replace(/^montacargas-\d+-/, '');
-    return cleanName.length > 20 ? cleanName.substring(0, 20) + '...' : cleanName;
+    return cleanName.length > 25 ? cleanName.substring(0, 25) + '...' : cleanName;
   };
 
   // Componente para botones de subida (solo visible para admin)

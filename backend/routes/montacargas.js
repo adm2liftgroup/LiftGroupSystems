@@ -3,8 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
-const { uploadToSupabase, deleteFromSupabase } = require('../supabase-storage');
+const { uploadDocumentToS3, deleteFromS3 } = require('../aws-s3');
 
 // Configurar multer para almacenamiento de archivos
 const storage = multer.memoryStorage();
@@ -73,16 +72,15 @@ router.post("/", upload.fields([
 
     console.log('📁 Archivos recibidos:', req.files);
     
-    // CAMBIO: Subir a Supabase en lugar de Cloudinary
+    // SUBIR A AWS S3
     if (req.files?.documento_pedimento) {
       try {
         const file = req.files.documento_pedimento[0];
         console.log(`📤 Subiendo documento_pedimento: ${file.originalname}`);
-        documentoPedimento = await uploadToSupabase(file.buffer, file.originalname, file.mimetype);
+        documentoPedimento = await uploadDocumentToS3(file.buffer, file.originalname, file.mimetype);
         console.log('✅ documento_pedimento subido:', documentoPedimento);
       } catch (error) {
         console.error('❌ Error subiendo documento_pedimento:', error);
-        // Continuar sin el documento
       }
     }
     
@@ -90,11 +88,10 @@ router.post("/", upload.fields([
       try {
         const file = req.files.documento_adicional[0];
         console.log(`📤 Subiendo documento_adicional: ${file.originalname}`);
-        documentoAdicional = await uploadToSupabase(file.buffer, file.originalname, file.mimetype);
+        documentoAdicional = await uploadDocumentToS3(file.buffer, file.originalname, file.mimetype);
         console.log('✅ documento_adicional subido:', documentoAdicional);
       } catch (error) {
         console.error('❌ Error subiendo documento_adicional:', error);
-        // Continuar sin el documento
       }
     }
     
@@ -102,15 +99,13 @@ router.post("/", upload.fields([
       try {
         const file = req.files.doc_ped_adicional[0];
         console.log(`📤 Subiendo doc_ped_adicional: ${file.originalname}`);
-        docPedAdicional = await uploadToSupabase(file.buffer, file.originalname, file.mimetype);
+        docPedAdicional = await uploadDocumentToS3(file.buffer, file.originalname, file.mimetype);
         console.log('✅ doc_ped_adicional subido:', docPedAdicional);
       } catch (error) {
         console.error('❌ Error subiendo doc_ped_adicional:', error);
-        // Continuar sin el documento
       }
     }
 
-    // Resto del código igual...
     console.log('💾 Guardando en BD:');
     console.log('   - documento_pedimento:', documentoPedimento);
     console.log('   - documento_adicional:', documentoAdicional);
@@ -129,7 +124,7 @@ router.post("/", upload.fields([
   }
 });
 
-// BLOQUE 4: Actualizar montacargas - CORREGIDO
+// BLOQUE 4: Actualizar montacargas - ACTUALIZADO PARA AWS S3
 router.put("/:id", upload.fields([
   { name: 'documento_pedimento', maxCount: 1 },
   { name: 'documento_adicional', maxCount: 1 }, 
@@ -174,98 +169,73 @@ router.put("/:id", upload.fields([
     console.log('   - adicional:', documentoAdicional);
     console.log('   - ped_adicional:', docPedAdicional);
 
-    // CAMBIO: Manejar archivos con Supabase en lugar de Cloudinary
+    // MANEJAR ARCHIVOS CON AWS S3
     if (req.files?.documento_pedimento) {
       try {
-        // PRIMERO eliminar el archivo anterior de Supabase si existe
-        if (documentoPedimento && documentoPedimento.includes('supabase.co')) {
+        // PRIMERO eliminar el archivo anterior de S3 si existe
+        if (documentoPedimento && documentoPedimento.includes('amazonaws.com')) {
           try {
-            await deleteFromSupabase(documentoPedimento);
-            console.log('✅ Archivo anterior de pedimento eliminado de Supabase');
+            await deleteFromS3(documentoPedimento);
+            console.log('✅ Archivo anterior de pedimento eliminado de S3');
           } catch (error) {
             console.error('⚠️ Error eliminando archivo anterior de pedimento, pero continuando:', error.message);
           }
-        } else if (documentoPedimento) {
-          // Si es un archivo local antiguo, eliminarlo localmente
-          const oldFilePath = path.join(__dirname, '../uploads/montacargas', documentoPedimento);
-          if (fs.existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
-            console.log('🗑️ Archivo anterior local eliminado:', documentoPedimento);
-          }
         }
         
-        // SUBIR nuevo archivo a Supabase
+        // SUBIR nuevo archivo a S3
         const file = req.files.documento_pedimento[0];
         console.log(`📤 Subiendo nuevo documento_pedimento: ${file.originalname}`);
-        documentoPedimento = await uploadToSupabase(file.buffer, file.originalname, file.mimetype);
-        console.log('☁️ Nuevo archivo de pedimento (Supabase):', documentoPedimento);
+        documentoPedimento = await uploadDocumentToS3(file.buffer, file.originalname, file.mimetype);
+        console.log('☁️ Nuevo archivo de pedimento (S3):', documentoPedimento);
       } catch (error) {
         console.error('❌ Error subiendo nuevo documento_pedimento:', error);
-        // Mantener el documento anterior si hay error
       }
     }
     
     if (req.files?.documento_adicional) {
       try {
-        // PRIMERO eliminar el archivo anterior de Supabase si existe
-        if (documentoAdicional && documentoAdicional.includes('supabase.co')) {
+        // PRIMERO eliminar el archivo anterior de S3 si existe
+        if (documentoAdicional && documentoAdicional.includes('amazonaws.com')) {
           try {
-            await deleteFromSupabase(documentoAdicional);
-            console.log('✅ Archivo anterior adicional eliminado de Supabase');
+            await deleteFromS3(documentoAdicional);
+            console.log('✅ Archivo anterior adicional eliminado de S3');
           } catch (error) {
             console.error('⚠️ Error eliminando archivo anterior adicional, pero continuando:', error.message);
           }
-        } else if (documentoAdicional) {
-          // Si es un archivo local antiguo, eliminarlo localmente
-          const oldFilePath = path.join(__dirname, '../uploads/montacargas', documentoAdicional);
-          if (fs.existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
-            console.log('🗑️ Archivo anterior local eliminado:', documentoAdicional);
-          }
         }
         
-        // SUBIR nuevo archivo a Supabase
+        // SUBIR nuevo archivo a S3
         const file = req.files.documento_adicional[0];
         console.log(`📤 Subiendo nuevo documento_adicional: ${file.originalname}`);
-        documentoAdicional = await uploadToSupabase(file.buffer, file.originalname, file.mimetype);
-        console.log('☁️ Nuevo archivo adicional (Supabase):', documentoAdicional);
+        documentoAdicional = await uploadDocumentToS3(file.buffer, file.originalname, file.mimetype);
+        console.log('☁️ Nuevo archivo adicional (S3):', documentoAdicional);
       } catch (error) {
         console.error('❌ Error subiendo nuevo documento_adicional:', error);
-        // Mantener el documento anterior si hay error
       }
     }
 
     if (req.files?.doc_ped_adicional) {
       try {
-        // PRIMERO eliminar el archivo anterior de Supabase si existe
-        if (docPedAdicional && docPedAdicional.includes('supabase.co')) {
+        // PRIMERO eliminar el archivo anterior de S3 si existe
+        if (docPedAdicional && docPedAdicional.includes('amazonaws.com')) {
           try {
-            await deleteFromSupabase(docPedAdicional);
-            console.log('✅ Archivo anterior ped_adicional eliminado de Supabase');
+            await deleteFromS3(docPedAdicional);
+            console.log('✅ Archivo anterior ped_adicional eliminado de S3');
           } catch (error) {
             console.error('⚠️ Error eliminando archivo anterior ped_adicional, pero continuando:', error.message);
           }
-        } else if (docPedAdicional) {
-          // Si es un archivo local antiguo, eliminarlo localmente
-          const oldFilePath = path.join(__dirname, '../uploads/montacargas', docPedAdicional);
-          if (fs.existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
-            console.log('🗑️ Archivo anterior local eliminado:', docPedAdicional);
-          }
         }
         
-        // SUBIR nuevo archivo a Supabase
+        // SUBIR nuevo archivo a S3
         const file = req.files.doc_ped_adicional[0];
         console.log(`📤 Subiendo nuevo doc_ped_adicional: ${file.originalname}`);
-        docPedAdicional = await uploadToSupabase(file.buffer, file.originalname, file.mimetype);
-        console.log('☁️ Nuevo archivo ped_adicional (Supabase):', docPedAdicional);
+        docPedAdicional = await uploadDocumentToS3(file.buffer, file.originalname, file.mimetype);
+        console.log('☁️ Nuevo archivo ped_adicional (S3):', docPedAdicional);
       } catch (error) {
         console.error('❌ Error subiendo nuevo doc_ped_adicional:', error);
-        // Mantener el documento anterior si hay error
       }
     }
 
-    // Resto del código igual...
     console.log('💾 Valores finales para guardar en BD:');
     console.log('   - pedimento:', documentoPedimento);
     console.log('   - adicional:', documentoAdicional);
@@ -320,41 +290,23 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ error: "Montacargas no encontrado" });
     }
 
-    // CAMBIO: Eliminar archivos de Supabase si existen
+    // ELIMINAR ARCHIVOS DE AWS S3 SI EXISTEN
     const documentos = currentMontacargas.rows[0];
     if (documentos) {
-      // Eliminar de Supabase si son URLs de Supabase
-      if (documentos.documento_pedimento && documentos.documento_pedimento.includes('supabase.co')) {
-        await deleteFromSupabase(documentos.documento_pedimento);
-        console.log('✅ documento_pedimento eliminado de Supabase');
+      if (documentos.documento_pedimento && documentos.documento_pedimento.includes('amazonaws.com')) {
+        await deleteFromS3(documentos.documento_pedimento);
+        console.log('✅ documento_pedimento eliminado de S3');
       }
       
-      if (documentos.documento_adicional && documentos.documento_adicional.includes('supabase.co')) {
-        await deleteFromSupabase(documentos.documento_adicional);
-        console.log('✅ documento_adicional eliminado de Supabase');
+      if (documentos.documento_adicional && documentos.documento_adicional.includes('amazonaws.com')) {
+        await deleteFromS3(documentos.documento_adicional);
+        console.log('✅ documento_adicional eliminado de S3');
       }
       
-      if (documentos.doc_ped_adicional && documentos.doc_ped_adicional.includes('supabase.co')) {
-        await deleteFromSupabase(documentos.doc_ped_adicional);
-        console.log('✅ doc_ped_adicional eliminado de Supabase');
+      if (documentos.doc_ped_adicional && documentos.doc_ped_adicional.includes('amazonaws.com')) {
+        await deleteFromS3(documentos.doc_ped_adicional);
+        console.log('✅ doc_ped_adicional eliminado de S3');
       }
-
-      // También eliminar archivos locales antiguos si existen (para desarrollo)
-      const documentosLocales = [
-        documentos.documento_pedimento,
-        documentos.documento_adicional,
-        documentos.doc_ped_adicional
-      ];
-
-      documentosLocales.forEach(filename => {
-        if (filename && !filename.includes('supabase.co') && !filename.includes('cloudinary')) {
-          const filePath = path.join(__dirname, '../uploads/montacargas', filename);
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            console.log('🗑️ Archivo local eliminado:', filename);
-          }
-        }
-      });
     }
 
     res.json({ 
@@ -368,7 +320,7 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// BLOQUE 6: Descargar documento
+// BLOQUE 6: Descargar documento - ACTUALIZADO PARA S3
 router.get("/documento/:url", async (req, res) => {
   try {
     const { url } = req.params;
@@ -379,7 +331,7 @@ router.get("/documento/:url", async (req, res) => {
       return res.status(404).json({ error: "Archivo no encontrado" });
     }
 
-    // Redirigir directamente a la URL (funciona para Supabase y archivos locales)
+    // Redirigir directamente a la URL de S3
     res.redirect(fileUrl);
 
   } catch (err) {
@@ -391,7 +343,7 @@ router.get("/documento/:url", async (req, res) => {
   }
 });
 
-// BLOQUE 7: Eliminar documento - CORREGIDO
+// BLOQUE 7: Eliminar documento - ACTUALIZADO PARA S3
 router.delete("/documento/:id/:tipo", async (req, res) => {
   try {
     console.log('=== INICIANDO ELIMINACIÓN DE DOCUMENTO ===');
@@ -424,15 +376,15 @@ router.delete("/documento/:id/:tipo", async (req, res) => {
     const fileUrl = current.rows[0][updateField];
     console.log('📄 URL a eliminar:', fileUrl);
 
-    // CAMBIO: Eliminar de Supabase SI existe
-    if (fileUrl && fileUrl.includes('supabase.co')) {
-      console.log('🗑️ Eliminando de Supabase...');
+    // ELIMINAR DE AWS S3 SI existe
+    if (fileUrl && fileUrl.includes('amazonaws.com')) {
+      console.log('🗑️ Eliminando de AWS S3...');
       try {
-        await deleteFromSupabase(fileUrl);
-        console.log('✅ Archivo eliminado de Supabase');
-      } catch (supabaseError) {
-        console.error('❌ Error eliminando de Supabase:', supabaseError);
-        // CONTINUAR aunque falle Supabase
+        await deleteFromS3(fileUrl);
+        console.log('✅ Archivo eliminado de AWS S3');
+      } catch (s3Error) {
+        console.error('❌ Error eliminando de S3:', s3Error);
+        // CONTINUAR aunque falle S3
       }
     }
 

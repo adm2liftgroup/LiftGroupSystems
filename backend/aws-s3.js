@@ -10,10 +10,10 @@ const s3Client = new S3Client({
 
 const BUCKET_NAME = process.env.AWS_BUCKET_NAME;
 
-// Subir imagen a S3 - SIN ACL
+// Subir imagen a S3
 const uploadImageToS3 = async (fileBuffer, fileName, mimetype) => {
   try {
-    console.log(`📤 Subiendo a AWS S3: ${fileName}`);
+    console.log(`📤 Subiendo imagen a AWS S3: ${fileName}`);
     
     const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const filePath = `refacciones-images/${Date.now()}-${cleanFileName}`;
@@ -23,7 +23,6 @@ const uploadImageToS3 = async (fileBuffer, fileName, mimetype) => {
       Key: filePath,
       Body: fileBuffer,
       ContentType: mimetype
-      // ❌ REMOVED: ACL: 'public-read'
     });
 
     await s3Client.send(command);
@@ -34,12 +33,40 @@ const uploadImageToS3 = async (fileBuffer, fileName, mimetype) => {
     return imageUrl;
     
   } catch (error) {
-    console.error('❌ Error subiendo a S3:', error);
+    console.error('❌ Error subiendo imagen a S3:', error);
     throw error;
   }
 };
 
-// Eliminar imagen de S3
+// Subir documento a S3 (PDF, DOC, etc.)
+const uploadDocumentToS3 = async (fileBuffer, fileName, mimetype) => {
+  try {
+    console.log(`📤 Subiendo documento a AWS S3: ${fileName}`);
+    
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `montacargas-documents/${Date.now()}-${cleanFileName}`;
+    
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: filePath,
+      Body: fileBuffer,
+      ContentType: mimetype
+    });
+
+    await s3Client.send(command);
+
+    const documentUrl = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${filePath}`;
+    
+    console.log('✅ Documento subido a S3:', documentUrl);
+    return documentUrl;
+    
+  } catch (error) {
+    console.error('❌ Error subiendo documento a S3:', error);
+    throw error;
+  }
+};
+
+// Eliminar archivo de S3
 const deleteFromS3 = async (fileUrl) => {
   try {
     if (!fileUrl || !fileUrl.includes('amazonaws.com')) return;
@@ -64,5 +91,6 @@ const deleteFromS3 = async (fileUrl) => {
 
 module.exports = {
   uploadImageToS3,
+  uploadDocumentToS3,
   deleteFromS3
 };
