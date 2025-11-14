@@ -1452,7 +1452,6 @@ const ObservacionesResueltasPanel = ({ observaciones, loading, error, mes, anio 
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">CARGO</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">TÉCNICO</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">FECHA RESOLUCIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">IMÁGENES</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ACCIONES</th>
                 </tr>
               </thead>
@@ -1486,13 +1485,6 @@ const ObservacionesResueltasPanel = ({ observaciones, loading, error, mes, anio 
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
                         {formatDate(observacion.fecha_resolucion)}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {imagenes.length > 0 ? (
-                          <span className="text-green-600 font-medium">{imagenes.length} imagen(es)</span>
-                        ) : (
-                          <span className="text-gray-400">Sin imágenes</span>
-                        )}
-                      </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm">
                         <button
                           onClick={() => setObservacionDetalle(observacion)}
@@ -1515,7 +1507,7 @@ const ObservacionesResueltasPanel = ({ observaciones, loading, error, mes, anio 
         </div>
       )}
 
-      {/* MODAL DE DETALLE DE OBSERVACIÓN */}
+      {/* MODAL DE DETALLE DE OBSERVACIÓN - CORREGIDO */}
       {observacionDetalle && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1552,8 +1544,11 @@ const ObservacionesResueltasPanel = ({ observaciones, loading, error, mes, anio 
                       {observacionDetalle.cargo_a === "empresa" ? "Cargo a Empresa" : "Cargo a Cliente"}
                     </span>
                   </p>
-                  <p><strong>Técnico:</strong> {observacionDetalle.resuelto_por_nombre || observacionDetalle.tecnico_nombre || "N/A"}</p>
+                  <p><strong>Técnico que resolvió:</strong> {observacionDetalle.resuelto_por_nombre || observacionDetalle.tecnico_nombre || "N/A"}</p>
                   <p><strong>Fecha Resolución:</strong> {formatDate(observacionDetalle.fecha_resolucion)}</p>
+                  {observacionDetalle.creado_por && (
+                    <p><strong>Creado por:</strong> {observacionDetalle.tecnico_nombre || "N/A"}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1565,7 +1560,7 @@ const ObservacionesResueltasPanel = ({ observaciones, loading, error, mes, anio 
               </div>
             </div>
 
-            {/* IMÁGENES DE LA OBSERVACIÓN */}
+            {/* IMÁGENES DE LA OBSERVACIÓN - SOLO SI EXISTEN */}
             {obtenerImagenesObservacion(observacionDetalle).length > 0 && (
               <div className="mb-4">
                 <h4 className="font-semibold mb-3">Evidencias Fotográficas</h4>
