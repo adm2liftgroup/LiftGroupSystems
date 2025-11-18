@@ -62,7 +62,7 @@ export default function RefaccionesCargo({ montacargas }) {
   // FUNCIONES PARA VERIFICAR ROLES
   const isTecnico = () => userRole === 'tecnico';
   const isAdmin = () => userRole === 'admin';
-  const canAddRefacciones = () => isTecnico();
+  const canAddRefacciones = () => userRole === 'user';
   const canDeleteImages = () => isTecnico() || isAdmin(); // Técnicos Y administradores pueden eliminar imágenes
 
   // FUNCIÓN: Manejar selección de imágenes para observación
