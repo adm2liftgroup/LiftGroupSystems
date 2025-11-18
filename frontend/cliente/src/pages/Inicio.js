@@ -548,30 +548,52 @@ export default function Inicio() {
             </div>
 
             {/* Submenú - Solo muestra las pestañas relacionadas con montacargas cuando hay uno seleccionado */}
-            {selectedMontacargas && (
-              <div className="flex gap-2 mb-4 flex-wrap">
-                {[
-                  "Información del equipo",
-                  "Servicios Preventivos Historial",
-                  "Inversión Habilitar",
-                  "Inversión Inicial",
-                  "Refacciones con Cargo",
-                  "Programas Preventivos"
-                ].map((tab) => (
-                  <button
-                    key={tab}
-                    className={`px-3 py-1 text-sm md:px-4 md:py-2 md:text-base rounded ${
-                      activeTab === tab
-                        ? "bg-purple-600 text-white"
-                        : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-                    }`}
-                    onClick={() => setActiveTab(tab)}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
-            )}
+{selectedMontacargas && (
+  <div className="flex gap-2 mb-4 flex-wrap">
+    {user?.rol === "admin" ? (
+      // TODAS LAS OPCIONES PARA ADMIN
+      [
+        "Información del equipo",
+        "Servicios Preventivos Historial", 
+        "Inversión Habilitar",
+        "Inversión Inicial",
+        "Refacciones con Cargo",
+        "Programas Preventivos"
+      ].map((tab) => (
+        <button
+          key={tab}
+          className={`px-3 py-1 text-sm md:px-4 md:py-2 md:text-base rounded ${
+            activeTab === tab
+              ? "bg-purple-600 text-white"
+              : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+          }`}
+          onClick={() => setActiveTab(tab)}
+        >
+          {tab}
+        </button>
+      ))
+    ) : (
+      // SOLO 3 OPCIONES PARA USUARIOS NORMALES
+      [
+        "Servicios Preventivos Historial",
+        "Refacciones con Cargo", 
+        "Programas Preventivos"
+      ].map((tab) => (
+        <button
+          key={tab}
+          className={`px-3 py-1 text-sm md:px-4 md:py-2 md:text-base rounded ${
+            activeTab === tab
+              ? "bg-purple-600 text-white"
+              : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+          }`}
+          onClick={() => setActiveTab(tab)}
+        >
+          {tab}
+        </button>
+      ))
+    )}
+  </div>
+)}
 
             {/* Contenido dinámico */}
             <div className="p-4 border rounded bg-gray-100 overflow-x-auto">
