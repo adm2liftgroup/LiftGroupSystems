@@ -117,61 +117,61 @@ export default function InformacionEquipo({ montacargas, onMontacargasUpdate }) 
   };
 
   const handleDownload = async (fileUrl, tipo) => {
-    try {
-      if (!fileUrl) {
-        alert('No hay documento para descargar');
-        return;
-      }
-
-      console.log('📥 Iniciando descarga de:', fileUrl);
-
-      // Para AWS S3, podemos descargar directamente sin pasar por el backend
-      const downloadUrl = fileUrl.includes('amazonaws.com') 
-        ? fileUrl // Descarga directa desde S3
-        : `${API_URL}/api/montacargas/documento/${encodeURIComponent(fileUrl)}`; // Para URLs antiguas
-        
-      console.log('🌐 Descargando desde:', downloadUrl);
-
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = downloadUrl;
-
-      let fileName = 'documento.pdf';
-      try {
-        if (fileUrl.includes('amazonaws.com')) {
-          // Extraer nombre de archivo de URL de S3
-          const urlParts = fileUrl.split('/');
-          const s3FileName = urlParts[urlParts.length - 1];
-          // Remover timestamp del nombre
-          fileName = s3FileName.replace(/^\d+-/, '');
-        } else if (fileUrl.includes('cloudinary')) {
-          const urlParts = fileUrl.split('/');
-          const publicIdPart = urlParts[urlParts.length - 1];
-          const publicId = decodeURIComponent(publicIdPart.split('?')[0]);
-          const nameFromPublicId = publicId.split('/').pop();
-          if (nameFromPublicId && nameFromPublicId.includes('.')) {
-            fileName = nameFromPublicId;
-          }
-        } else {
-          const urlParts = fileUrl.split('/');
-          fileName = urlParts[urlParts.length - 1];
-        }
-      } catch (e) {
-        console.log('Error extrayendo nombre:', e);
-      }
-      
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      
-      console.log('✅ Descarga iniciada:', fileName);
-      
-    } catch (error) {
-      console.error('❌ Error downloading file:', error);
-      alert('❌ Error al descargar el documento: ' + error.message);
+  console.log('🎯 [DEBUG] handleDownload EJECUTADO', { fileUrl, tipo });
+  
+  try {
+    if (!fileUrl) {
+      alert('No hay documento para descargar');
+      return;
     }
-  };
+
+    console.log('📥 Iniciando descarga de:', fileUrl);
+
+    // SIEMPRE usar la URL directa de S3 para descargas
+    let downloadUrl = fileUrl;
+    
+    // Si es una URL antigua (no S3), construir la ruta del backend
+    if (!fileUrl.includes('amazonaws.com')) {
+      downloadUrl = `${API_URL}/api/montacargas/documento/${encodeURIComponent(fileUrl)}`;
+    }
+    
+    console.log('🌐 Descargando desde:', downloadUrl);
+
+    // Crear enlace temporal - método más confiable
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.target = '_blank'; // Abrir en nueva pestaña
+    a.rel = 'noopener noreferrer';
+    
+    // Extraer nombre de archivo
+    let fileName = 'documento.pdf';
+    try {
+      if (fileUrl.includes('amazonaws.com')) {
+        const urlParts = fileUrl.split('/');
+        const s3FileName = urlParts[urlParts.length - 1];
+        fileName = s3FileName.replace(/^\d+-/, '');
+      } else {
+        const urlParts = fileUrl.split('/');
+        fileName = urlParts[urlParts.length - 1];
+      }
+    } catch (e) {
+      console.log('Error extrayendo nombre:', e);
+    }
+    
+    a.download = fileName;
+    
+    // Agregar al DOM temporalmente
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    console.log('✅ Descarga iniciada:', fileName);
+    
+  } catch (error) {
+    console.error('❌ Error downloading file:', error);
+    alert('❌ Error al descargar el documento: ' + error.message);
+  }
+};
 
   const handleDeleteDocument = async (tipo) => {
     // Verificar permisos antes de eliminar

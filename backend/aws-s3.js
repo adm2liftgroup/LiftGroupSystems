@@ -22,7 +22,8 @@ const uploadImageToS3 = async (fileBuffer, fileName, mimetype) => {
       Bucket: BUCKET_NAME,
       Key: filePath,
       Body: fileBuffer,
-      ContentType: mimetype
+      ContentType: mimetype,
+      ACL: 'public-read'  // 👈 ESTA LÍNEA ES CRÍTICA
     });
 
     await s3Client.send(command);
@@ -50,7 +51,8 @@ const uploadDocumentToS3 = async (fileBuffer, fileName, mimetype) => {
       Bucket: BUCKET_NAME,
       Key: filePath,
       Body: fileBuffer,
-      ContentType: mimetype
+      ContentType: mimetype,
+      ACL: 'public-read'  // 👈 ESTA LÍNEA ES CRÍTICA
     });
 
     await s3Client.send(command);
