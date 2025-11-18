@@ -576,7 +576,8 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
     { title: "Hidráulica", range: [51, 60] },
     { title: "Pruebas Finales", range: [61, 70] },
     { title: "Limpieza y Lubricación", range: [71, 84] },
-    { title: "Observaciones y Firmas" }
+    { title: "Observaciones" },
+    { title: "Firmas" }
   ];
 
   // Componente de Canvas para firma del cliente
@@ -1111,18 +1112,37 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
             />
           </div>
         </div>
+      </div>
+    );
+  };
 
-        {/* FIRMA DEL CLIENTE - NUEVA SECCIÓN */}
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <label className="block font-medium text-gray-800 mb-2">Firma del Cliente</label>
+  const renderFirmasSection = () => {
+    return (
+      <div className="space-y-6">
+        {/* Información del equipo */}
+        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <h3 className="font-bold text-blue-800 mb-2">Información del Equipo</h3>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div><strong>No. Económico:</strong> #{mantenimiento.montacargas_numero}</div>
+            <div><strong>Marca:</strong> {mantenimiento.montacargas_marca}</div>
+            <div><strong>Modelo:</strong> {mantenimiento.montacargas_modelo}</div>
+            <div><strong>Serie:</strong> {mantenimiento.montacargas_serie}</div>
+            <div><strong>Ubicación:</strong> {mantenimiento.montacargas_ubicacion}</div>
+            <div><strong>Planta:</strong> {mantenimiento.montacargas_planta}</div>
+          </div>
+        </div>
+
+        {/* FIRMA DEL CLIENTE - SEPARADA COMO EN LA IMAGEN */}
+        <div className="bg-white p-6 rounded-lg border border-gray-200">
+          <h3 className="font-bold text-gray-800 mb-4 text-center">FIRMA DEL CLIENTE</h3>
           
           {!mostrarCanvasFirma ? (
-            <div className="text-center p-6 border-2 border-dashed border-gray-300 rounded-lg">
+            <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
               <p className="text-gray-600 mb-4">El cliente debe firmar para aceptar el servicio realizado</p>
               <button
                 type="button"
                 onClick={() => setMostrarCanvasFirma(true)}
-                className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+                className="bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 font-medium"
               >
                 Solicitar Firma del Cliente
               </button>
@@ -1140,7 +1160,7 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
                   value={firmaClienteNombre}
                   onChange={(e) => setFirmaClienteNombre(e.target.value)}
                   placeholder="Ingrese el nombre completo del cliente"
-                  className="w-full p-2 border border-gray-300 rounded text-sm"
+                  className="w-full p-3 border border-gray-300 rounded text-sm"
                   required
                 />
               </div>
@@ -1166,13 +1186,17 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
           )}
         </div>
 
-        {/* Firma del técnico */}
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <label className="block font-medium text-gray-800 mb-2">Firma del Técnico</label>
-          <div className="border-2 border-dashed border-gray-300 rounded p-4 text-center">
-            <p className="text-gray-600 mb-2">Técnico responsable del servicio</p>
-            <p className="text-sm text-gray-500">Técnico: {tecnico?.nombre || "N/A"}</p>
-            <p className="text-sm text-gray-500">Fecha: {new Date().toLocaleDateString('es-ES')}</p>
+        {/* Firma del técnico - ESTILO SIMILAR A LA IMAGEN */}
+        <div className="bg-white p-6 rounded-lg border border-gray-200">
+          <h3 className="font-bold text-gray-800 mb-4 text-center">FIRMA DEL TÉCNICO</h3>
+          <div className="border-2 border-gray-300 rounded-lg p-6 text-center bg-gray-50">
+            <div className="mb-4">
+              <p className="text-gray-600 mb-2">Espacio para firma digital</p>
+            </div>
+            <div className="text-sm text-gray-700 space-y-1">
+              <p><strong>Técnico:</strong> {tecnico?.nombre || "N/A"}</p>
+              <p><strong>Fecha:</strong> {new Date().toLocaleDateString('es-ES')}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1256,15 +1280,27 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
 
       {/* Content */}
       <div className="p-4 max-h-[60vh] overflow-y-auto">
-        {currentSection < sections.length - 1 ? (
+        {currentSection < sections.length - 2 ? (
           <div className="space-y-3">
             <h3 className="text-lg font-bold text-gray-800 mb-4">
               {sections[currentSection].title}
             </h3>
             {renderSpecialItems()}
           </div>
+        ) : currentSection === sections.length - 2 ? (
+          <div className="space-y-3">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">
+              {sections[currentSection].title}
+            </h3>
+            {renderObservacionesSection()}
+          </div>
         ) : (
-          renderObservacionesSection()
+          <div className="space-y-3">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">
+              {sections[currentSection].title}
+            </h3>
+            {renderFirmasSection()}
+          </div>
         )}
       </div>
 
@@ -1309,7 +1345,7 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
       </div>
     </div>
   );
-};
+}; 
 
 // BLOQUE 1.9: Panel de Checklists Completados - MEJORADO
 const ChecklistsCompletadosPanel = ({ checklists, loading, error }) => {

@@ -421,7 +421,7 @@ router.patch("/:id/estado", async (req, res) => {
 
     // Procesar tecnico_id
     let tecnicoIdValido = null;
-    if (tecnico_id !== undefined && tecnicoid !== null && tecnicoid !== "") {
+    if (tecnico_id !== undefined && tecnico_id !== null && tecnico_id !== "") {
       const tecnicoIdParsed = parseInt(tecnico_id);
       if (!isNaN(tecnicoIdParsed)) {
         tecnicoIdValido = tecnicoIdParsed;
