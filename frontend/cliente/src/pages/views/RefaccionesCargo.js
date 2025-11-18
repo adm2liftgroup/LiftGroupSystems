@@ -76,126 +76,169 @@ export default function RefaccionesCargo({ montacargas }) {
   // ========== FUNCIONES DE FIRMA DIGITAL ==========
 
   // Componente de Canvas para firma
-  const FirmaCanvas = ({ onFirmaCompleta }) => {
-    const canvasRef = useRef(null);
-    const [isDrawing, setIsDrawing] = useState(false);
+  // Componente de Canvas para firma - VERSIÓN CORREGIDA
+const FirmaCanvas = ({ onFirmaCompleta }) => {
+  const canvasRef = useRef(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
 
-    useEffect(() => {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      
-      // Configurar canvas
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.fillStyle = 'white';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }, []);
+  // Configuración inicial del canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    // Configurar canvas
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, []);
 
-    const startDrawing = (e) => {
-      setIsDrawing(true);
-      const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      const ctx = canvas.getContext('2d');
-      ctx.beginPath();
-      ctx.moveTo(x, y);
+  // Obtener posición exacta en el canvas (para mouse y touch)
+  const getCanvasCoordinates = (clientX, clientY) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
     };
+  };
 
-    const draw = (e) => {
-      if (!isDrawing) return;
-      
-      const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      const ctx = canvas.getContext('2d');
-      ctx.lineTo(x, y);
-      ctx.stroke();
-    };
+  // MANEJO PARA MOUSE
+  const startDrawing = (e) => {
+    e.preventDefault();
+    const { x, y } = getCanvasCoordinates(e.clientX, e.clientY);
+    
+    setIsDrawing(true);
+    setLastPos({ x, y });
+    
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
 
-    const stopDrawing = () => {
-      setIsDrawing(false);
-      const canvas = canvasRef.current;
-      const dataURL = canvas.toDataURL();
-      onFirmaCompleta(dataURL);
-    };
+  const draw = (e) => {
+    e.preventDefault();
+    if (!isDrawing) return;
+    
+    const { x, y } = getCanvasCoordinates(e.clientX, e.clientY);
+    
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    
+    setLastPos({ x, y });
+  };
 
-    const clearCanvas = () => {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = 'white';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      onFirmaCompleta(null);
-    };
+  const stopDrawing = () => {
+    if (!isDrawing) return;
+    
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    const dataURL = canvas.toDataURL();
+    onFirmaCompleta(dataURL);
+  };
 
-    // Manejo táctil para dispositivos móviles
-    const handleTouchStart = (e) => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      const mouseEvent = new MouseEvent('mousedown', {
-        clientX: touch.clientX,
-        clientY: touch.clientY
-      });
-      canvasRef.current.dispatchEvent(mouseEvent);
-    };
+  // MANEJO PARA TACTIL - VERSIÓN MEJORADA
+  const handleTouchStart = (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const { x, y } = getCanvasCoordinates(touch.clientX, touch.clientY);
+    
+    setIsDrawing(true);
+    setLastPos({ x, y });
+    
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
 
-    const handleTouchMove = (e) => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      const mouseEvent = new MouseEvent('mousemove', {
-        clientX: touch.clientX,
-        clientY: touch.clientY
-      });
-      canvasRef.current.dispatchEvent(mouseEvent);
-    };
+  const handleTouchMove = (e) => {
+    e.preventDefault();
+    if (!isDrawing) return;
+    
+    const touch = e.touches[0];
+    const { x, y } = getCanvasCoordinates(touch.clientX, touch.clientY);
+    
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    
+    setLastPos({ x, y });
+  };
 
-    const handleTouchEnd = (e) => {
-      e.preventDefault();
-      const mouseEvent = new MouseEvent('mouseup', {});
-      canvasRef.current.dispatchEvent(mouseEvent);
-    };
+  const handleTouchEnd = (e) => {
+    e.preventDefault();
+    if (!isDrawing) return;
+    
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    const dataURL = canvas.toDataURL();
+    onFirmaCompleta(dataURL);
+  };
 
-    return (
-      <div className="border-2 border-gray-300 rounded-lg p-4 bg-white">
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Firma Digital *
-          </label>
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    onFirmaCompleta(null);
+  };
+
+  return (
+    <div className="border-2 border-gray-300 rounded-lg p-4 bg-white">
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Firma Digital *
+        </label>
+        <div className="border border-gray-300 rounded bg-white overflow-hidden">
           <canvas
             ref={canvasRef}
             width={400}
             height={200}
-            className="border border-gray-300 rounded w-full cursor-crosshair touch-none bg-white"
+            className="block w-full h-48 touch-none bg-white"
+            style={{ 
+              touchAction: 'none',
+              cursor: 'crosshair'
+            }}
+            // Eventos de mouse
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={stopDrawing}
             onMouseLeave={stopDrawing}
+            // Eventos táctiles
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
           />
-          <p className="text-xs text-gray-500 mt-2">
-            Dibuje su firma en el área superior. En dispositivos móviles, use el dedo.
-          </p>
         </div>
-        
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={clearCanvas}
-            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
-          >
-            Limpiar Firma
-          </button>
-        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          Dibuje su firma en el área superior. En dispositivos móviles, use el dedo.
+        </p>
       </div>
-    );
-  };
+      
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={clearCanvas}
+          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
+        >
+          Limpiar Firma
+        </button>
+      </div>
+    </div>
+  );
+};
 
   // FUNCIÓN: Iniciar proceso de resolución con firma
   const iniciarResolucionConFirma = (observacion) => {
