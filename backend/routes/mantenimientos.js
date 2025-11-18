@@ -2,6 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { uploadImageToS3 } = require('../aws-s3');
 
 // Función para determinar el tipo de mantenimiento según el mes
 function getTipoMantenimiento(mes) {
@@ -395,13 +396,18 @@ router.patch("/:id/estado", async (req, res) => {
       partes_faltantes,
       golpes_unidad,
       condiciones_pintura,
-      respuestas_incidencias
+      respuestas_incidencias,
+      // NUEVOS CAMPOS PARA FIRMA DEL CLIENTE
+      firma_cliente_data,
+      firma_cliente_nombre
     } = req.body;
 
     console.log("Actualizando estado del mantenimiento con checklist:", { 
       id, status, tecnico_id, tecnico_nombre, observaciones,
       hora_inicio, hora_termino, actividades_pendientes, partes_faltantes,
-      golpes_unidad, condiciones_pintura, respuestas_incidencias
+      golpes_unidad, condiciones_pintura, respuestas_incidencias,
+      firma_cliente_data: firma_cliente_data ? 'PRESENTE' : 'AUSENTE',
+      firma_cliente_nombre
     });
 
     // Validar que el estado sea válido
@@ -415,7 +421,7 @@ router.patch("/:id/estado", async (req, res) => {
 
     // Procesar tecnico_id
     let tecnicoIdValido = null;
-    if (tecnico_id !== undefined && tecnico_id !== null && tecnico_id !== "") {
+    if (tecnico_id !== undefined && tecnicoid !== null && tecnicoid !== "") {
       const tecnicoIdParsed = parseInt(tecnico_id);
       if (!isNaN(tecnicoIdParsed)) {
         tecnicoIdValido = tecnicoIdParsed;
@@ -424,6 +430,30 @@ router.patch("/:id/estado", async (req, res) => {
           success: false, 
           error: "El ID del técnico debe ser un número válido" 
         });
+      }
+    }
+
+    // Procesar firma del cliente si está presente
+    let firma_cliente_url = null;
+    if (firma_cliente_data && firma_cliente_nombre) {
+      try {
+        console.log('✍️ Procesando firma del cliente...');
+        
+        // Convertir base64 a buffer
+        const base64Data = firma_cliente_data.replace(/^data:image\/\w+;base64,/, '');
+        const firmaBuffer = Buffer.from(base64Data, 'base64');
+        
+        // Subir firma a S3 (usa la misma función que para las observaciones)
+        firma_cliente_url = await uploadImageToS3(
+          firmaBuffer,
+          `firma-cliente-${Date.now()}.png`,
+          'image/png'
+        );
+        
+        console.log('✅ Firma del cliente subida a S3:', firma_cliente_url);
+      } catch (firmaError) {
+        console.error('❌ Error subiendo firma del cliente a S3:', firmaError);
+        // No detenemos el proceso por error en la firma
       }
     }
 
@@ -463,7 +493,7 @@ router.patch("/:id/estado", async (req, res) => {
 
       // 2. SI ES COMPLETADO Y HAY DATOS DE CHECKLIST, GUARDAR EL CHECKLIST
       let checklistResult = null;
-      if (status === 'completado' && (hora_inicio || hora_termino || observaciones || actividades_pendientes)) {
+      if (status === 'completado' && (hora_inicio || hora_termino || observaciones || actividades_pendientes || firma_cliente_url)) {
         const queryChecklist = `
           INSERT INTO checklists_completados (
             mantenimiento_id,
@@ -476,8 +506,11 @@ router.patch("/:id/estado", async (req, res) => {
             partes_faltantes,
             golpes_unidad,
             condiciones_pintura,
-            respuestas_incidencias
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            respuestas_incidencias,
+            firma_cliente_url,
+            firma_cliente_nombre,
+            firma_cliente_fecha
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
           RETURNING *
         `;
 
@@ -492,11 +525,14 @@ router.patch("/:id/estado", async (req, res) => {
           partes_faltantes,
           golpes_unidad,
           condiciones_pintura,
-          respuestas_incidencias ? JSON.stringify(respuestas_incidencias) : null
+          respuestas_incidencias ? JSON.stringify(respuestas_incidencias) : null,
+          firma_cliente_url,
+          firma_cliente_nombre,
+          firma_cliente_url ? new Date() : null
         ];
 
         checklistResult = await client.query(queryChecklist, paramsChecklist);
-        console.log("Checklist guardado:", checklistResult.rows[0]);
+        console.log("Checklist guardado con firma del cliente:", checklistResult.rows[0]);
       }
 
       await client.query('COMMIT');
@@ -512,6 +548,11 @@ router.patch("/:id/estado", async (req, res) => {
       if (checklistResult) {
         response.checklist = checklistResult.rows[0];
         response.message += ' y checklist guardado';
+        
+        // Si incluye firma del cliente
+        if (firma_cliente_url) {
+          response.message += ' con firma del cliente';
+        }
       }
 
       res.json(response);

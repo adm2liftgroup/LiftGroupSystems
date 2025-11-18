@@ -550,7 +550,7 @@ const PanelTecnico = ({
   );
 };
 
-// BLOQUE 1.8: Componente de Checklist Móvil
+//Bloque 1.8: Panel de Checklists
 const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
   const [checklistData, setChecklistData] = useState({});
   const [observaciones, setObservaciones] = useState("");
@@ -562,6 +562,10 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
   const [condicionesPintura, setCondicionesPintura] = useState("Bueno");
   const [currentSection, setCurrentSection] = useState(0);
   
+  // Estados para la firma del cliente
+  const [firmaClienteData, setFirmaClienteData] = useState(null);
+  const [firmaClienteNombre, setFirmaClienteNombre] = useState("");
+  const [mostrarCanvasFirma, setMostrarCanvasFirma] = useState(false);
 
   const sections = [
     { title: "Información General", range: [1, 10] },
@@ -574,6 +578,158 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
     { title: "Limpieza y Lubricación", range: [71, 84] },
     { title: "Observaciones y Firmas" }
   ];
+
+  // Componente de Canvas para firma del cliente
+  const FirmaClienteCanvas = ({ onFirmaCompleta }) => {
+    const canvasRef = useRef(null);
+    const [isDrawing, setIsDrawing] = useState(false);
+    const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
+
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      
+      const ctx = canvas.getContext('2d');
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }, []);
+
+    const getCanvasCoordinates = (clientX, clientY) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return { x: 0, y: 0 };
+      
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+      };
+    };
+
+    const startDrawing = (e) => {
+      e.preventDefault();
+      const { x, y } = getCanvasCoordinates(e.clientX, e.clientY);
+      
+      setIsDrawing(true);
+      setLastPos({ x, y });
+      
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    };
+
+    const draw = (e) => {
+      e.preventDefault();
+      if (!isDrawing) return;
+      
+      const { x, y } = getCanvasCoordinates(e.clientX, e.clientY);
+      
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      
+      setLastPos({ x, y });
+    };
+
+    const stopDrawing = () => {
+      if (!isDrawing) return;
+      setIsDrawing(false);
+      const canvas = canvasRef.current;
+      const dataURL = canvas.toDataURL();
+      onFirmaCompleta(dataURL);
+    };
+
+    const handleTouchStart = (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const { x, y } = getCanvasCoordinates(touch.clientX, touch.clientY);
+      
+      setIsDrawing(true);
+      setLastPos({ x, y });
+      
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    };
+
+    const handleTouchMove = (e) => {
+      e.preventDefault();
+      if (!isDrawing) return;
+      
+      const touch = e.touches[0];
+      const { x, y } = getCanvasCoordinates(touch.clientX, touch.clientY);
+      
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      
+      setLastPos({ x, y });
+    };
+
+    const handleTouchEnd = (e) => {
+      e.preventDefault();
+      if (!isDrawing) return;
+      
+      setIsDrawing(false);
+      const canvas = canvasRef.current;
+      const dataURL = canvas.toDataURL();
+      onFirmaCompleta(dataURL);
+    };
+
+    const clearCanvas = () => {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      onFirmaCompleta(null);
+    };
+
+    return (
+      <div className="border-2 border-gray-300 rounded-lg p-4 bg-white">
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Firma del Cliente *
+          </label>
+          <div className="border border-gray-300 rounded bg-white overflow-hidden">
+            <canvas
+              ref={canvasRef}
+              width={400}
+              height={200}
+              className="block w-full h-48 touch-none bg-white"
+              style={{ touchAction: 'none', cursor: 'crosshair' }}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            El cliente debe dibujar su firma en el área superior.
+          </p>
+        </div>
+        
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={clearCanvas}
+            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
+          >
+            Limpiar Firma
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   const getDescripcionChecklist = (numero) => {
     const descripciones = {
@@ -956,11 +1112,65 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
           </div>
         </div>
 
+        {/* FIRMA DEL CLIENTE - NUEVA SECCIÓN */}
+        <div className="bg-white p-4 rounded-lg border border-gray-200">
+          <label className="block font-medium text-gray-800 mb-2">Firma del Cliente</label>
+          
+          {!mostrarCanvasFirma ? (
+            <div className="text-center p-6 border-2 border-dashed border-gray-300 rounded-lg">
+              <p className="text-gray-600 mb-4">El cliente debe firmar para aceptar el servicio realizado</p>
+              <button
+                type="button"
+                onClick={() => setMostrarCanvasFirma(true)}
+                className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+              >
+                Solicitar Firma del Cliente
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <FirmaClienteCanvas onFirmaCompleta={setFirmaClienteData} />
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nombre del Cliente *
+                </label>
+                <input
+                  type="text"
+                  value={firmaClienteNombre}
+                  onChange={(e) => setFirmaClienteNombre(e.target.value)}
+                  placeholder="Ingrese el nombre completo del cliente"
+                  className="w-full p-2 border border-gray-300 rounded text-sm"
+                  required
+                />
+              </div>
+
+              {firmaClienteData && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded">
+                  <p className="text-green-700 text-sm">✅ Firma del cliente capturada correctamente</p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMostrarCanvasFirma(false);
+                  setFirmaClienteData(null);
+                  setFirmaClienteNombre("");
+                }}
+                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
+              >
+                Cancelar Firma
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Firma del técnico */}
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <label className="block font-medium text-gray-800 mb-2">Firma del Técnico</label>
           <div className="border-2 border-dashed border-gray-300 rounded p-4 text-center">
-            <p className="text-gray-600 mb-2">Espacio para firma digital</p>
+            <p className="text-gray-600 mb-2">Técnico responsable del servicio</p>
             <p className="text-sm text-gray-500">Técnico: {tecnico?.nombre || "N/A"}</p>
             <p className="text-sm text-gray-500">Fecha: {new Date().toLocaleDateString('es-ES')}</p>
           </div>
@@ -970,6 +1180,12 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
   };
 
   const handleSubmitChecklist = () => {
+    // Validar que se tenga la firma del cliente si se mostró el canvas
+    if (mostrarCanvasFirma && (!firmaClienteData || !firmaClienteNombre.trim())) {
+      alert("Debe capturar la firma y nombre del cliente antes de completar el checklist");
+      return;
+    }
+
     const checklistCompleto = {
       ...checklistData,
       observaciones,
@@ -981,7 +1197,10 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
       condicionesPintura,
       tecnico: tecnico?.nombre,
       fecha: new Date().toISOString(),
-      mantenimientoId: mantenimiento.id
+      mantenimientoId: mantenimiento.id,
+      // Incluir datos de la firma del cliente
+      firma_cliente_data: firmaClienteData,
+      firma_cliente_nombre: firmaClienteNombre
     };
 
     onCompletarChecklist(checklistCompleto);
@@ -1074,9 +1293,16 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
           ) : (
             <button
               onClick={handleSubmitChecklist}
-              className="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
+              disabled={mostrarCanvasFirma && (!firmaClienteData || !firmaClienteNombre.trim())}
+              className={`px-6 py-3 rounded-lg font-medium ${
+                mostrarCanvasFirma && (!firmaClienteData || !firmaClienteNombre.trim())
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
             >
-              Completar Checklist
+              {mostrarCanvasFirma && (!firmaClienteData || !firmaClienteNombre.trim()) 
+                ? 'Complete la firma del cliente' 
+                : 'Completar Checklist'}
             </button>
           )}
         </div>
