@@ -8,6 +8,14 @@ export default function RefaccionesCargo({ montacargas }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Estados para firma digital
+  const [mostrarModalFirma, setMostrarModalFirma] = useState(false);
+  const [observacionParaCompletar, setObservacionParaCompletar] = useState(null);
+  const [firmaData, setFirmaData] = useState(null);
+  const [firmaNombre, setFirmaNombre] = useState('');
+  const [subiendoFirma, setSubiendoFirma] = useState(false);
+
   const [formData, setFormData] = useState({
     descripcion: '',
     cargo_a: 'empresa'
@@ -63,25 +71,222 @@ export default function RefaccionesCargo({ montacargas }) {
   const isTecnico = () => userRole === 'tecnico';
   const isAdmin = () => userRole === 'admin';
   const canAddRefacciones = () => userRole === 'user';
-  const canDeleteImages = () => isTecnico() || isAdmin(); // Técnicos Y administradores pueden eliminar imágenes
+  const canDeleteImages = () => isTecnico() || isAdmin();
+
+  // ========== FUNCIONES DE FIRMA DIGITAL ==========
+
+  // Componente de Canvas para firma
+  const FirmaCanvas = ({ onFirmaCompleta }) => {
+    const canvasRef = useRef(null);
+    const [isDrawing, setIsDrawing] = useState(false);
+
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      
+      // Configurar canvas
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }, []);
+
+    const startDrawing = (e) => {
+      setIsDrawing(true);
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      const ctx = canvas.getContext('2d');
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    };
+
+    const draw = (e) => {
+      if (!isDrawing) return;
+      
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      const ctx = canvas.getContext('2d');
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    };
+
+    const stopDrawing = () => {
+      setIsDrawing(false);
+      const canvas = canvasRef.current;
+      const dataURL = canvas.toDataURL();
+      onFirmaCompleta(dataURL);
+    };
+
+    const clearCanvas = () => {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      onFirmaCompleta(null);
+    };
+
+    // Manejo táctil para dispositivos móviles
+    const handleTouchStart = (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const mouseEvent = new MouseEvent('mousedown', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      });
+      canvasRef.current.dispatchEvent(mouseEvent);
+    };
+
+    const handleTouchMove = (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const mouseEvent = new MouseEvent('mousemove', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      });
+      canvasRef.current.dispatchEvent(mouseEvent);
+    };
+
+    const handleTouchEnd = (e) => {
+      e.preventDefault();
+      const mouseEvent = new MouseEvent('mouseup', {});
+      canvasRef.current.dispatchEvent(mouseEvent);
+    };
+
+    return (
+      <div className="border-2 border-gray-300 rounded-lg p-4 bg-white">
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Firma Digital *
+          </label>
+          <canvas
+            ref={canvasRef}
+            width={400}
+            height={200}
+            className="border border-gray-300 rounded w-full cursor-crosshair touch-none bg-white"
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          />
+          <p className="text-xs text-gray-500 mt-2">
+            Dibuje su firma en el área superior. En dispositivos móviles, use el dedo.
+          </p>
+        </div>
+        
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={clearCanvas}
+            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
+          >
+            Limpiar Firma
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // FUNCIÓN: Iniciar proceso de resolución con firma
+  const iniciarResolucionConFirma = (observacion) => {
+    if (!canAddRefacciones()) {
+      setError('❌ No tienes permisos para completar observaciones');
+      return;
+    }
+
+    setObservacionParaCompletar(observacion);
+    setFirmaData(null);
+    setFirmaNombre('');
+    setMostrarModalFirma(true);
+    setError('');
+  };
+
+  // FUNCIÓN: Completar observación con firma
+  const completarObservacionConFirma = async () => {
+    if (!firmaData || !firmaNombre.trim()) {
+      setError('Debe proporcionar su firma y nombre completo');
+      return;
+    }
+
+    setSubiendoFirma(true);
+    setError('');
+
+    try {
+      const token = localStorage.getItem("token");
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      // Convertir firma de DataURL a Blob
+      const response = await fetch(firmaData);
+      const blob = await response.blob();
+      
+      const formData = new FormData();
+      formData.append('descripcion', observacionParaCompletar.descripcion);
+      formData.append('cargo_a', observacionParaCompletar.cargo_a);
+      formData.append('estado_resolucion', 'resuelto');
+      formData.append('es_evidencia', observacionParaCompletar.es_evidencia || 'false');
+      formData.append('firma', blob, `firma-${Date.now()}.png`);
+      formData.append('firma_nombre', firmaNombre.trim());
+      formData.append('resuelto_por', userData.id || '');
+      formData.append('resuelto_por_nombre', userData.nombre || userData.email || '');
+
+      const apiResponse = await fetch(
+        `${process.env.REACT_APP_API_URL}/api/refacciones/${observacionParaCompletar.id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        }
+      );
+
+      const data = await apiResponse.json();
+
+      if (apiResponse.ok && data.success) {
+        setSuccess('✅ Observación completada con firma');
+        setMostrarModalFirma(false);
+        setObservacionParaCompletar(null);
+        setFirmaData(null);
+        setFirmaNombre('');
+        fetchObservaciones(mantenimientoSeleccionado.id);
+      } else {
+        throw new Error(data.error || 'Error al completar observación');
+      }
+    } catch (err) {
+      console.error('Error al completar observación con firma:', err);
+      setError(err.message);
+    } finally {
+      setSubiendoFirma(false);
+    }
+  };
+
+  // ========== FUNCIONES EXISTENTES ==========
 
   // FUNCIÓN: Manejar selección de imágenes para observación
   const handleImagenesSelect = (e) => {
     const files = Array.from(e.target.files);
     
-    // Validar cantidad máxima (3)
     if (imagenesObservacion.length + files.length > 3) {
       setError('Máximo 3 imágenes permitidas');
       return;
     }
 
-    // Validar cada archivo
     const nuevasImagenes = [];
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 
     files.forEach(file => {
       if (!allowedTypes.includes(file.type)) {
-        setError(`El archivo ${file.name} no es una imagen válida (${file.type})`);
+        setError(`El archivo ${file.name} no es una imagen válida`);
         return;
       }
 
@@ -101,7 +306,6 @@ export default function RefaccionesCargo({ montacargas }) {
     setImagenesObservacion(prev => [...prev, ...nuevasImagenes]);
     setError('');
     
-    // Limpiar input file
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -112,7 +316,7 @@ export default function RefaccionesCargo({ montacargas }) {
     setImagenesObservacion(prev => prev.filter((_, i) => i !== index));
   };
 
-  // FUNCIÓN: Subir observación con imágenes - SOLO TÉCNICOS
+  // FUNCIÓN: Subir observación con imágenes
   const subirObservacionConImagenes = async () => {
     if (!canAddRefacciones()) {
       setError('❌ No tienes permisos para agregar observaciones');
@@ -136,14 +340,12 @@ export default function RefaccionesCargo({ montacargas }) {
       const token = localStorage.getItem("token");
       const formData = new FormData();
       
-      // Agregar campos como strings
       formData.append('mantenimiento_id', observacionConImagenes.mantenimiento_id.toString());
       formData.append('descripcion', observacionConImagenes.descripcion);
       formData.append('cargo_a', observacionConImagenes.cargo_a);
       formData.append('es_evidencia', 'true');
       formData.append('estado_resolucion', 'resuelto');
 
-      // Agregar todas las imágenes al FormData
       imagenesObservacion.forEach((imagen, index) => {
         formData.append('imagenes', imagen.file);
       });
@@ -165,7 +367,7 @@ export default function RefaccionesCargo({ montacargas }) {
         throw new Error(data.error || 'Error al subir observación con imágenes');
       }
 
-      setSuccess(`Observación completada con ${imagenesObservacion.length} imagen(es)`);
+      setSuccess(`✅ Observación completada con ${imagenesObservacion.length} imagen(es)`);
       setImagenesObservacion([]);
       setObservacionConImagenes(null);
       fetchObservaciones(mantenimientoSeleccionado.id);
@@ -178,7 +380,7 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   };
 
-  // FUNCIÓN: Agregar imágenes a observación existente - SOLO TÉCNICOS
+  // FUNCIÓN: Agregar imágenes a observación existente
   const agregarImagenesAObservacion = (observacion) => {
     if (!canAddRefacciones()) {
       setError('❌ No tienes permisos para agregar imágenes');
@@ -188,7 +390,7 @@ export default function RefaccionesCargo({ montacargas }) {
     setImagenesObservacion([]);
   };
 
-  // FUNCIÓN: Eliminar imagen específica de una observación - TÉCNICOS Y ADMINS
+  // FUNCIÓN: Eliminar imagen específica de una observación
   const handleEliminarImagen = async (observacionId, numeroImagen) => {
     if (!canDeleteImages()) {
       setError('❌ No tienes permisos para eliminar imágenes');
@@ -218,7 +420,7 @@ export default function RefaccionesCargo({ montacargas }) {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setSuccess('Imagen eliminada correctamente');
+        setSuccess('✅ Imagen eliminada correctamente');
         fetchObservaciones(mantenimientoSeleccionado.id);
       } else {
         throw new Error(data.error || 'Error al eliminar imagen');
@@ -400,7 +602,6 @@ export default function RefaccionesCargo({ montacargas }) {
     try {
       const token = localStorage.getItem("token");
       
-      // Usar JSON en lugar de FormData para NO permitir imágenes en la creación inicial
       const requestBody = {
         mantenimiento_id: mantenimientoSeleccionado.id,
         descripcion: formData.descripcion.trim(),
@@ -424,7 +625,7 @@ export default function RefaccionesCargo({ montacargas }) {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setSuccess('Observación agregada correctamente');
+        setSuccess('✅ Observación agregada correctamente');
         setFormData({
           descripcion: '',
           cargo_a: 'empresa'
@@ -488,7 +689,7 @@ export default function RefaccionesCargo({ montacargas }) {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setSuccess('Observación actualizada correctamente');
+        setSuccess('✅ Observación actualizada correctamente');
         setEditandoObservacion(null);
         fetchObservaciones(mantenimientoSeleccionado.id);
       } else {
@@ -531,60 +732,13 @@ export default function RefaccionesCargo({ montacargas }) {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setSuccess('Observación eliminada correctamente');
+        setSuccess('✅ Observación eliminada correctamente');
         fetchObservaciones(mantenimientoSeleccionado.id);
       } else {
         throw new Error(data.error || 'Error al eliminar observación');
       }
     } catch (err) {
       console.error('Error en handleEliminarObservacion:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResolverObservacion = async (observacionId) => {
-    if (!canAddRefacciones()) {
-      setError('❌ No tienes permisos para resolver observaciones');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const token = localStorage.getItem("token");
-      const observacion = observaciones.find(o => o.id === observacionId);
-      
-      const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/api/refacciones/${observacionId}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            descripcion: observacion.descripcion,
-            cargo_a: observacion.cargo_a,
-            estado_resolucion: 'resuelto',
-            es_evidencia: observacion.es_evidencia || 'false'
-          })
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setSuccess('Observación marcada como resuelta');
-        fetchObservaciones(mantenimientoSeleccionado.id);
-      } else {
-        throw new Error(data.error || 'Error al resolver observación');
-      }
-    } catch (err) {
-      console.error('Error en handleResolverObservacion:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -926,7 +1080,7 @@ export default function RefaccionesCargo({ montacargas }) {
           </div>
         </div>
 
-        {/* Columna 2: Formulario para agregar observación (SOLO TÉCNICOS) */}
+        {/* Columna 2: Formulario para agregar observación */}
         {canAddRefacciones() && (
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -1107,6 +1261,35 @@ export default function RefaccionesCargo({ montacargas }) {
                             </div>
                           </div>
                         )}
+
+                        {/* MOSTRAR FIRMA SI EXISTE */}
+                        {observacion.firma_url && (
+                          <div className="mt-3 p-3 bg-gray-50 rounded-md border">
+                            <p className="text-sm font-medium text-gray-700 mb-2">
+                              ✍️ Firma de completado:
+                            </p>
+                            <div className="flex items-center gap-3">
+                              <img 
+                                src={observacion.firma_url} 
+                                alt="Firma" 
+                                className="h-16 border border-gray-300 rounded bg-white"
+                              />
+                              <div>
+                                <p className="text-sm text-gray-800">
+                                  <strong>Nombre:</strong> {observacion.firma_nombre}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Fecha: {formatDate(observacion.fecha_resolucion)}
+                                </p>
+                                {observacion.resuelto_por_nombre && (
+                                  <p className="text-xs text-gray-500">
+                                    Completado por: {observacion.resuelto_por_nombre}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         
                         <p className="text-gray-800 mb-3 whitespace-pre-wrap text-sm">
                           {observacion.descripcion}
@@ -1126,7 +1309,7 @@ export default function RefaccionesCargo({ montacargas }) {
                           )}
                         </div>
 
-                        {/* BOTONES DE ACCIÓN SOLO PARA TÉCNICOS */}
+                        {/* BOTONES DE ACCIÓN SOLO PARA USUARIOS NORMALES */}
                         {canAddRefacciones() && (
                           <div className="flex justify-end gap-2 mt-3 pt-2 border-t">
                             {/* BOTÓN: Agregar imágenes a observación existente */}
@@ -1139,12 +1322,13 @@ export default function RefaccionesCargo({ montacargas }) {
                               </button>
                             )}
                             
+                            {/* BOTÓN: Completar con firma (REEMPLAZA al botón Resolver) */}
                             {observacion.estado_resolucion !== 'resuelto' && (
                               <button
-                                onClick={() => handleResolverObservacion(observacion.id)}
+                                onClick={() => iniciarResolucionConFirma(observacion)}
                                 className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
                               >
-                                Resolver
+                                ✍️ Completar con Firma
                               </button>
                             )}
                             <button
@@ -1190,7 +1374,7 @@ export default function RefaccionesCargo({ montacargas }) {
         </div>
       </div>
 
-      {/* Modal para agregar imágenes a observación existente (SOLO TÉCNICOS) */}
+      {/* Modal para agregar imágenes a observación existente */}
       {observacionConImagenes && canAddRefacciones() && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -1317,6 +1501,99 @@ export default function RefaccionesCargo({ montacargas }) {
             <p className="text-xs text-gray-500 text-center mt-3">
               Formatos: JPEG, PNG, GIF, WebP. Máx. 5MB por imagen.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para firma digital */}
+      {mostrarModalFirma && observacionParaCompletar && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-screen overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">
+                ✍️ Completar Observación con Firma
+              </h3>
+              <button
+                onClick={() => {
+                  setMostrarModalFirma(false);
+                  setObservacionParaCompletar(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={subiendoFirma}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Información de la observación */}
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+              <p className="text-sm text-blue-800">
+                <strong>Observación a completar:</strong> {observacionParaCompletar.descripcion}
+              </p>
+              <p className="text-sm text-blue-700 mt-1">
+                <strong>Cargo:</strong> {getCargoText(observacionParaCompletar.cargo_a)}
+              </p>
+            </div>
+
+            {/* Componente de firma */}
+            <FirmaCanvas onFirmaCompleta={setFirmaData} />
+
+            {/* Campo para nombre */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nombre completo *
+              </label>
+              <input
+                type="text"
+                value={firmaNombre}
+                onChange={(e) => setFirmaNombre(e.target.value)}
+                placeholder="Ingrese su nombre completo"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+
+            {/* Vista previa de firma */}
+            {firmaData && (
+              <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                <p className="text-sm font-medium text-gray-700 mb-2">Vista previa de firma:</p>
+                <img 
+                  src={firmaData} 
+                  alt="Vista previa de firma" 
+                  className="h-20 border border-gray-300 rounded bg-white"
+                />
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-4 border-t mt-4">
+              <button
+                onClick={completarObservacionConFirma}
+                disabled={subiendoFirma || !firmaData || !firmaNombre.trim()}
+                className="flex-1 bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {subiendoFirma ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Completando...
+                  </div>
+                ) : (
+                  '✅ Completar con Firma'
+                )}
+              </button>
+              
+              <button
+                onClick={() => {
+                  setMostrarModalFirma(false);
+                  setObservacionParaCompletar(null);
+                }}
+                disabled={subiendoFirma}
+                className="px-4 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
