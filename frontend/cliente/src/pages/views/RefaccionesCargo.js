@@ -255,63 +255,64 @@ const FirmaCanvas = ({ onFirmaCompleta }) => {
   };
 
   // FUNCIÓN: Completar observación con firma
-  const completarObservacionConFirma = async () => {
-    if (!firmaData || !firmaNombre.trim()) {
-      setError('Debe proporcionar su firma y nombre completo');
-      return;
-    }
+  // FUNCIÓN: Completar observación con firma - ACTUALIZADA
+const completarObservacionConFirma = async () => {
+  if (!firmaData || !firmaNombre.trim()) {
+    setError('Debe proporcionar su firma y nombre completo');
+    return;
+  }
 
-    setSubiendoFirma(true);
-    setError('');
+  setSubiendoFirma(true);
+  setError('');
 
-    try {
-      const token = localStorage.getItem("token");
-      const userData = JSON.parse(localStorage.getItem('user') || '{}');
-      
-      // Convertir firma de DataURL a Blob
-      const response = await fetch(firmaData);
-      const blob = await response.blob();
-      
-      const formData = new FormData();
-      formData.append('descripcion', observacionParaCompletar.descripcion);
-      formData.append('cargo_a', observacionParaCompletar.cargo_a);
-      formData.append('estado_resolucion', 'resuelto');
-      formData.append('es_evidencia', observacionParaCompletar.es_evidencia || 'false');
-      formData.append('firma', blob, `firma-${Date.now()}.png`);
-      formData.append('firma_nombre', firmaNombre.trim());
-      formData.append('resuelto_por', userData.id || '');
-      formData.append('resuelto_por_nombre', userData.nombre || userData.email || '');
+  try {
+    const token = localStorage.getItem("token");
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    // Enviar la firma como base64 en el body en lugar de FormData
+    const requestBody = {
+      descripcion: observacionParaCompletar.descripcion,
+      cargo_a: observacionParaCompletar.cargo_a,
+      estado_resolucion: 'resuelto',
+      es_evidencia: observacionParaCompletar.es_evidencia || 'false',
+      // Nuevos campos para firma
+      firma_data: firmaData, // Esto es el base64 del canvas
+      firma_nombre: firmaNombre.trim(),
+      resuelto_por: userData.id || '',
+      resuelto_por_nombre: userData.nombre || userData.email || ''
+    };
 
-      const apiResponse = await fetch(
-        `${process.env.REACT_APP_API_URL}/api/refacciones/${observacionParaCompletar.id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formData
-        }
-      );
-
-      const data = await apiResponse.json();
-
-      if (apiResponse.ok && data.success) {
-        setSuccess('✅ Observación completada con firma');
-        setMostrarModalFirma(false);
-        setObservacionParaCompletar(null);
-        setFirmaData(null);
-        setFirmaNombre('');
-        fetchObservaciones(mantenimientoSeleccionado.id);
-      } else {
-        throw new Error(data.error || 'Error al completar observación');
+    const apiResponse = await fetch(
+      `${process.env.REACT_APP_API_URL}/api/refacciones/${observacionParaCompletar.id}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestBody)
       }
-    } catch (err) {
-      console.error('Error al completar observación con firma:', err);
-      setError(err.message);
-    } finally {
-      setSubiendoFirma(false);
+    );
+
+    const data = await apiResponse.json();
+
+    if (apiResponse.ok && data.success) {
+      setSuccess('✅ Observación completada con firma');
+      setMostrarModalFirma(false);
+      setObservacionParaCompletar(null);
+      setFirmaData(null);
+      setFirmaNombre('');
+      fetchObservaciones(mantenimientoSeleccionado.id);
+    } else {
+      throw new Error(data.error || 'Error al completar observación');
     }
-  };
+  } catch (err) {
+    console.error('Error al completar observación con firma:', err);
+    setError(err.message);
+  } finally {
+    setSubiendoFirma(false);
+  }
+};
 
   // ========== FUNCIONES EXISTENTES ==========
 

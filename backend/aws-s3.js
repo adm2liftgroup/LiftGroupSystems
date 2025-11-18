@@ -91,8 +91,36 @@ const deleteFromS3 = async (fileUrl) => {
   }
 };
 
+const uploadFirmaToS3 = async (fileBuffer, fileName, mimetype) => {
+  try {
+    console.log(`✍️ Subiendo firma a AWS S3: ${fileName}`);
+    
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `firmas/${Date.now()}-${cleanFileName}`;
+    
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: filePath,
+      Body: fileBuffer,
+      ContentType: mimetype
+    });
+
+    await s3Client.send(command);
+
+    const firmaUrl = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${filePath}`;
+    
+    console.log('✅ Firma subida a S3:', firmaUrl);
+    return firmaUrl;
+    
+  } catch (error) {
+    console.error('❌ Error subiendo firma a S3:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   uploadImageToS3,
   uploadDocumentToS3,
+  uploadFirmaToS3,
   deleteFromS3
 };

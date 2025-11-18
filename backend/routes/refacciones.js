@@ -4,7 +4,7 @@ const pool = require("../db");
 const multer = require('multer');
 const { uploadImageToS3, deleteFromS3 } = require('../aws-s3');
 
-// Configurar multer para MÚLTIPLES imágenes
+// Configurar multer para MÚLTIPLES imágenes Y firma
 const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
@@ -21,7 +21,7 @@ const upload = multer({
   }
 });
 
-// BLOQUE 1: Obtener todas las observaciones/refacciones
+// BLOQUE 1: Obtener todas las observaciones/refacciones - CORREGIDO CON CAMPOS FIRMA
 router.get("/", async (req, res) => {
   try {
     const q = await pool.query(
@@ -56,7 +56,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// BLOQUE 2: Obtener observaciones de un mantenimiento específico
+// BLOQUE 2: Obtener observaciones de un mantenimiento específico - CORREGIDO CON CAMPOS FIRMA
 router.get("/mantenimiento/:mantenimientoId", async (req, res) => {
   try {
     const { mantenimientoId } = req.params;
@@ -87,7 +87,7 @@ router.get("/mantenimiento/:mantenimientoId", async (req, res) => {
   }
 });
 
-// BLOQUE 3: Agregar nueva observación con hasta 3 imágenes
+// BLOQUE 3: Agregar nueva observación con hasta 3 imágenes - ACTUALIZADO PARA FIRMA
 router.post("/", upload.array('imagenes', 3), async (req, res) => {
   try {
     console.log('📥 POST /api/refacciones recibido');
@@ -99,7 +99,10 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
       descripcion,
       cargo_a = 'empresa',
       estado_resolucion = 'pendiente',
-      es_evidencia = 'false'
+      es_evidencia = 'false',
+      // Nuevos campos para firma
+      firma_data = null,
+      firma_nombre = null
     } = req.body;
 
     // Validaciones
@@ -140,6 +143,7 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
     let imagen_url_1 = null, imagen_nombre_1 = null;
     let imagen_url_2 = null, imagen_nombre_2 = null;
     let imagen_url_3 = null, imagen_nombre_3 = null;
+    let firma_url = null;
 
     // Subir hasta 3 imágenes
     if (req.files && req.files.length > 0) {
@@ -172,6 +176,28 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
       }
     }
 
+    // Procesar firma digital si está presente
+    if (firma_data && firma_nombre) {
+      try {
+        console.log('✍️ Procesando firma digital...');
+        
+        // Convertir base64 a buffer
+        const base64Data = firma_data.replace(/^data:image\/\w+;base64,/, '');
+        const firmaBuffer = Buffer.from(base64Data, 'base64');
+        
+        // Subir firma a S3
+        firma_url = await uploadImageToS3(
+          firmaBuffer,
+          `firma-${Date.now()}.png`,
+          'image/png'
+        );
+        
+        console.log('✅ Firma subida a S3:', firma_url);
+      } catch (firmaError) {
+        console.error('❌ Error subiendo firma a S3:', firmaError);
+      }
+    }
+
     console.log('💾 Guardando en base de datos...');
     
     // Convertir es_evidencia a boolean
@@ -180,8 +206,9 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
     const result = await pool.query(
       `INSERT INTO observaciones_mantenimiento 
        (mantenimiento_id, descripcion, cargo_a, estado_resolucion, creado_por, 
-        imagen_url_1, imagen_nombre_1, imagen_url_2, imagen_nombre_2, imagen_url_3, imagen_nombre_3, es_evidencia)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        imagen_url_1, imagen_nombre_1, imagen_url_2, imagen_nombre_2, imagen_url_3, imagen_nombre_3, 
+        es_evidencia, firma_url, firma_nombre, firma_fecha)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING *`,
       [
         mantenimiento_id, 
@@ -195,7 +222,10 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
         imagen_nombre_2,
         imagen_url_3,
         imagen_nombre_3,
-        esEvidenciaBool
+        esEvidenciaBool,
+        firma_url,
+        firma_nombre,
+        firma_url ? new Date() : null // Solo poner fecha si hay firma
       ]
     );
 
@@ -203,7 +233,7 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
     res.json({
       success: true,
       refaccion: result.rows[0],
-      message: `Observación agregada correctamente${req.files?.length > 0 ? ` con ${req.files.length} imagen(es)` : ''}`
+      message: `Observación agregada correctamente${req.files?.length > 0 ? ` con ${req.files.length} imagen(es)` : ''}${firma_url ? ' y firma' : ''}`
     });
   } catch (err) {
     console.error("❌ Error agregando refacción:", err);
@@ -214,18 +244,29 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
   }
 });
 
-// BLOQUE 4: Actualizar observación/refacción
+// BLOQUE 4: Actualizar observación/refacción - ACTUALIZADO PARA FIRMA
+// BLOQUE 4: Actualizar observación/refacción - COMPLETO Y CORREGIDO
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { descripcion, cargo_a, estado_resolucion, es_evidencia } = req.body;
+    const { 
+      descripcion, 
+      cargo_a, 
+      estado_resolucion, 
+      es_evidencia,
+      // Nuevos campos para firma
+      firma_data,
+      firma_nombre,
+      resuelto_por,
+      resuelto_por_nombre
+    } = req.body;
 
     console.log('📥 PUT /api/refacciones/' + id + ' recibido');
     console.log('📋 Body fields:', req.body);
 
     // Verificar que la observación existe
     const observacionCheck = await pool.query(
-      'SELECT id FROM observaciones_mantenimiento WHERE id = $1',
+      'SELECT id, firma_url FROM observaciones_mantenimiento WHERE id = $1',
       [id]
     );
 
@@ -242,42 +283,130 @@ router.put("/:id", async (req, res) => {
     let query = `UPDATE observaciones_mantenimiento 
                  SET descripcion = $1, cargo_a = $2, estado_resolucion = $3, es_evidencia = $4`;
     let params = [descripcion, cargo_a, estado_resolucion, esEvidenciaBool];
+    let paramCount = 5;
+
+    // Procesar firma digital si está presente
+    let firma_url = null;
+    if (firma_data && firma_nombre) {
+      try {
+        console.log('✍️ Procesando firma digital...');
+        
+        // Validar que sea un base64 válido
+        if (!firma_data.startsWith('data:image/')) {
+          throw new Error('Formato de firma inválido');
+        }
+        
+        // Convertir base64 a buffer
+        const base64Data = firma_data.replace(/^data:image\/\w+;base64,/, '');
+        const firmaBuffer = Buffer.from(base64Data, 'base64');
+        
+        // Validar que el buffer no esté vacío
+        if (firmaBuffer.length === 0) {
+          throw new Error('La firma está vacía');
+        }
+        
+        // Subir firma a S3
+        firma_url = await uploadImageToS3(
+          firmaBuffer,
+          `firma-${Date.now()}-${firma_nombre.replace(/[^a-zA-Z0-9]/g, '_')}.png`,
+          'image/png'
+        );
+        
+        console.log('✅ Firma subida a S3:', firma_url);
+        
+        // Eliminar firma anterior si existe
+        const firmaAnterior = observacionCheck.rows[0].firma_url;
+        if (firmaAnterior && firmaAnterior.includes('amazonaws.com')) {
+          try {
+            await deleteFromS3(firmaAnterior);
+            console.log('🗑️ Firma anterior eliminada:', firmaAnterior);
+          } catch (deleteError) {
+            console.error('⚠️ Error eliminando firma anterior:', deleteError);
+            // No detenemos el proceso por este error
+          }
+        }
+        
+        // Agregar campos de firma a la consulta
+        query += `, firma_url = $${paramCount}, firma_nombre = $${paramCount + 1}, firma_fecha = $${paramCount + 2}`;
+        params.push(firma_url, firma_nombre.trim(), new Date());
+        paramCount += 3;
+        
+      } catch (firmaError) {
+        console.error('❌ Error subiendo firma a S3:', firmaError);
+        return res.status(400).json({ 
+          success: false,
+          error: `Error al procesar firma: ${firmaError.message}` 
+        });
+      }
+    }
 
     // Si se marca como resuelto, agregar fecha y usuario
     if (estado_resolucion === 'resuelto') {
-      query += `, fecha_resolucion = NOW(), resuelto_por = $5`;
-      params.push(req.user?.id || null);
+      query += `, fecha_resolucion = NOW(), resuelto_por = $${paramCount}`;
+      params.push(req.user?.id || resuelto_por || null);
+      paramCount++;
     } else if (estado_resolucion === 'pendiente') {
+      // Solo limpiar campos de resolución, mantener la firma si existe
       query += `, fecha_resolucion = NULL, resuelto_por = NULL`;
+      
+      // Si no hay firma nueva y queremos limpiar la firma existente al volver a pendiente
+      // query += `, fecha_resolucion = NULL, resuelto_por = NULL, firma_url = NULL, firma_nombre = NULL, firma_fecha = NULL`;
     }
 
-    query += ` WHERE id = $${params.length + 1} RETURNING *`;
+    query += ` WHERE id = $${paramCount} RETURNING *`;
     params.push(id);
+
+    console.log('🔍 Ejecutando query:', query);
+    console.log('📊 Params:', params);
 
     const result = await pool.query(query, params);
 
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        error: "No se pudo actualizar la observación" 
+      });
+    }
+
+    // Obtener la observación actualizada con información completa
+    const observacionActualizada = await pool.query(
+      `SELECT om.*, 
+              u1.nombre as tecnico_nombre,
+              u2.nombre as resuelto_por_nombre
+       FROM observaciones_mantenimiento om
+       LEFT JOIN "Usuarios" u1 ON om.creado_por = u1.id
+       LEFT JOIN "Usuarios" u2 ON om.resuelto_por = u2.id
+       WHERE om.id = $1`,
+      [id]
+    );
+
+    const mensaje = "Observación actualizada correctamente" + 
+                   (firma_url ? " con firma" : "") + 
+                   (estado_resolucion === 'resuelto' ? " y marcada como resuelta" : "");
+
     res.json({
       success: true,
-      refaccion: result.rows[0],
-      message: "Observación/refacción actualizada correctamente"
+      refaccion: observacionActualizada.rows[0],
+      message: mensaje
     });
+
   } catch (err) {
-    console.error("Error actualizando refacción:", err);
+    console.error("❌ Error actualizando refacción:", err);
     res.status(500).json({ 
       success: false,
-      error: "Error al actualizar refacción" 
+      error: err.message || "Error al actualizar refacción" 
     });
   }
 });
 
-// BLOQUE 5: Eliminar observación/refacción - ACTUALIZADO PARA 3 IMÁGENES
+// BLOQUE 5: Eliminar observación/refacción - ACTUALIZADO PARA ELIMINAR FIRMA
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Primero obtener la información para eliminar las imágenes
+    // Primero obtener la información para eliminar las imágenes Y firma
     const observacion = await pool.query(
-      'SELECT imagen_url_1, imagen_url_2, imagen_url_3 FROM observaciones_mantenimiento WHERE id = $1',
+      'SELECT imagen_url_1, imagen_url_2, imagen_url_3, firma_url FROM observaciones_mantenimiento WHERE id = $1',
       [id]
     );
 
@@ -293,18 +422,23 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    // Eliminar TODAS las imágenes de AWS S3 si existen
+    // Eliminar TODAS las imágenes Y firma de AWS S3 si existen
     if (observacion.rows.length > 0) {
       const obs = observacion.rows[0];
-      const imagenes = [obs.imagen_url_1, obs.imagen_url_2, obs.imagen_url_3];
+      const archivos = [
+        obs.imagen_url_1, 
+        obs.imagen_url_2, 
+        obs.imagen_url_3,
+        obs.firma_url  // Agregar firma a la lista de archivos a eliminar
+      ];
       
-      for (const imagenUrl of imagenes) {
-        if (imagenUrl && imagenUrl.includes('amazonaws.com')) {
+      for (const archivoUrl of archivos) {
+        if (archivoUrl && archivoUrl.includes('amazonaws.com')) {
           try {
-            await deleteFromS3(imagenUrl);
-            console.log('✅ Imagen eliminada de AWS S3:', imagenUrl);
+            await deleteFromS3(archivoUrl);
+            console.log('✅ Archivo eliminado de AWS S3:', archivoUrl);
           } catch (error) {
-            console.error('❌ Error eliminando imagen de S3:', error);
+            console.error('❌ Error eliminando archivo de S3:', error);
           }
         }
       }
@@ -386,7 +520,7 @@ router.delete("/:id/imagen/:numero", async (req, res) => {
   }
 });
 
-// BLOQUE 7: Resolver observación específica
+// BLOQUE 7: Resolver observación específica - ACTUALIZADO PARA FIRMA
 router.put("/:id/resolver", async (req, res) => {
   try {
     const { id } = req.params;
@@ -486,7 +620,7 @@ router.get("/estadisticas", async (req, res) => {
   }
 });
 
-// BLOQUE 9: Obtener observaciones resueltas del mes actual - NUEVA RUTA
+// BLOQUE 9: Obtener observaciones resueltas del mes actual - ACTUALIZADO CON FIRMA
 router.get("/observaciones-resueltas-mes", async (req, res) => {
   try {
     const { mes, anio } = req.query;
