@@ -550,7 +550,7 @@ const PanelTecnico = ({
   );
 };
 
-//Bloque 1.8: Panel de Checklists
+// BLOQUE 1.8: Panel de Checklists - CORREGIDO
 const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
   const [checklistData, setChecklistData] = useState({});
   const [observaciones, setObservaciones] = useState("");
@@ -562,10 +562,11 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
   const [condicionesPintura, setCondicionesPintura] = useState("Bueno");
   const [currentSection, setCurrentSection] = useState(0);
   
-  // Estados para la firma del cliente
-  const [firmaClienteData, setFirmaClienteData] = useState(null);
-  const [firmaClienteNombre, setFirmaClienteNombre] = useState("");
-  const [mostrarCanvasFirma, setMostrarCanvasFirma] = useState(false);
+  // Estados para la firma del cliente - CORREGIDOS para coincidir con RefaccionesCargo
+  const [firmaData, setFirmaData] = useState(null);
+  const [firmaNombre, setFirmaNombre] = useState("");
+  const [mostrarModalFirma, setMostrarModalFirma] = useState(false);
+  const [subiendoFirma, setSubiendoFirma] = useState(false);
 
   const sections = [
     { title: "Información General", range: [1, 10] },
@@ -580,8 +581,8 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
     { title: "Firmas" }
   ];
 
-  // Componente de Canvas para firma del cliente
-  const FirmaClienteCanvas = ({ onFirmaCompleta }) => {
+  // Componente de Canvas para firma del cliente - IDÉNTICO al de RefaccionesCargo
+  const FirmaCanvas = ({ onFirmaCompleta }) => {
     const canvasRef = useRef(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
@@ -695,7 +696,7 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
       <div className="border-2 border-gray-300 rounded-lg p-4 bg-white">
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Firma del Cliente *
+            Firma Digital *
           </label>
           <div className="border border-gray-300 rounded bg-white overflow-hidden">
             <canvas
@@ -703,7 +704,10 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
               width={400}
               height={200}
               className="block w-full h-48 touch-none bg-white"
-              style={{ touchAction: 'none', cursor: 'crosshair' }}
+              style={{ 
+                touchAction: 'none',
+                cursor: 'crosshair'
+              }}
               onMouseDown={startDrawing}
               onMouseMove={draw}
               onMouseUp={stopDrawing}
@@ -715,7 +719,7 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
             />
           </div>
           <p className="text-xs text-gray-500 mt-2">
-            El cliente debe dibujar su firma en el área superior.
+            Dibuje su firma en el área superior. En dispositivos móviles, use el dedo.
           </p>
         </div>
         
@@ -730,6 +734,13 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
         </div>
       </div>
     );
+  };
+
+  // Función para completar con firma - similar a RefaccionesCargo
+  const iniciarFirmaCliente = () => {
+    setMostrarModalFirma(true);
+    setFirmaData(null);
+    setFirmaNombre("");
   };
 
   const getDescripcionChecklist = (numero) => {
@@ -1132,70 +1143,61 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
           </div>
         </div>
 
-        {/* FIRMA DEL CLIENTE - SEPARADA COMO EN LA IMAGEN */}
+        {/* FIRMA DEL CLIENTE - ESTILO MEJORADO */}
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <h3 className="font-bold text-gray-800 mb-4 text-center">FIRMA DEL CLIENTE</h3>
           
-          {!mostrarCanvasFirma ? (
+          {!firmaData ? (
             <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
               <p className="text-gray-600 mb-4">El cliente debe firmar para aceptar el servicio realizado</p>
               <button
                 type="button"
-                onClick={() => setMostrarCanvasFirma(true)}
+                onClick={iniciarFirmaCliente}
                 className="bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 font-medium"
               >
-                Solicitar Firma del Cliente
+                ✍️ Solicitar Firma del Cliente
               </button>
             </div>
           ) : (
             <div className="space-y-4">
-              <FirmaClienteCanvas onFirmaCompleta={setFirmaClienteData} />
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre del Cliente *
-                </label>
-                <input
-                  type="text"
-                  value={firmaClienteNombre}
-                  onChange={(e) => setFirmaClienteNombre(e.target.value)}
-                  placeholder="Ingrese el nombre completo del cliente"
-                  className="w-full p-3 border border-gray-300 rounded text-sm"
-                  required
-                />
-              </div>
-
-              {firmaClienteData && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded">
-                  <p className="text-green-700 text-sm">✅ Firma del cliente capturada correctamente</p>
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-green-700 font-medium">✅ Firma del cliente capturada</p>
+                    <p className="text-green-600 text-sm">Nombre: {firmaNombre}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setFirmaData(null);
+                      setFirmaNombre("");
+                    }}
+                    className="text-red-600 hover:text-red-800 text-sm"
+                  >
+                    Cambiar Firma
+                  </button>
                 </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMostrarCanvasFirma(false);
-                  setFirmaClienteData(null);
-                  setFirmaClienteNombre("");
-                }}
-                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
-              >
-                Cancelar Firma
-              </button>
+              </div>
+              
+              <div className="border border-gray-300 rounded-lg p-4 bg-white">
+                <img 
+                  src={firmaData} 
+                  alt="Firma del cliente" 
+                  className="h-24 mx-auto border border-gray-300 bg-white"
+                />
+                <p className="text-center text-sm text-gray-600 mt-2">Vista previa de la firma</p>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Firma del técnico - ESTILO SIMILAR A LA IMAGEN */}
+        {/* Firma del técnico */}
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <h3 className="font-bold text-gray-800 mb-4 text-center">FIRMA DEL TÉCNICO</h3>
           <div className="border-2 border-gray-300 rounded-lg p-6 text-center bg-gray-50">
-            <div className="mb-4">
-              <p className="text-gray-600 mb-2">Espacio para firma digital</p>
-            </div>
             <div className="text-sm text-gray-700 space-y-1">
               <p><strong>Técnico:</strong> {tecnico?.nombre || "N/A"}</p>
               <p><strong>Fecha:</strong> {new Date().toLocaleDateString('es-ES')}</p>
+              <p><strong>Hora:</strong> {new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</p>
             </div>
           </div>
         </div>
@@ -1204,12 +1206,6 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
   };
 
   const handleSubmitChecklist = () => {
-    // Validar que se tenga la firma del cliente si se mostró el canvas
-    if (mostrarCanvasFirma && (!firmaClienteData || !firmaClienteNombre.trim())) {
-      alert("Debe capturar la firma y nombre del cliente antes de completar el checklist");
-      return;
-    }
-
     const checklistCompleto = {
       ...checklistData,
       observaciones,
@@ -1222,9 +1218,9 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
       tecnico: tecnico?.nombre,
       fecha: new Date().toISOString(),
       mantenimientoId: mantenimiento.id,
-      // Incluir datos de la firma del cliente
-      firma_cliente_data: firmaClienteData,
-      firma_cliente_nombre: firmaClienteNombre
+      // Incluir datos de la firma del cliente - NOMBRES CORREGIDOS
+      firma_cliente_data: firmaData,
+      firma_cliente_nombre: firmaNombre
     };
 
     onCompletarChecklist(checklistCompleto);
@@ -1329,23 +1325,106 @@ const ChecklistMovil = ({ mantenimiento, tecnico, onCompletarChecklist }) => {
           ) : (
             <button
               onClick={handleSubmitChecklist}
-              disabled={mostrarCanvasFirma && (!firmaClienteData || !firmaClienteNombre.trim())}
-              className={`px-6 py-3 rounded-lg font-medium ${
-                mostrarCanvasFirma && (!firmaClienteData || !firmaClienteNombre.trim())
-                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                  : 'bg-green-600 text-white hover:bg-green-700'
-              }`}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
             >
-              {mostrarCanvasFirma && (!firmaClienteData || !firmaClienteNombre.trim()) 
-                ? 'Complete la firma del cliente' 
-                : 'Completar Checklist'}
+              Completar Checklist
             </button>
           )}
         </div>
       </div>
+
+      {/* Modal para firma digital - COPIADO DE RefaccionesCargo */}
+      {mostrarModalFirma && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-screen overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">
+                ✍️ Firma del Cliente
+              </h3>
+              <button
+                onClick={() => {
+                  setMostrarModalFirma(false);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={subiendoFirma}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Información del servicio */}
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+              <p className="text-sm text-blue-800">
+                <strong>Servicio a firmar:</strong> Mantenimiento {mantenimiento.tipo} - Montacargas #{mantenimiento.montacargas_numero}
+              </p>
+              <p className="text-sm text-blue-700 mt-1">
+                <strong>Fecha:</strong> {new Date().toLocaleDateString('es-ES')}
+              </p>
+            </div>
+
+            {/* Componente de firma */}
+            <FirmaCanvas onFirmaCompleta={setFirmaData} />
+
+            {/* Campo para nombre */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nombre completo del cliente *
+              </label>
+              <input
+                type="text"
+                value={firmaNombre}
+                onChange={(e) => setFirmaNombre(e.target.value)}
+                placeholder="Ingrese el nombre completo del cliente"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+
+            {/* Vista previa de firma */}
+            {firmaData && (
+              <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                <p className="text-sm font-medium text-gray-700 mb-2">Vista previa de firma:</p>
+                <img 
+                  src={firmaData} 
+                  alt="Vista previa de firma" 
+                  className="h-20 border border-gray-300 rounded bg-white"
+                />
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-4 border-t mt-4">
+              <button
+                onClick={() => {
+                  if (!firmaData || !firmaNombre.trim()) {
+                    alert("Debe proporcionar la firma y nombre del cliente");
+                    return;
+                  }
+                  setMostrarModalFirma(false);
+                }}
+                disabled={subiendoFirma || !firmaData || !firmaNombre.trim()}
+                className="flex-1 bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                ✅ Confirmar Firma
+              </button>
+              
+              <button
+                onClick={() => {
+                  setMostrarModalFirma(false);
+                }}
+                disabled={subiendoFirma}
+                className="px-4 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}; 
+};
 
 // BLOQUE 1.9: Panel de Checklists Completados - MEJORADO
 const ChecklistsCompletadosPanel = ({ checklists, loading, error }) => {
