@@ -1507,7 +1507,7 @@ const ObservacionesResueltasPanel = ({ observaciones, loading, error, mes, anio 
         </div>
       )}
 
-      {/* MODAL DE DETALLE DE OBSERVACIÓN - CORREGIDO */}
+      {/* MODAL DE DETALLE DE OBSERVACIÓN - ACTUALIZADO CON FIRMA */}
       {observacionDetalle && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1560,10 +1560,52 @@ const ObservacionesResueltasPanel = ({ observaciones, loading, error, mes, anio 
               </div>
             </div>
 
+            {/* SECCIÓN DE FIRMA DIGITAL - NUEVA */}
+            {observacionDetalle.firma_url && (
+              <div className="mb-4">
+                <h4 className="font-semibold mb-3">✍️ Firma de Completado</h4>
+                <div className="bg-white border border-gray-300 rounded-lg p-4">
+                  <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                    <div className="flex-shrink-0">
+                      <img 
+                        src={observacionDetalle.firma_url} 
+                        alt="Firma del técnico"
+                        className="h-24 w-48 border border-gray-300 rounded bg-white object-contain"
+                        onError={(e) => {
+                          console.error('Error cargando firma:', observacionDetalle.firma_url);
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'block';
+                        }}
+                      />
+                      <div className="hidden text-red-500 text-sm mt-1">
+                        ❌ Error al cargar la firma
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="space-y-2">
+                        <p className="text-sm">
+                          <strong>Nombre:</strong> {observacionDetalle.firma_nombre || "No especificado"}
+                        </p>
+                        <p className="text-sm">
+                          <strong>Fecha de firma:</strong> {formatDate(observacionDetalle.firma_fecha)}
+                        </p>
+                        <p className="text-sm">
+                          <strong>Completado por:</strong> {observacionDetalle.resuelto_por_nombre || observacionDetalle.tecnico_nombre || "N/A"}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Esta firma digital certifica que la observación fue completada y verificada.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* IMÁGENES DE LA OBSERVACIÓN - SOLO SI EXISTEN */}
             {obtenerImagenesObservacion(observacionDetalle).length > 0 && (
               <div className="mb-4">
-                <h4 className="font-semibold mb-3">Evidencias Fotográficas</h4>
+                <h4 className="font-semibold mb-3">📷 Evidencias Fotográficas</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {obtenerImagenesObservacion(observacionDetalle).map((imagen) => (
                     <div key={imagen.numero} className="border border-gray-200 rounded-lg overflow-hidden">
@@ -1572,7 +1614,15 @@ const ObservacionesResueltasPanel = ({ observaciones, loading, error, mes, anio 
                         alt={`Evidencia ${imagen.numero}`}
                         className="w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
                         onClick={() => window.open(imagen.url, '_blank')}
+                        onError={(e) => {
+                          console.error('Error cargando imagen:', imagen.url);
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
                       />
+                      <div className="hidden h-48 bg-gray-100 items-center justify-center text-gray-500">
+                        ❌ Error al cargar imagen
+                      </div>
                       <div className="p-2 bg-gray-50">
                         <p className="text-xs text-gray-600 truncate">{imagen.nombre}</p>
                       </div>
@@ -1600,7 +1650,46 @@ const ObservacionesResueltasPanel = ({ observaciones, loading, error, mes, anio 
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end">
+            {/* RESUMEN DE INFORMACIÓN */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4">
+              <h4 className="font-semibold text-gray-800 mb-2">Resumen</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                <div>
+                  <strong>Estado:</strong> 
+                  <span className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${getEstadoColor(observacionDetalle.estado_resolucion)}`}>
+                    {observacionDetalle.estado_resolucion}
+                  </span>
+                </div>
+                <div>
+                  <strong>Cargo:</strong> 
+                  <span className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${getCargoColor(observacionDetalle.cargo_a)}`}>
+                    {observacionDetalle.cargo_a === "empresa" ? "Empresa" : "Cliente"}
+                  </span>
+                </div>
+                <div>
+                  <strong>Firma:</strong> 
+                  <span className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${
+                    observacionDetalle.firma_url ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                  }`}>
+                    {observacionDetalle.firma_url ? "Con firma" : "Sin firma"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              {observacionDetalle.firma_url && (
+                <button
+                  onClick={() => window.open(observacionDetalle.firma_url, '_blank')}
+                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  Ver Firma Completa
+                </button>
+              )}
               <button
                 onClick={() => setObservacionDetalle(null)}
                 className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
