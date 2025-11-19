@@ -62,6 +62,9 @@ router.get("/", async (req, res) => {
 router.get("/mantenimiento/:mantenimientoId", async (req, res) => {
   try {
     const { mantenimientoId } = req.params;
+    
+    console.log('🔍 Obteniendo observaciones para mantenimiento:', mantenimientoId);
+    console.log('👤 Usuario haciendo la petición:', req.user?.id, req.user?.rol);
 
     const q = await pool.query(
       `SELECT 
@@ -77,6 +80,18 @@ router.get("/mantenimiento/:mantenimientoId", async (req, res) => {
        ORDER BY om.creado_en DESC`,
       [mantenimientoId]
     );
+
+    console.log(`✅ Encontradas ${q.rows.length} observaciones para mantenimiento ${mantenimientoId}`);
+    
+    // Log para debug: mostrar información de cada observación
+    q.rows.forEach((obs, index) => {
+      console.log(`📋 Observación ${index + 1}:`, {
+        id: obs.id,
+        tecnico_asignado_id: obs.tecnico_asignado_id,
+        tecnico_asignado_nombre: obs.tecnico_asignado_nombre,
+        estado: obs.estado_resolucion
+      });
+    });
 
     res.json({
       success: true,
@@ -145,14 +160,18 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
     }
 
     // NUEVO: Validar que el técnico asignado existe si se proporciona
-    if (tecnico_asignado_id) {
+    let tecnicoAsignadoId = null;
+    if (tecnico_asignado_id && tecnico_asignado_id !== '') {
+      // Convertir a número entero
+      tecnicoAsignadoId = parseInt(tecnico_asignado_id);
+      
       const tecnicoCheck = await pool.query(
         'SELECT id, nombre FROM "Usuarios" WHERE id = $1',
-        [tecnico_asignado_id]
+        [tecnicoAsignadoId]
       );
       
       if (tecnicoCheck.rows.length === 0) {
-        console.log('❌ Técnico asignado no encontrado:', tecnico_asignado_id);
+        console.log('❌ Técnico asignado no encontrado:', tecnicoAsignadoId);
         return res.status(400).json({ 
           success: false,
           error: "El técnico asignado no existe" 
@@ -248,7 +267,7 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
         firma_url,
         firma_nombre,
         firma_url ? new Date() : null, // Solo poner fecha si hay firma
-        tecnico_asignado_id || null  // NUEVO
+        tecnicoAsignadoId  // NUEVO: usar la variable convertida
       ]
     );
 
@@ -271,7 +290,7 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
     res.json({
       success: true,
       refaccion: observacionCompleta.rows[0],
-      message: `Observación agregada correctamente${req.files?.length > 0 ? ` con ${req.files.length} imagen(es)` : ''}${firma_url ? ' y firma' : ''}${tecnico_asignado_id ? ' y técnico asignado' : ''}`
+      message: `Observación agregada correctamente${req.files?.length > 0 ? ` con ${req.files.length} imagen(es)` : ''}${firma_url ? ' y firma' : ''}${tecnicoAsignadoId ? ' y técnico asignado' : ''}`
     });
   } catch (err) {
     console.error("❌ Error agregando refacción:", err);
@@ -316,14 +335,18 @@ router.put("/:id", async (req, res) => {
     }
 
     // NUEVO: Validar que el técnico asignado existe si se proporciona
-    if (tecnico_asignado_id) {
+    let tecnicoAsignadoId = null;
+    if (tecnico_asignado_id && tecnico_asignado_id !== '') {
+      // Convertir a número entero
+      tecnicoAsignadoId = parseInt(tecnico_asignado_id);
+      
       const tecnicoCheck = await pool.query(
         'SELECT id, nombre FROM "Usuarios" WHERE id = $1',
-        [tecnico_asignado_id]
+        [tecnicoAsignadoId]
       );
       
       if (tecnicoCheck.rows.length === 0) {
-        console.log('❌ Técnico asignado no encontrado:', tecnico_asignado_id);
+        console.log('❌ Técnico asignado no encontrado:', tecnicoAsignadoId);
         return res.status(400).json({ 
           success: false,
           error: "El técnico asignado no existe" 
@@ -337,8 +360,9 @@ router.put("/:id", async (req, res) => {
 
     let query = `UPDATE observaciones_mantenimiento 
                  SET descripcion = $1, cargo_a = $2, estado_resolucion = $3, es_evidencia = $4, tecnico_asignado_id = $5`;  // NUEVO
-    let params = [descripcion, cargo_a, estado_resolucion, esEvidenciaBool, tecnico_asignado_id || null];
+    let params = [descripcion, cargo_a, estado_resolucion, esEvidenciaBool, tecnicoAsignadoId]; // NUEVO: usar variable convertida
     let paramCount = 6;
+
 
     // Procesar firma digital si está presente
     let firma_url = null;
