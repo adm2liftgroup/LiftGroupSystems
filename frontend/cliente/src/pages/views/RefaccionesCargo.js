@@ -53,6 +53,14 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   }, []);
 
+  // Debug: verificar datos del usuario
+  useEffect(() => {
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    console.log('👤 Datos del usuario en localStorage:', userData);
+    console.log('🔧 ID del técnico:', userData.id, 'Tipo:', typeof userData.id);
+    console.log('🎭 Rol del usuario:', userData.rol);
+  }, []);
+
   // FUNCIÓN: Obtener lista de técnicos
   const fetchTecnicos = async () => {
     setLoadingTecnicos(true);
@@ -123,11 +131,22 @@ export default function RefaccionesCargo({ montacargas }) {
     } else if (isTecnico()) {
       // Técnico solo ve las observaciones asignadas a él
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
-      console.log('🔧 Técnico ID:', userData.id, '- Filtrando observaciones asignadas');
+      const userId = parseInt(userData.id);
+      
+      console.log('🔧 Técnico ID:', userId, 'Nombre:', userData.nombre);
+      console.log('📋 Total de observaciones recibidas:', observaciones.length);
       
       const observacionesFiltradas = observaciones.filter(obs => {
-        const esAsignado = obs.tecnico_asignado_id === userData.id;
-        console.log(`📋 Observación ${obs.id}: tecnico_asignado_id=${obs.tecnico_asignado_id}, esAsignado=${esAsignado}`);
+        // Convertir ambos a número para comparación estricta
+        const tecnicoId = obs.tecnico_asignado_id ? parseInt(obs.tecnico_asignado_id) : null;
+        
+        const esAsignado = userId === tecnicoId;
+        console.log(`🔍 Comparando: userId=${userId} vs tecnicoId=${tecnicoId} -> ${esAsignado}`);
+        
+        if (esAsignado) {
+          console.log(`✅ ENCONTRADA: Observación ${obs.id} asignada a técnico ${tecnicoId}`);
+        }
+        
         return esAsignado;
       });
       
@@ -943,6 +962,15 @@ export default function RefaccionesCargo({ montacargas }) {
 
   // Obtener observaciones filtradas según el rol
   const observacionesFiltradas = getObservacionesFiltradas();
+
+  // Debug del estado actual
+  useEffect(() => {
+    console.log('🎯 Estado actual del componente:');
+    console.log('- userRole:', userRole);
+    console.log('- observaciones totales:', observaciones.length);
+    console.log('- observaciones filtradas:', observacionesFiltradas.length);
+    console.log('- mantenimiento seleccionado:', mantenimientoSeleccionado?.id);
+  }, [observaciones, observacionesFiltradas, mantenimientoSeleccionado, userRole]);
 
   if (!montacargas) {
     return (
