@@ -1397,7 +1397,7 @@ const ChecklistsCompletadosPanel = ({ checklists, loading, error }) => {
       '10': { titulo: 'Tapas de masas de llantas traseras - Requiere reemplazo' },
       '11': { titulo: 'Tornillos de parrilla y barra - Requieren reemplazo' },
       '15': { titulo: 'Pistón del cofre - Requiere reemplazo' },
-      '17': { titulo: 'Tapete y piso - Requieren reemplazo' },
+      '17': { titulo: 'Tapate y piso - Requieren reemplazo' },
       '19': { titulo: 'Terminales, bornes o protector de batería - Requieren reemplazo' },
       '21': { titulo: 'Batería - Requiere reemplazo' },
       '27': { titulo: 'Caja de fusibles o fusibles - Requieren reemplazo' },
@@ -1477,7 +1477,7 @@ const ChecklistsCompletadosPanel = ({ checklists, loading, error }) => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">MONTACARGAS</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">TÉCNICO</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">FECHA COMPLETADO</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">OBSERVACIONES</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">FIRMA CLIENTE</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ACCIONES</th>
                 </tr>
               </thead>
@@ -1501,11 +1501,15 @@ const ChecklistsCompletadosPanel = ({ checklists, loading, error }) => {
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
                       {formatDate(checklist.creado_en)}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-600">
-                      {checklist.observaciones ? (
-                        <span className="line-clamp-2">{checklist.observaciones}</span>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm">
+                      {checklist.firma_cliente_url ? (
+                        <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                          ✅ Con firma
+                        </span>
                       ) : (
-                        <span className="text-gray-400">Sin observaciones</span>
+                        <span className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                          ❌ Sin firma
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
@@ -1528,7 +1532,7 @@ const ChecklistsCompletadosPanel = ({ checklists, loading, error }) => {
         </div>
       )}
 
-      {/* MODAL DE DETALLE MEJORADO */}
+      {/* MODAL DE DETALLE ACTUALIZADO CON FIRMA DEL CLIENTE */}
       {checklistDetalle && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1563,6 +1567,45 @@ const ChecklistsCompletadosPanel = ({ checklists, loading, error }) => {
                 </div>
               </div>
             </div>
+
+            {/* SECCIÓN DE FIRMA DEL CLIENTE - NUEVA */}
+            {checklistDetalle.firma_cliente_url && (
+              <div className="mb-4">
+                <h4 className="font-semibold mb-3">✍️ Firma del Cliente</h4>
+                <div className="bg-white border border-gray-300 rounded-lg p-4">
+                  <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                    <div className="flex-shrink-0">
+                      <img 
+                        src={checklistDetalle.firma_cliente_url} 
+                        alt="Firma del cliente"
+                        className="h-24 w-48 border border-gray-300 rounded bg-white object-contain"
+                        onError={(e) => {
+                          console.error('Error cargando firma del cliente:', checklistDetalle.firma_cliente_url);
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'block';
+                        }}
+                      />
+                      <div className="hidden text-red-500 text-sm mt-1">
+                        ❌ Error al cargar la firma del cliente
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="space-y-2">
+                        <p className="text-sm">
+                          <strong>Nombre del cliente:</strong> {checklistDetalle.firma_cliente_nombre || "No especificado"}
+                        </p>
+                        <p className="text-sm">
+                          <strong>Fecha de firma:</strong> {formatDate(checklistDetalle.firma_cliente_fecha)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          El cliente firmó para aceptar el servicio realizado.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {checklistDetalle.observaciones && (
               <div className="mb-4">
@@ -1627,7 +1670,19 @@ const ChecklistsCompletadosPanel = ({ checklists, loading, error }) => {
               </div>
             )}
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex justify-end space-x-3">
+              {checklistDetalle.firma_cliente_url && (
+                <button
+                  onClick={() => window.open(checklistDetalle.firma_cliente_url, '_blank')}
+                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  Ver Firma Completa
+                </button>
+              )}
               <button
                 onClick={() => setChecklistDetalle(null)}
                 className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
@@ -1641,7 +1696,6 @@ const ChecklistsCompletadosPanel = ({ checklists, loading, error }) => {
     </div>
   );
 };
-
 // BLOQUE 1.10: Panel de Observaciones Resueltas del Mes
 const ObservacionesResueltasPanel = ({ observaciones, loading, error, mes, anio }) => {
   const [observacionDetalle, setObservacionDetalle] = useState(null);
