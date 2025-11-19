@@ -18,7 +18,8 @@ export default function RefaccionesCargo({ montacargas }) {
 
   const [formData, setFormData] = useState({
     descripcion: '',
-    cargo_a: 'empresa'
+    cargo_a: 'empresa',
+    tecnico_asignado_id: '' // NUEVO: Para asignar técnico
   });
   const [editandoObservacion, setEditandoObservacion] = useState(null);
   
@@ -34,8 +35,10 @@ export default function RefaccionesCargo({ montacargas }) {
     status: ''
   });
 
-  // Estado para el rol del usuario
+  // Estado para el rol del usuario y lista de técnicos
   const [userRole, setUserRole] = useState('user');
+  const [tecnicos, setTecnicos] = useState([]); // NUEVO: Lista de técnicos para asignar
+  const [loadingTecnicos, setLoadingTecnicos] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -43,7 +46,41 @@ export default function RefaccionesCargo({ montacargas }) {
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('user') || '{}');
     setUserRole(userData.rol || 'user');
+    
+    // Si es admin, cargar la lista de técnicos
+    if (userData.rol === 'admin') {
+      fetchTecnicos();
+    }
   }, []);
+
+  // NUEVA FUNCIÓN: Obtener lista de técnicos
+  const fetchTecnicos = async () => {
+    setLoadingTecnicos(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/auth/tecnicos`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setTecnicos(data.tecnicos || []);
+        } else {
+          console.error('Error al cargar técnicos:', data.error);
+        }
+      }
+    } catch (err) {
+      console.error('Error en fetchTecnicos:', err);
+    } finally {
+      setLoadingTecnicos(false);
+    }
+  };
 
   useEffect(() => {
     if (montacargas && montacargas.numero) {
@@ -67,183 +104,192 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   }, [mantenimientoSeleccionado]);
 
-  // FUNCIONES PARA VERIFICAR ROLES
+  // FUNCIONES PARA VERIFICAR ROLES - MODIFICADAS
   const isTecnico = () => userRole === 'tecnico';
   const isAdmin = () => userRole === 'admin';
-  const canAddRefacciones = () => userRole === 'user';
-  const canDeleteImages = () => isTecnico() || isAdmin();
+  const canAddRefacciones = () => isAdmin(); // SOLO admins pueden agregar
+  const canDeleteImages = () => isAdmin(); // SOLO admins pueden eliminar imágenes
+  const canEditObservaciones = () => isAdmin(); // SOLO admins pueden editar
+  const canViewObservaciones = () => isAdmin() || isTecnico(); // Admins y técnicos pueden ver
+
+  // FUNCIÓN: Obtener observaciones filtradas por técnico
+  const getObservacionesFiltradas = () => {
+    if (isAdmin()) {
+      // Admin ve todas las observaciones
+      return observaciones;
+    } else if (isTecnico()) {
+      // Técnico solo ve las observaciones asignadas a él
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      return observaciones.filter(obs => 
+        obs.tecnico_asignado_id === userData.id || 
+        obs.resuelto_por === userData.id
+      );
+    }
+    return [];
+  };
 
   // ========== FUNCIONES DE FIRMA DIGITAL ==========
 
   // Componente de Canvas para firma
-  // Componente de Canvas para firma - VERSIÓN CORREGIDA
-const FirmaCanvas = ({ onFirmaCompleta }) => {
-  const canvasRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
+  const FirmaCanvas = ({ onFirmaCompleta }) => {
+    const canvasRef = useRef(null);
+    const [isDrawing, setIsDrawing] = useState(false);
+    const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
 
-  // Configuración inicial del canvas
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    
-    // Configurar canvas
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }, []);
-
-  // Obtener posición exacta en el canvas (para mouse y touch)
-  const getCanvasCoordinates = (clientX, clientY) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    
-    return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY
-    };
-  };
-
-  // MANEJO PARA MOUSE
-  const startDrawing = (e) => {
-    e.preventDefault();
-    const { x, y } = getCanvasCoordinates(e.clientX, e.clientY);
-    
-    setIsDrawing(true);
-    setLastPos({ x, y });
-    
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-  };
-
-  const draw = (e) => {
-    e.preventDefault();
-    if (!isDrawing) return;
-    
-    const { x, y } = getCanvasCoordinates(e.clientX, e.clientY);
-    
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    
-    setLastPos({ x, y });
-  };
-
-  const stopDrawing = () => {
-    if (!isDrawing) return;
-    
-    setIsDrawing(false);
-    const canvas = canvasRef.current;
-    const dataURL = canvas.toDataURL();
-    onFirmaCompleta(dataURL);
-  };
-
-  // MANEJO PARA TACTIL - VERSIÓN MEJORADA
-  const handleTouchStart = (e) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const { x, y } = getCanvasCoordinates(touch.clientX, touch.clientY);
-    
-    setIsDrawing(true);
-    setLastPos({ x, y });
-    
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-  };
-
-  const handleTouchMove = (e) => {
-    e.preventDefault();
-    if (!isDrawing) return;
-    
-    const touch = e.touches[0];
-    const { x, y } = getCanvasCoordinates(touch.clientX, touch.clientY);
-    
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    
-    setLastPos({ x, y });
-  };
-
-  const handleTouchEnd = (e) => {
-    e.preventDefault();
-    if (!isDrawing) return;
-    
-    setIsDrawing(false);
-    const canvas = canvasRef.current;
-    const dataURL = canvas.toDataURL();
-    onFirmaCompleta(dataURL);
-  };
-
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    onFirmaCompleta(null);
-  };
-
-  return (
-    <div className="border-2 border-gray-300 rounded-lg p-4 bg-white">
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Firma Digital *
-        </label>
-        <div className="border border-gray-300 rounded bg-white overflow-hidden">
-          <canvas
-            ref={canvasRef}
-            width={400}
-            height={200}
-            className="block w-full h-48 touch-none bg-white"
-            style={{ 
-              touchAction: 'none',
-              cursor: 'crosshair'
-            }}
-            // Eventos de mouse
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-            // Eventos táctiles
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchEnd}
-          />
-        </div>
-        <p className="text-xs text-gray-500 mt-2">
-          Dibuje su firma en el área superior. En dispositivos móviles, use el dedo.
-        </p>
-      </div>
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
       
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={clearCanvas}
-          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
-        >
-          Limpiar Firma
-        </button>
+      const ctx = canvas.getContext('2d');
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }, []);
+
+    const getCanvasCoordinates = (clientX, clientY) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return { x: 0, y: 0 };
+      
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+      };
+    };
+
+    const startDrawing = (e) => {
+      e.preventDefault();
+      const { x, y } = getCanvasCoordinates(e.clientX, e.clientY);
+      
+      setIsDrawing(true);
+      setLastPos({ x, y });
+      
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    };
+
+    const draw = (e) => {
+      e.preventDefault();
+      if (!isDrawing) return;
+      
+      const { x, y } = getCanvasCoordinates(e.clientX, e.clientY);
+      
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      
+      setLastPos({ x, y });
+    };
+
+    const stopDrawing = () => {
+      if (!isDrawing) return;
+      
+      setIsDrawing(false);
+      const canvas = canvasRef.current;
+      const dataURL = canvas.toDataURL();
+      onFirmaCompleta(dataURL);
+    };
+
+    const handleTouchStart = (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const { x, y } = getCanvasCoordinates(touch.clientX, touch.clientY);
+      
+      setIsDrawing(true);
+      setLastPos({ x, y });
+      
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    };
+
+    const handleTouchMove = (e) => {
+      e.preventDefault();
+      if (!isDrawing) return;
+      
+      const touch = e.touches[0];
+      const { x, y } = getCanvasCoordinates(touch.clientX, touch.clientY);
+      
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      
+      setLastPos({ x, y });
+    };
+
+    const handleTouchEnd = (e) => {
+      e.preventDefault();
+      if (!isDrawing) return;
+      
+      setIsDrawing(false);
+      const canvas = canvasRef.current;
+      const dataURL = canvas.toDataURL();
+      onFirmaCompleta(dataURL);
+    };
+
+    const clearCanvas = () => {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      onFirmaCompleta(null);
+    };
+
+    return (
+      <div className="border-2 border-gray-300 rounded-lg p-4 bg-white">
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Firma Digital *
+          </label>
+          <div className="border border-gray-300 rounded bg-white overflow-hidden">
+            <canvas
+              ref={canvasRef}
+              width={400}
+              height={200}
+              className="block w-full h-48 touch-none bg-white"
+              style={{ 
+                touchAction: 'none',
+                cursor: 'crosshair'
+              }}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            Dibuje su firma en el área superior. En dispositivos móviles, use el dedo.
+          </p>
+        </div>
+        
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={clearCanvas}
+            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
+          >
+            Limpiar Firma
+          </button>
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   // FUNCIÓN: Iniciar proceso de resolución con firma
   const iniciarResolucionConFirma = (observacion) => {
-    if (!canAddRefacciones()) {
-      setError('❌ No tienes permisos para completar observaciones');
+    if (!isTecnico()) {
+      setError('❌ Solo los técnicos pueden completar observaciones');
       return;
     }
 
@@ -255,110 +301,63 @@ const FirmaCanvas = ({ onFirmaCompleta }) => {
   };
 
   // FUNCIÓN: Completar observación con firma
-  // FUNCIÓN: Completar observación con firma - ACTUALIZADA
-const completarObservacionConFirma = async () => {
-  if (!firmaData || !firmaNombre.trim()) {
-    setError('Debe proporcionar su firma y nombre completo');
-    return;
-  }
-
-  setSubiendoFirma(true);
-  setError('');
-
-  try {
-    const token = localStorage.getItem("token");
-    const userData = JSON.parse(localStorage.getItem('user') || '{}');
-    
-    // Enviar la firma como base64 en el body en lugar de FormData
-    const requestBody = {
-      descripcion: observacionParaCompletar.descripcion,
-      cargo_a: observacionParaCompletar.cargo_a,
-      estado_resolucion: 'resuelto',
-      es_evidencia: observacionParaCompletar.es_evidencia || 'false',
-      // Nuevos campos para firma
-      firma_data: firmaData, // Esto es el base64 del canvas
-      firma_nombre: firmaNombre.trim(),
-      resuelto_por: userData.id || '',
-      resuelto_por_nombre: userData.nombre || userData.email || ''
-    };
-
-    const apiResponse = await fetch(
-      `${process.env.REACT_APP_API_URL}/api/refacciones/${observacionParaCompletar.id}`,
-      {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(requestBody)
-      }
-    );
-
-    const data = await apiResponse.json();
-
-    if (apiResponse.ok && data.success) {
-      setSuccess('✅ Observación completada con firma');
-      setMostrarModalFirma(false);
-      setObservacionParaCompletar(null);
-      setFirmaData(null);
-      setFirmaNombre('');
-      fetchObservaciones(mantenimientoSeleccionado.id);
-    } else {
-      throw new Error(data.error || 'Error al completar observación');
-    }
-  } catch (err) {
-    console.error('Error al completar observación con firma:', err);
-    setError(err.message);
-  } finally {
-    setSubiendoFirma(false);
-  }
-};
-
-  // ========== FUNCIONES EXISTENTES ==========
-
-  // FUNCIÓN: Manejar selección de imágenes para observación
-  const handleImagenesSelect = (e) => {
-    const files = Array.from(e.target.files);
-    
-    if (imagenesObservacion.length + files.length > 3) {
-      setError('Máximo 3 imágenes permitidas');
+  const completarObservacionConFirma = async () => {
+    if (!firmaData || !firmaNombre.trim()) {
+      setError('Debe proporcionar su firma y nombre completo');
       return;
     }
 
-    const nuevasImagenes = [];
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-
-    files.forEach(file => {
-      if (!allowedTypes.includes(file.type)) {
-        setError(`El archivo ${file.name} no es una imagen válida`);
-        return;
-      }
-
-      if (file.size > 5 * 1024 * 1024) {
-        setError(`La imagen ${file.name} no debe superar los 5MB`);
-        return;
-      }
-
-      nuevasImagenes.push({
-        file,
-        preview: URL.createObjectURL(file),
-        name: file.name,
-        type: file.type
-      });
-    });
-
-    setImagenesObservacion(prev => [...prev, ...nuevasImagenes]);
+    setSubiendoFirma(true);
     setError('');
-    
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+
+    try {
+      const token = localStorage.getItem("token");
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      const requestBody = {
+        descripcion: observacionParaCompletar.descripcion,
+        cargo_a: observacionParaCompletar.cargo_a,
+        estado_resolucion: 'resuelto',
+        es_evidencia: observacionParaCompletar.es_evidencia || 'false',
+        firma_data: firmaData,
+        firma_nombre: firmaNombre.trim(),
+        resuelto_por: userData.id || '',
+        resuelto_por_nombre: userData.nombre || userData.email || ''
+      };
+
+      const apiResponse = await fetch(
+        `${process.env.REACT_APP_API_URL}/api/refacciones/${observacionParaCompletar.id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(requestBody)
+        }
+      );
+
+      const data = await apiResponse.json();
+
+      if (apiResponse.ok && data.success) {
+        setSuccess('✅ Observación completada con firma');
+        setMostrarModalFirma(false);
+        setObservacionParaCompletar(null);
+        setFirmaData(null);
+        setFirmaNombre('');
+        fetchObservaciones(mantenimientoSeleccionado.id);
+      } else {
+        throw new Error(data.error || 'Error al completar observación');
+      }
+    } catch (err) {
+      console.error('Error al completar observación con firma:', err);
+      setError(err.message);
+    } finally {
+      setSubiendoFirma(false);
     }
   };
 
-  // FUNCIÓN: Eliminar imagen específica
-  const removeImagen = (index) => {
-    setImagenesObservacion(prev => prev.filter((_, i) => i !== index));
-  };
+  // ========== FUNCIONES EXISTENTES MODIFICADAS ==========
 
   // FUNCIÓN: Subir observación con imágenes
   const subirObservacionConImagenes = async () => {
@@ -389,6 +388,11 @@ const completarObservacionConFirma = async () => {
       formData.append('cargo_a', observacionConImagenes.cargo_a);
       formData.append('es_evidencia', 'true');
       formData.append('estado_resolucion', 'resuelto');
+      
+      // NUEVO: Incluir técnico asignado si existe
+      if (observacionConImagenes.tecnico_asignado_id) {
+        formData.append('tecnico_asignado_id', observacionConImagenes.tecnico_asignado_id);
+      }
 
       imagenesObservacion.forEach((imagen, index) => {
         formData.append('imagenes', imagen.file);
@@ -426,8 +430,8 @@ const completarObservacionConFirma = async () => {
 
   // FUNCIÓN: Agregar imágenes a observación existente
   const agregarImagenesAObservacion = (observacion) => {
-    if (!canAddRefacciones()) {
-      setError('❌ No tienes permisos para agregar imágenes');
+    if (!isTecnico()) {
+      setError('❌ Solo los técnicos pueden agregar imágenes a observaciones');
       return;
     }
     setObservacionConImagenes(observacion);
@@ -625,7 +629,7 @@ const completarObservacionConFirma = async () => {
     e.preventDefault();
     
     if (!canAddRefacciones()) {
-      setError('❌ No tienes permisos para agregar observaciones');
+      setError('❌ Solo los administradores pueden agregar observaciones');
       return;
     }
 
@@ -651,7 +655,9 @@ const completarObservacionConFirma = async () => {
         descripcion: formData.descripcion.trim(),
         cargo_a: formData.cargo_a,
         es_evidencia: 'false',
-        estado_resolucion: 'pendiente'
+        estado_resolucion: 'pendiente',
+        // NUEVO: Incluir técnico asignado si se seleccionó uno
+        tecnico_asignado_id: formData.tecnico_asignado_id || null
       };
 
       const response = await fetch(
@@ -672,7 +678,8 @@ const completarObservacionConFirma = async () => {
         setSuccess('✅ Observación agregada correctamente');
         setFormData({
           descripcion: '',
-          cargo_a: 'empresa'
+          cargo_a: 'empresa',
+          tecnico_asignado_id: ''
         });
         fetchObservaciones(mantenimientoSeleccionado.id);
       } else {
@@ -689,8 +696,8 @@ const completarObservacionConFirma = async () => {
   const handleEditarObservacion = async (e) => {
     e.preventDefault();
     
-    if (!canAddRefacciones()) {
-      setError('❌ No tienes permisos para editar observaciones');
+    if (!canEditObservaciones()) {
+      setError('❌ Solo los administradores pueden editar observaciones');
       return;
     }
     
@@ -715,7 +722,9 @@ const completarObservacionConFirma = async () => {
         descripcion: editandoObservacion.descripcion.trim(),
         cargo_a: editandoObservacion.cargo_a,
         estado_resolucion: editandoObservacion.estado_resolucion || 'pendiente',
-        es_evidencia: editandoObservacion.es_evidencia || 'false'
+        es_evidencia: editandoObservacion.es_evidencia || 'false',
+        // NUEVO: Incluir técnico asignado en la edición
+        tecnico_asignado_id: editandoObservacion.tecnico_asignado_id || null
       };
 
       const response = await fetch(
@@ -748,8 +757,8 @@ const completarObservacionConFirma = async () => {
   };
 
   const handleEliminarObservacion = async (observacionId) => {
-    if (!canAddRefacciones()) {
-      setError('❌ No tienes permisos para eliminar observaciones');
+    if (!canEditObservaciones()) {
+      setError('❌ Solo los administradores pueden eliminar observaciones');
       return;
     }
 
@@ -806,8 +815,8 @@ const completarObservacionConFirma = async () => {
   };
 
   const iniciarEdicion = (observacion) => {
-    if (!canAddRefacciones()) {
-      setError('❌ No tienes permisos para editar observaciones');
+    if (!canEditObservaciones()) {
+      setError('❌ Solo los administradores pueden editar observaciones');
       return;
     }
     setEditandoObservacion({ ...observacion });
@@ -892,6 +901,9 @@ const completarObservacionConFirma = async () => {
     7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
   };
 
+  // Obtener observaciones filtradas según el rol
+  const observacionesFiltradas = getObservacionesFiltradas();
+
   if (!montacargas) {
     return (
       <div className="p-6 text-center">
@@ -923,16 +935,18 @@ const completarObservacionConFirma = async () => {
         </div>
         <p className="text-gray-600">
           {isAdmin() 
-            ? 'Visualización de observaciones, fallas y refacciones de mantenimientos.' 
-            : 'Registre y gestione las observaciones, fallas y refacciones necesarias encontradas durante los mantenimientos.'}
+            ? 'Gestión de observaciones, fallas y refacciones de mantenimientos. Asigne observaciones a técnicos específicos.' 
+            : isTecnico()
+            ? 'Visualice las observaciones asignadas a usted y complete las tareas con firma digital.'
+            : 'Visualización de observaciones de mantenimiento.'}
         </p>
       </div>
 
-      {/* Mensaje informativo para administradores */}
-      {isAdmin() && (
+      {/* Mensaje informativo para técnicos */}
+      {isTecnico() && (
         <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-6">
           <p className="text-sm">
-            <strong>Modo de solo lectura:</strong> Como administrador, puedes visualizar todas las observaciones y eliminar imágenes, pero no puedes modificar las observaciones.
+            <strong>Modo técnico:</strong> Solo puede ver las observaciones asignadas a usted y completarlas con firma digital.
           </p>
         </div>
       )}
@@ -1124,8 +1138,8 @@ const completarObservacionConFirma = async () => {
           </div>
         </div>
 
-        {/* Columna 2: Formulario para agregar observación */}
-        {canAddRefacciones() && (
+        {/* Columna 2: Formulario para agregar observación (SOLO ADMIN) */}
+        {isAdmin() && (
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -1165,6 +1179,29 @@ const completarObservacionConFirma = async () => {
                           </select>
                         </div>
                       )}
+
+                      {/* NUEVO: Selector de técnico para asignar */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Asignar a Técnico
+                        </label>
+                        <select
+                          name="tecnico_asignado_id"
+                          value={editandoObservacion ? editandoObservacion.tecnico_asignado_id : formData.tecnico_asignado_id}
+                          onChange={editandoObservacion ? handleEditInputChange : handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="">Sin asignar</option>
+                          {tecnicos.map((tecnico) => (
+                            <option key={tecnico.id} value={tecnico.id}>
+                              {tecnico.nombre} - {tecnico.email}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Seleccione un técnico para asignar esta observación
+                        </p>
+                      </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1234,23 +1271,23 @@ const completarObservacionConFirma = async () => {
         )}
 
         {/* Columna 3: Lista de observaciones existentes */}
-        <div className={`${canAddRefacciones() ? 'lg:col-span-1' : 'lg:col-span-2'}`}>
+        <div className={`${isAdmin() ? 'lg:col-span-1' : 'lg:col-span-2'}`}>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-800">
-                Observaciones Registradas
+                {isAdmin() ? 'Observaciones Registradas' : 'Mis Observaciones Asignadas'}
               </h3>
               {mantenimientoSeleccionado && (
                 <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                  {observaciones.length} registros
+                  {observacionesFiltradas.length} registros
                 </span>
               )}
             </div>
 
             {mantenimientoSeleccionado ? (
-              observaciones.length > 0 ? (
+              observacionesFiltradas.length > 0 ? (
                 <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {observaciones.map((observacion) => {
+                  {observacionesFiltradas.map((observacion) => {
                     const imagenes = obtenerImagenesObservacion(observacion);
                     return (
                       <div
@@ -1270,6 +1307,12 @@ const completarObservacionConFirma = async () => {
                                 📷 Evidencia
                               </span>
                             )}
+                            {/* NUEVO: Badge de técnico asignado */}
+                            {observacion.tecnico_asignado_nombre && (
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                                👤 {observacion.tecnico_asignado_nombre}
+                              </span>
+                            )}
                           </div>
                         </div>
                         
@@ -1285,8 +1328,8 @@ const completarObservacionConFirma = async () => {
                                     className="h-24 w-full object-cover rounded-md border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
                                     onClick={() => window.open(imagen.url, '_blank')}
                                   />
-                                  {/* Botón eliminar imagen para TÉCNICOS Y ADMINS */}
-                                  {canDeleteImages() && (
+                                  {/* Botón eliminar imagen para ADMINS */}
+                                  {isAdmin() && (
                                     <button
                                       onClick={() => handleEliminarImagen(observacion.id, imagen.numero)}
                                       className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -1351,44 +1394,55 @@ const completarObservacionConFirma = async () => {
                               {observacion.resuelto_por_nombre && ` por ${observacion.resuelto_por_nombre}`}
                             </p>
                           )}
+                          
+                          {/* NUEVO: Información de técnico asignado */}
+                          {observacion.tecnico_asignado_nombre && (
+                            <p>
+                              Asignado a: {observacion.tecnico_asignado_nombre}
+                            </p>
+                          )}
                         </div>
 
-                        {/* BOTONES DE ACCIÓN SOLO PARA USUARIOS NORMALES */}
-                        {canAddRefacciones() && (
-                          <div className="flex justify-end gap-2 mt-3 pt-2 border-t">
-                            {/* BOTÓN: Agregar imágenes a observación existente */}
-                            {observacion.estado_resolucion !== 'resuelto' && imagenes.length < 3 && (
-                              <button
-                                onClick={() => agregarImagenesAObservacion(observacion)}
-                                className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700"
-                              >
-                                📷 Agregar Imágenes
-                              </button>
-                            )}
-                            
-                            {/* BOTÓN: Completar con firma (REEMPLAZA al botón Resolver) */}
-                            {observacion.estado_resolucion !== 'resuelto' && (
-                              <button
-                                onClick={() => iniciarResolucionConFirma(observacion)}
-                                className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
-                              >
-                                ✍️ Completar con Firma
-                              </button>
-                            )}
+                        {/* BOTONES DE ACCIÓN SEGÚN ROL */}
+                        <div className="flex justify-end gap-2 mt-3 pt-2 border-t">
+                          {/* BOTÓN: Agregar imágenes a observación existente (SOLO TÉCNICOS) */}
+                          {isTecnico() && observacion.estado_resolucion !== 'resuelto' && imagenes.length < 3 && (
                             <button
-                              onClick={() => iniciarEdicion(observacion)}
-                              className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                              onClick={() => agregarImagenesAObservacion(observacion)}
+                              className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700"
                             >
-                              Editar
+                              📷 Agregar Imágenes
                             </button>
+                          )}
+                          
+                          {/* BOTÓN: Completar con firma (SOLO TÉCNICOS) */}
+                          {isTecnico() && observacion.estado_resolucion !== 'resuelto' && (
                             <button
-                              onClick={() => handleEliminarObservacion(observacion.id)}
-                              className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+                              onClick={() => iniciarResolucionConFirma(observacion)}
+                              className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
                             >
-                              Eliminar
+                              ✍️ Completar con Firma
                             </button>
-                          </div>
-                        )}
+                          )}
+                          
+                          {/* BOTONES: Editar y Eliminar (SOLO ADMINS) */}
+                          {isAdmin() && (
+                            <>
+                              <button
+                                onClick={() => iniciarEdicion(observacion)}
+                                className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => handleEliminarObservacion(observacion.id)}
+                                className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+                              >
+                                Eliminar
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -1398,9 +1452,13 @@ const completarObservacionConFirma = async () => {
                   <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">No hay observaciones</h4>
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">
+                    {isAdmin() ? 'No hay observaciones' : 'No hay observaciones asignadas'}
+                  </h4>
                   <p className="text-gray-500">
-                    No se han registrado observaciones para este mantenimiento.
+                    {isAdmin() 
+                      ? 'No se han registrado observaciones para este mantenimiento.'
+                      : 'No tiene observaciones asignadas para este mantenimiento.'}
                   </p>
                 </div>
               )
@@ -1419,7 +1477,7 @@ const completarObservacionConFirma = async () => {
       </div>
 
       {/* Modal para agregar imágenes a observación existente */}
-      {observacionConImagenes && canAddRefacciones() && (
+      {observacionConImagenes && isTecnico() && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">

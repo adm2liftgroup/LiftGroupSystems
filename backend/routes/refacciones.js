@@ -21,7 +21,7 @@ const upload = multer({
   }
 });
 
-// BLOQUE 1: Obtener todas las observaciones/refacciones - CORREGIDO CON CAMPOS FIRMA
+// BLOQUE 1: Obtener todas las observaciones/refacciones - ACTUALIZADO CON TÉCNICO ASIGNADO
 router.get("/", async (req, res) => {
   try {
     const q = await pool.query(
@@ -34,12 +34,14 @@ router.get("/", async (req, res) => {
         m."Modelo" as montacargas_modelo,
         m."Serie" as montacargas_serie,
         u1.nombre as tecnico_nombre,
-        u2.nombre as resuelto_por_nombre
+        u2.nombre as resuelto_por_nombre,
+        u3.nombre as tecnico_asignado_nombre  -- NUEVO: técnico asignado
        FROM observaciones_mantenimiento om
        JOIN mantenimientos_programados mp ON om.mantenimiento_id = mp.id
        JOIN "Montacargas" m ON mp.montacargas_id = m.numero
        LEFT JOIN "Usuarios" u1 ON om.creado_por = u1.id
        LEFT JOIN "Usuarios" u2 ON om.resuelto_por = u2.id
+       LEFT JOIN "Usuarios" u3 ON om.tecnico_asignado_id = u3.id  -- NUEVO JOIN
        ORDER BY om.creado_en DESC`
     );
 
@@ -56,7 +58,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// BLOQUE 2: Obtener observaciones de un mantenimiento específico - CORREGIDO CON CAMPOS FIRMA
+// BLOQUE 2: Obtener observaciones de un mantenimiento específico - ACTUALIZADO CON TÉCNICO ASIGNADO
 router.get("/mantenimiento/:mantenimientoId", async (req, res) => {
   try {
     const { mantenimientoId } = req.params;
@@ -65,10 +67,12 @@ router.get("/mantenimiento/:mantenimientoId", async (req, res) => {
       `SELECT 
         om.*,
         u1.nombre as tecnico_nombre,
-        u2.nombre as resuelto_por_nombre
+        u2.nombre as resuelto_por_nombre,
+        u3.nombre as tecnico_asignado_nombre  -- NUEVO
        FROM observaciones_mantenimiento om
        LEFT JOIN "Usuarios" u1 ON om.creado_por = u1.id
        LEFT JOIN "Usuarios" u2 ON om.resuelto_por = u2.id
+       LEFT JOIN "Usuarios" u3 ON om.tecnico_asignado_id = u3.id  -- NUEVO JOIN
        WHERE om.mantenimiento_id = $1
        ORDER BY om.creado_en DESC`,
       [mantenimientoId]
@@ -87,7 +91,7 @@ router.get("/mantenimiento/:mantenimientoId", async (req, res) => {
   }
 });
 
-// BLOQUE 3: Agregar nueva observación con hasta 3 imágenes - ACTUALIZADO PARA FIRMA
+// BLOQUE 3: Agregar nueva observación con hasta 3 imágenes - ACTUALIZADO CON TÉCNICO ASIGNADO
 router.post("/", upload.array('imagenes', 3), async (req, res) => {
   try {
     console.log('📥 POST /api/refacciones recibido');
@@ -100,6 +104,7 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
       cargo_a = 'empresa',
       estado_resolucion = 'pendiente',
       es_evidencia = 'false',
+      tecnico_asignado_id = null,  // NUEVO: técnico asignado
       // Nuevos campos para firma
       firma_data = null,
       firma_nombre = null
@@ -137,6 +142,23 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
         success: false,
         error: "Mantenimiento no encontrado" 
       });
+    }
+
+    // NUEVO: Validar que el técnico asignado existe si se proporciona
+    if (tecnico_asignado_id) {
+      const tecnicoCheck = await pool.query(
+        'SELECT id, nombre FROM "Usuarios" WHERE id = $1',
+        [tecnico_asignado_id]
+      );
+      
+      if (tecnicoCheck.rows.length === 0) {
+        console.log('❌ Técnico asignado no encontrado:', tecnico_asignado_id);
+        return res.status(400).json({ 
+          success: false,
+          error: "El técnico asignado no existe" 
+        });
+      }
+      console.log('✅ Técnico asignado válido:', tecnicoCheck.rows[0].nombre);
     }
 
     // Inicializar campos de imágenes
@@ -207,8 +229,8 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
       `INSERT INTO observaciones_mantenimiento 
        (mantenimiento_id, descripcion, cargo_a, estado_resolucion, creado_por, 
         imagen_url_1, imagen_nombre_1, imagen_url_2, imagen_nombre_2, imagen_url_3, imagen_nombre_3, 
-        es_evidencia, firma_url, firma_nombre, firma_fecha)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        es_evidencia, firma_url, firma_nombre, firma_fecha, tecnico_asignado_id)  -- NUEVO CAMPO
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING *`,
       [
         mantenimiento_id, 
@@ -225,15 +247,31 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
         esEvidenciaBool,
         firma_url,
         firma_nombre,
-        firma_url ? new Date() : null // Solo poner fecha si hay firma
+        firma_url ? new Date() : null, // Solo poner fecha si hay firma
+        tecnico_asignado_id || null  // NUEVO
       ]
     );
 
     console.log('✅ Observación guardada correctamente con', req.files?.length || 0, 'imágenes');
+
+    // Obtener la observación completa con los nombres de los técnicos
+    const observacionCompleta = await pool.query(
+      `SELECT om.*,
+              u1.nombre as tecnico_nombre,
+              u2.nombre as resuelto_por_nombre,
+              u3.nombre as tecnico_asignado_nombre
+       FROM observaciones_mantenimiento om
+       LEFT JOIN "Usuarios" u1 ON om.creado_por = u1.id
+       LEFT JOIN "Usuarios" u2 ON om.resuelto_por = u2.id
+       LEFT JOIN "Usuarios" u3 ON om.tecnico_asignado_id = u3.id
+       WHERE om.id = $1`,
+      [result.rows[0].id]
+    );
+
     res.json({
       success: true,
-      refaccion: result.rows[0],
-      message: `Observación agregada correctamente${req.files?.length > 0 ? ` con ${req.files.length} imagen(es)` : ''}${firma_url ? ' y firma' : ''}`
+      refaccion: observacionCompleta.rows[0],
+      message: `Observación agregada correctamente${req.files?.length > 0 ? ` con ${req.files.length} imagen(es)` : ''}${firma_url ? ' y firma' : ''}${tecnico_asignado_id ? ' y técnico asignado' : ''}`
     });
   } catch (err) {
     console.error("❌ Error agregando refacción:", err);
@@ -244,8 +282,7 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
   }
 });
 
-// BLOQUE 4: Actualizar observación/refacción - ACTUALIZADO PARA FIRMA
-// BLOQUE 4: Actualizar observación/refacción - COMPLETO Y CORREGIDO
+// BLOQUE 4: Actualizar observación/refacción - ACTUALIZADO CON TÉCNICO ASIGNADO
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -254,6 +291,7 @@ router.put("/:id", async (req, res) => {
       cargo_a, 
       estado_resolucion, 
       es_evidencia,
+      tecnico_asignado_id = null,  // NUEVO
       // Nuevos campos para firma
       firma_data,
       firma_nombre,
@@ -277,13 +315,30 @@ router.put("/:id", async (req, res) => {
       });
     }
 
+    // NUEVO: Validar que el técnico asignado existe si se proporciona
+    if (tecnico_asignado_id) {
+      const tecnicoCheck = await pool.query(
+        'SELECT id, nombre FROM "Usuarios" WHERE id = $1',
+        [tecnico_asignado_id]
+      );
+      
+      if (tecnicoCheck.rows.length === 0) {
+        console.log('❌ Técnico asignado no encontrado:', tecnico_asignado_id);
+        return res.status(400).json({ 
+          success: false,
+          error: "El técnico asignado no existe" 
+        });
+      }
+      console.log('✅ Técnico asignado válido:', tecnicoCheck.rows[0].nombre);
+    }
+
     // Convertir es_evidencia a boolean
     const esEvidenciaBool = es_evidencia === 'true' || es_evidencia === true;
 
     let query = `UPDATE observaciones_mantenimiento 
-                 SET descripcion = $1, cargo_a = $2, estado_resolucion = $3, es_evidencia = $4`;
-    let params = [descripcion, cargo_a, estado_resolucion, esEvidenciaBool];
-    let paramCount = 5;
+                 SET descripcion = $1, cargo_a = $2, estado_resolucion = $3, es_evidencia = $4, tecnico_asignado_id = $5`;  // NUEVO
+    let params = [descripcion, cargo_a, estado_resolucion, esEvidenciaBool, tecnico_asignado_id || null];
+    let paramCount = 6;
 
     // Procesar firma digital si está presente
     let firma_url = null;
@@ -372,17 +427,20 @@ router.put("/:id", async (req, res) => {
     const observacionActualizada = await pool.query(
       `SELECT om.*, 
               u1.nombre as tecnico_nombre,
-              u2.nombre as resuelto_por_nombre
+              u2.nombre as resuelto_por_nombre,
+              u3.nombre as tecnico_asignado_nombre  -- NUEVO
        FROM observaciones_mantenimiento om
        LEFT JOIN "Usuarios" u1 ON om.creado_por = u1.id
        LEFT JOIN "Usuarios" u2 ON om.resuelto_por = u2.id
+       LEFT JOIN "Usuarios" u3 ON om.tecnico_asignado_id = u3.id  -- NUEVO JOIN
        WHERE om.id = $1`,
       [id]
     );
 
     const mensaje = "Observación actualizada correctamente" + 
                    (firma_url ? " con firma" : "") + 
-                   (estado_resolucion === 'resuelto' ? " y marcada como resuelta" : "");
+                   (estado_resolucion === 'resuelto' ? " y marcada como resuelta" : "") +
+                   (tecnico_asignado_id ? " y técnico asignado actualizado" : "");
 
     res.json({
       success: true,
@@ -547,10 +605,12 @@ router.put("/:id/resolver", async (req, res) => {
     const observacionActualizada = await pool.query(
       `SELECT om.*, 
               u1.nombre as tecnico_nombre,
-              u2.nombre as resuelto_por_nombre
+              u2.nombre as resuelto_por_nombre,
+              u3.nombre as tecnico_asignado_nombre  -- NUEVO
        FROM observaciones_mantenimiento om
        LEFT JOIN "Usuarios" u1 ON om.creado_por = u1.id
        LEFT JOIN "Usuarios" u2 ON om.resuelto_por = u2.id
+       LEFT JOIN "Usuarios" u3 ON om.tecnico_asignado_id = u3.id  -- NUEVO JOIN
        WHERE om.id = $1`,
       [id]
     );
@@ -602,13 +662,25 @@ router.get("/estadisticas", async (req, res) => {
        GROUP BY es_evidencia`
     );
 
+    // NUEVO: Estadísticas por técnico asignado
+    const porTecnicoAsignado = await pool.query(
+      `SELECT 
+         u.nombre as tecnico_nombre,
+         COUNT(*) as total
+       FROM observaciones_mantenimiento om
+       LEFT JOIN "Usuarios" u ON om.tecnico_asignado_id = u.id
+       GROUP BY u.nombre
+       ORDER BY total DESC`
+    );
+
     res.json({
       success: true,
       estadisticas: {
         por_estado: estados.rows,
         por_cargo: cargos.rows,
         mensual: mensual.rows,
-        por_tipo: porTipo.rows
+        por_tipo: porTipo.rows,
+        por_tecnico_asignado: porTecnicoAsignado.rows  // NUEVO
       }
     });
   } catch (err) {
@@ -620,7 +692,7 @@ router.get("/estadisticas", async (req, res) => {
   }
 });
 
-// BLOQUE 9: Obtener observaciones resueltas del mes actual - ACTUALIZADO CON FIRMA
+// BLOQUE 9: Obtener observaciones resueltas del mes actual - ACTUALIZADO CON TÉCNICO ASIGNADO
 router.get("/observaciones-resueltas-mes", async (req, res) => {
   try {
     const { mes, anio } = req.query;
@@ -642,12 +714,14 @@ router.get("/observaciones-resueltas-mes", async (req, res) => {
         m."Serie" as montacargas_serie,
         m."Ubicacion" as montacargas_ubicacion,
         u1.nombre as tecnico_nombre,
-        u2.nombre as resuelto_por_nombre
+        u2.nombre as resuelto_por_nombre,
+        u3.nombre as tecnico_asignado_nombre  -- NUEVO
        FROM observaciones_mantenimiento om
        JOIN mantenimientos_programados mp ON om.mantenimiento_id = mp.id
        JOIN "Montacargas" m ON mp.montacargas_id = m.numero
        LEFT JOIN "Usuarios" u1 ON om.creado_por = u1.id
        LEFT JOIN "Usuarios" u2 ON om.resuelto_por = u2.id
+       LEFT JOIN "Usuarios" u3 ON om.tecnico_asignado_id = u3.id  -- NUEVO JOIN
        WHERE om.estado_resolucion = 'resuelto'
          AND EXTRACT(MONTH FROM om.fecha_resolucion) = $1
          AND EXTRACT(YEAR FROM om.fecha_resolucion) = $2
@@ -669,6 +743,89 @@ router.get("/observaciones-resueltas-mes", async (req, res) => {
     res.status(500).json({ 
       success: false,
       error: "Error al obtener observaciones resueltas" 
+    });
+  }
+});
+
+// BLOQUE 10: Obtener observaciones por técnico asignado - NUEVO
+router.get("/tecnico/:tecnicoId", async (req, res) => {
+  try {
+    const { tecnicoId } = req.params;
+
+    const q = await pool.query(
+      `SELECT 
+        om.*,
+        mp.tipo as mantenimiento_tipo,
+        mp.fecha as mantenimiento_fecha,
+        m.numero as montacargas_numero,
+        m."Marca" as montacargas_marca,
+        m."Modelo" as montacargas_modelo,
+        m."Serie" as montacargas_serie,
+        u1.nombre as tecnico_nombre,
+        u2.nombre as resuelto_por_nombre,
+        u3.nombre as tecnico_asignado_nombre
+       FROM observaciones_mantenimiento om
+       JOIN mantenimientos_programados mp ON om.mantenimiento_id = mp.id
+       JOIN "Montacargas" m ON mp.montacargas_id = m.numero
+       LEFT JOIN "Usuarios" u1 ON om.creado_por = u1.id
+       LEFT JOIN "Usuarios" u2 ON om.resuelto_por = u2.id
+       LEFT JOIN "Usuarios" u3 ON om.tecnico_asignado_id = u3.id
+       WHERE om.tecnico_asignado_id = $1
+       ORDER BY om.creado_en DESC`,
+      [tecnicoId]
+    );
+
+    res.json({
+      success: true,
+      observaciones: q.rows,
+      total: q.rows.length
+    });
+  } catch (err) {
+    console.error("Error obteniendo observaciones por técnico:", err);
+    res.status(500).json({ 
+      success: false,
+      error: "Error al obtener observaciones" 
+    });
+  }
+});
+
+// BLOQUE 11: Obtener observaciones pendientes por técnico - NUEVO
+router.get("/tecnico/:tecnicoId/pendientes", async (req, res) => {
+  try {
+    const { tecnicoId } = req.params;
+
+    const q = await pool.query(
+      `SELECT 
+        om.*,
+        mp.tipo as mantenimiento_tipo,
+        mp.fecha as mantenimiento_fecha,
+        m.numero as montacargas_numero,
+        m."Marca" as montacargas_marca,
+        m."Modelo" as montacargas_modelo,
+        m."Serie" as montacargas_serie,
+        u1.nombre as tecnico_nombre,
+        u3.nombre as tecnico_asignado_nombre
+       FROM observaciones_mantenimiento om
+       JOIN mantenimientos_programados mp ON om.mantenimiento_id = mp.id
+       JOIN "Montacargas" m ON mp.montacargas_id = m.numero
+       LEFT JOIN "Usuarios" u1 ON om.creado_por = u1.id
+       LEFT JOIN "Usuarios" u3 ON om.tecnico_asignado_id = u3.id
+       WHERE om.tecnico_asignado_id = $1 
+         AND om.estado_resolucion = 'pendiente'
+       ORDER BY om.creado_en DESC`,
+      [tecnicoId]
+    );
+
+    res.json({
+      success: true,
+      observaciones: q.rows,
+      total: q.rows.length
+    });
+  } catch (err) {
+    console.error("Error obteniendo observaciones pendientes por técnico:", err);
+    res.status(500).json({ 
+      success: false,
+      error: "Error al obtener observaciones pendientes" 
     });
   }
 });
