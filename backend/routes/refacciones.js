@@ -3,6 +3,114 @@ const router = express.Router();
 const pool = require("../db");
 const multer = require('multer');
 const { uploadImageToS3, deleteFromS3 } = require('../aws-s3');
+const nodemailer = require('nodemailer');
+
+// Configurar el transporter para Brevo (Sendinblue)
+const transporter = nodemailer.createTransport({
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  auth: {
+    user: process.env.BREVO_SMTP_USER,
+    pass: process.env.BREVO_SMTP_PASS
+  }
+});
+
+// FUNCIÓN: Enviar notificación de asignación de observación
+const enviarNotificacionObservacion = async (tecnicoEmail, tecnicoNombre, observacionData, mantenimientoData) => {
+  try {
+    console.log('📧 Enviando notificación de observación asignada a:', tecnicoEmail);
+    
+    const fechaProgramada = new Date(mantenimientoData.fecha).toLocaleDateString('es-ES', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || 'notificaciones@liftgroup.com',
+      to: tecnicoEmail,
+      subject: `📋 Nueva Observación Asignada - Montacargas #${mantenimientoData.montacargas_numero}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                .card { background: white; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                .badge { display: inline-block; padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; }
+                .badge-pendiente { background: #fff3cd; color: #856404; }
+                .badge-empresa { background: #d1ecf1; color: #0c5460; }
+                .badge-cliente { background: #f8d7da; color: #721c24; }
+                .footer { text-align: center; margin-top: 20px; padding: 20px; color: #666; font-size: 12px; }
+                .btn { display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-top: 15px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🔧 Nueva Observación Asignada</h1>
+                    <p>Sistema de Gestión de Mantenimiento - LiftGroup</p>
+                </div>
+                
+                <div class="content">
+                    <p>Hola <strong>${tecnicoNombre}</strong>,</p>
+                    <p>Has sido asignado a una nueva observación de mantenimiento en el sistema.</p>
+                    
+                    <div class="card">
+                        <h3>📋 Detalles de la Observación</h3>
+                        <p><strong>Descripción:</strong> ${observacionData.descripcion}</p>
+                        <p><strong>Estado:</strong> <span class="badge badge-pendiente">Pendiente</span></p>
+                        <p><strong>Cargo:</strong> <span class="badge ${observacionData.cargo_a === 'empresa' ? 'badge-empresa' : 'badge-cliente'}">${observacionData.cargo_a === 'empresa' ? 'Cargo a Empresa' : 'Cargo a Cliente'}</span></p>
+                        <p><strong>Fecha de Creación:</strong> ${new Date().toLocaleDateString('es-ES')}</p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>🚗 Información del Montacargas</h3>
+                        <p><strong>Número:</strong> #${mantenimientoData.montacargas_numero}</p>
+                        <p><strong>Marca/Modelo:</strong> ${mantenimientoData.montacargas_marca} ${mantenimientoData.montacargas_modelo}</p>
+                        <p><strong>Serie:</strong> ${mantenimientoData.montacargas_serie}</p>
+                        <p><strong>Ubicación:</strong> ${mantenimientoData.montacargas_ubicacion || 'No especificada'}</p>
+                        <p><strong>Mantenimiento:</strong> ${mantenimientoData.tipo} - ${fechaProgramada}</p>
+                    </div>
+                    
+                    <div style="text-align: center;">
+                        <a href="${process.env.FRONTEND_URL || 'https://tu-app.com'}" class="btn">
+                            📲 Acceder al Sistema
+                        </a>
+                    </div>
+                    
+                    <p><strong>Acciones Requeridas:</strong></p>
+                    <ul>
+                        <li>Revisar la observación asignada</li>
+                        <li>Completar la tarea con firma digital</li>
+                        <li>Agregar imágenes como evidencia si es necesario</li>
+                        <li>Marcar como completado cuando finalice</li>
+                    </ul>
+                </div>
+                
+                <div class="footer">
+                    <p>Este es un mensaje automático del Sistema de Gestión de Mantenimiento LiftGroup.</p>
+                    <p>Por favor no responda a este correo.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+      `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Notificación de observación enviada:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error enviando notificación de observación:', error);
+    return false;
+  }
+};
 
 // Configurar multer para MÚLTIPLES imágenes Y firma
 const storage = multer.memoryStorage();
@@ -118,6 +226,7 @@ router.get("/mantenimiento/:mantenimientoId", async (req, res) => {
 });
 
 // BLOQUE 3: Agregar nueva observación con hasta 3 imágenes - ACTUALIZADO CON TÉCNICO ASIGNADO
+// BLOQUE 3: Agregar nueva observación con hasta 3 imágenes - ACTUALIZADO CON NOTIFICACIÓN POR CORREO
 router.post("/", upload.array('imagenes', 3), async (req, res) => {
   try {
     console.log('📥 POST /api/refacciones recibido');
@@ -130,7 +239,7 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
       cargo_a = 'empresa',
       estado_resolucion = 'pendiente',
       es_evidencia = 'false',
-      tecnico_asignado_id = null,  // NUEVO: técnico asignado
+      tecnico_asignado_id = null,
       // Nuevos campos para firma
       firma_data = null,
       firma_nombre = null
@@ -155,7 +264,9 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
 
     // Verificar que el mantenimiento existe
     const mantenimientoCheck = await pool.query(
-      `SELECT mp.*, m.numero as montacargas_numero 
+      `SELECT mp.*, m.numero as montacargas_numero, 
+              m."Marca" as montacargas_marca, m."Modelo" as montacargas_modelo,
+              m."Serie" as montacargas_serie, m."Ubicacion" as montacargas_ubicacion
        FROM mantenimientos_programados mp
        JOIN "Montacargas" m ON mp.montacargas_id = m.numero
        WHERE mp.id = $1`,
@@ -170,8 +281,12 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
       });
     }
 
-    // NUEVO: Validar que el técnico asignado existe si se proporciona
+    const mantenimientoInfo = mantenimientoCheck.rows[0];
+
+    // NUEVO: Validar que el técnico asignado existe si se proporciona y obtener info para correo
     let tecnicoAsignadoId = null;
+    let tecnicoInfo = null;
+
     if (tecnico_asignado_id && tecnico_asignado_id !== '') {
       // Convertir a número entero
       tecnicoAsignadoId = parseInt(tecnico_asignado_id);
@@ -180,7 +295,7 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
       console.log('🆔 tecnico_asignado_id convertido:', tecnicoAsignadoId, 'Tipo:', typeof tecnicoAsignadoId);
 
       const tecnicoCheck = await pool.query(
-        'SELECT id, nombre FROM "Usuarios" WHERE id = $1',
+        'SELECT id, nombre, email FROM "Usuarios" WHERE id = $1',
         [tecnicoAsignadoId]
       );
       
@@ -191,7 +306,9 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
           error: "El técnico asignado no existe" 
         });
       }
-      console.log('✅ Técnico asignado válido:', tecnicoCheck.rows[0].nombre);
+      
+      tecnicoInfo = tecnicoCheck.rows[0];
+      console.log('✅ Técnico asignado válido:', tecnicoInfo.nombre, 'Email:', tecnicoInfo.email);
     }
 
     // Inicializar campos de imágenes
@@ -262,7 +379,7 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
       `INSERT INTO observaciones_mantenimiento 
        (mantenimiento_id, descripcion, cargo_a, estado_resolucion, creado_por, 
         imagen_url_1, imagen_nombre_1, imagen_url_2, imagen_nombre_2, imagen_url_3, imagen_nombre_3, 
-        es_evidencia, firma_url, firma_nombre, firma_fecha, tecnico_asignado_id)  -- NUEVO CAMPO
+        es_evidencia, firma_url, firma_nombre, firma_fecha, tecnico_asignado_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING *`,
       [
@@ -280,12 +397,48 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
         esEvidenciaBool,
         firma_url,
         firma_nombre,
-        firma_url ? new Date() : null, // Solo poner fecha si hay firma
-        tecnicoAsignadoId  // NUEVO: usar la variable convertida
+        firma_url ? new Date() : null,
+        tecnicoAsignadoId
       ]
     );
 
     console.log('✅ Observación guardada correctamente con', req.files?.length || 0, 'imágenes');
+
+    // NUEVO: Enviar notificación por correo si se asignó a un técnico
+    let notificacionEnviada = false;
+    if (tecnicoAsignadoId && tecnicoInfo) {
+      try {
+        const observacionData = {
+          descripcion: descripcion.trim(),
+          cargo_a: cargo_a,
+          estado_resolucion: estado_resolucion
+        };
+
+        console.log('📧 Preparando envío de notificación a:', tecnicoInfo.email);
+        
+        // Enviar notificación en segundo plano (no esperar respuesta)
+        enviarNotificacionObservacion(
+          tecnicoInfo.email,
+          tecnicoInfo.nombre,
+          observacionData,
+          mantenimientoInfo
+        ).then(success => {
+          if (success) {
+            console.log('✅ Notificación enviada exitosamente a:', tecnicoInfo.email);
+          } else {
+            console.log('⚠️ No se pudo enviar notificación a:', tecnicoInfo.email);
+          }
+        }).catch(emailError => {
+          console.error('❌ Error en envío de notificación:', emailError);
+        });
+
+        notificacionEnviada = true;
+        
+      } catch (notifError) {
+        console.error('❌ Error preparando notificación:', notifError);
+        // No fallar la operación principal por error en notificación
+      }
+    }
 
     // Obtener la observación completa con los nombres de los técnicos
     const observacionCompleta = await pool.query(
@@ -301,11 +454,15 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
       [result.rows[0].id]
     );
 
+    const mensaje = `Observación agregada correctamente${req.files?.length > 0 ? ` con ${req.files.length} imagen(es)` : ''}${firma_url ? ' y firma' : ''}${tecnicoAsignadoId ? ' y técnico asignado' : ''}`;
+
     res.json({
       success: true,
       refaccion: observacionCompleta.rows[0],
-      message: `Observación agregada correctamente${req.files?.length > 0 ? ` con ${req.files.length} imagen(es)` : ''}${firma_url ? ' y firma' : ''}${tecnicoAsignadoId ? ' y técnico asignado' : ''}`
+      message: mensaje,
+      notificacion_enviada: notificacionEnviada
     });
+
   } catch (err) {
     console.error("❌ Error agregando refacción:", err);
     res.status(500).json({ 
@@ -324,7 +481,7 @@ router.put("/:id", async (req, res) => {
       cargo_a, 
       estado_resolucion, 
       es_evidencia,
-      tecnico_asignado_id = null,  // NUEVO
+      tecnico_asignado_id = null,
       // Nuevos campos para firma
       firma_data,
       firma_nombre,
@@ -335,9 +492,9 @@ router.put("/:id", async (req, res) => {
     console.log('📥 PUT /api/refacciones/' + id + ' recibido');
     console.log('📋 Body fields:', req.body);
 
-    // Verificar que la observación existe
+    // Verificar que la observación existe y obtener datos actuales
     const observacionCheck = await pool.query(
-      'SELECT id, firma_url FROM observaciones_mantenimiento WHERE id = $1',
+      'SELECT id, firma_url, tecnico_asignado_id, mantenimiento_id FROM observaciones_mantenimiento WHERE id = $1',
       [id]
     );
 
@@ -348,8 +505,18 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // NUEVO: Validar que el técnico asignado existe si se proporciona
+    const observacionActual = observacionCheck.rows[0];
+    const tecnicoAnteriorId = observacionActual.tecnico_asignado_id;
+    
+    // NUEVO: Detectar si se está cambiando el técnico asignado
+    const tecnicoAsignadoCambiado = tecnico_asignado_id && 
+                                   tecnico_asignado_id !== tecnicoAnteriorId &&
+                                   tecnico_asignado_id !== '';
+
     let tecnicoAsignadoId = null;
+    let tecnicoInfo = null;
+    let mantenimientoInfo = null;
+
     if (tecnico_asignado_id && tecnico_asignado_id !== '') {
       // Convertir a número entero
       tecnicoAsignadoId = parseInt(tecnico_asignado_id);
@@ -358,7 +525,7 @@ router.put("/:id", async (req, res) => {
       console.log('🆔 tecnico_asignado_id convertido:', tecnicoAsignadoId, 'Tipo:', typeof tecnicoAsignadoId);
 
       const tecnicoCheck = await pool.query(
-        'SELECT id, nombre FROM "Usuarios" WHERE id = $1',
+        'SELECT id, nombre, email FROM "Usuarios" WHERE id = $1',
         [tecnicoAsignadoId]
       );
       
@@ -369,15 +536,40 @@ router.put("/:id", async (req, res) => {
           error: "El técnico asignado no existe" 
         });
       }
-      console.log('✅ Técnico asignado válido:', tecnicoCheck.rows[0].nombre);
+      
+      tecnicoInfo = tecnicoCheck.rows[0];
+      console.log('✅ Técnico asignado válido:', tecnicoInfo.nombre);
+
+      // Obtener información del mantenimiento para el correo
+      if (tecnicoAsignadoCambiado) {
+        try {
+          const mantenimientoData = await pool.query(
+            `SELECT mp.*, m.numero as montacargas_numero, m."Marca" as montacargas_marca, 
+                    m."Modelo" as montacargas_modelo, m."Serie" as montacargas_serie,
+                    m."Ubicacion" as montacargas_ubicacion
+             FROM observaciones_mantenimiento om
+             JOIN mantenimientos_programados mp ON om.mantenimiento_id = mp.id
+             JOIN "Montacargas" m ON mp.montacargas_id = m.numero
+             WHERE om.id = $1`,
+            [id]
+          );
+
+          if (mantenimientoData.rows.length > 0) {
+            mantenimientoInfo = mantenimientoData.rows[0];
+            console.log('✅ Información de mantenimiento obtenida para notificación');
+          }
+        } catch (infoError) {
+          console.error('❌ Error obteniendo información para notificación:', infoError);
+        }
+      }
     }
 
     // Convertir es_evidencia a boolean
     const esEvidenciaBool = es_evidencia === 'true' || es_evidencia === true;
 
     let query = `UPDATE observaciones_mantenimiento 
-                 SET descripcion = $1, cargo_a = $2, estado_resolucion = $3, es_evidencia = $4, tecnico_asignado_id = $5`;  // NUEVO
-    let params = [descripcion, cargo_a, estado_resolucion, esEvidenciaBool, tecnicoAsignadoId]; // NUEVO: usar variable convertida
+                 SET descripcion = $1, cargo_a = $2, estado_resolucion = $3, es_evidencia = $4, tecnico_asignado_id = $5`;
+    let params = [descripcion, cargo_a, estado_resolucion, esEvidenciaBool, tecnicoAsignadoId];
     let paramCount = 6;
 
     // Procesar firma digital si está presente
@@ -410,7 +602,7 @@ router.put("/:id", async (req, res) => {
         console.log('✅ Firma subida a S3:', firma_url);
         
         // Eliminar firma anterior si existe
-        const firmaAnterior = observacionCheck.rows[0].firma_url;
+        const firmaAnterior = observacionActual.firma_url;
         if (firmaAnterior && firmaAnterior.includes('amazonaws.com')) {
           try {
             await deleteFromS3(firmaAnterior);
@@ -443,9 +635,6 @@ router.put("/:id", async (req, res) => {
     } else if (estado_resolucion === 'pendiente') {
       // Solo limpiar campos de resolución, mantener la firma si existe
       query += `, fecha_resolucion = NULL, resuelto_por = NULL`;
-      
-      // Si no hay firma nueva y queremos limpiar la firma existente al volver a pendiente
-      // query += `, fecha_resolucion = NULL, resuelto_por = NULL, firma_url = NULL, firma_nombre = NULL, firma_fecha = NULL`;
     }
 
     query += ` WHERE id = $${paramCount} RETURNING *`;
@@ -463,16 +652,51 @@ router.put("/:id", async (req, res) => {
       });
     }
 
+    // NUEVO: Enviar notificación por correo si se cambió el técnico asignado
+    let notificacionEnviada = false;
+    if (tecnicoAsignadoCambiado && tecnicoInfo && mantenimientoInfo) {
+      try {
+        const observacionData = {
+          descripcion: descripcion,
+          cargo_a: cargo_a,
+          estado_resolucion: estado_resolucion
+        };
+
+        console.log('📧 Enviando notificación de reasignación a:', tecnicoInfo.email);
+        
+        // Enviar notificación en segundo plano
+        enviarNotificacionObservacion(
+          tecnicoInfo.email,
+          tecnicoInfo.nombre,
+          observacionData,
+          mantenimientoInfo
+        ).then(success => {
+          if (success) {
+            console.log('✅ Notificación de reasignación enviada a:', tecnicoInfo.email);
+          } else {
+            console.log('⚠️ No se pudo enviar notificación de reasignación a:', tecnicoInfo.email);
+          }
+        }).catch(emailError => {
+          console.error('❌ Error en envío de notificación de reasignación:', emailError);
+        });
+
+        notificacionEnviada = true;
+        
+      } catch (notifError) {
+        console.error('❌ Error preparando notificación de reasignación:', notifError);
+      }
+    }
+
     // Obtener la observación actualizada con información completa
     const observacionActualizada = await pool.query(
       `SELECT om.*, 
               u1.nombre as tecnico_nombre,
               u2.nombre as resuelto_por_nombre,
-              u3.nombre as tecnico_asignado_nombre  -- NUEVO
+              u3.nombre as tecnico_asignado_nombre
        FROM observaciones_mantenimiento om
        LEFT JOIN "Usuarios" u1 ON om.creado_por = u1.id
        LEFT JOIN "Usuarios" u2 ON om.resuelto_por = u2.id
-       LEFT JOIN "Usuarios" u3 ON om.tecnico_asignado_id = u3.id  -- NUEVO JOIN
+       LEFT JOIN "Usuarios" u3 ON om.tecnico_asignado_id = u3.id
        WHERE om.id = $1`,
       [id]
     );
@@ -485,7 +709,8 @@ router.put("/:id", async (req, res) => {
     res.json({
       success: true,
       refaccion: observacionActualizada.rows[0],
-      message: mensaje
+      message: mensaje,
+      notificacion_enviada: notificacionEnviada
     });
 
   } catch (err) {
