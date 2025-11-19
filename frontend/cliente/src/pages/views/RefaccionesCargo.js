@@ -389,72 +389,71 @@ export default function RefaccionesCargo({ montacargas }) {
 
   // FUNCIÓN: Subir observación con imágenes
   const subirObservacionConImagenes = async () => {
-    if (!canAddRefacciones()) {
-      setError('❌ No tienes permisos para agregar observaciones');
-      return;
-    }
+  if (!isTecnico()) {  // Cambiar esto
+    setError('❌ Solo los técnicos pueden agregar imágenes a observaciones');
+    return;
+  }
 
-    if (!observacionConImagenes) {
-      setError('No hay observación seleccionada');
-      return;
-    }
+  if (!observacionConImagenes) {
+    setError('No hay observación seleccionada');
+    return;
+  }
 
-    if (imagenesObservacion.length === 0) {
-      setError('Debe agregar al menos una imagen');
-      return;
-    }
+  if (imagenesObservacion.length === 0) {
+    setError('Debe agregar al menos una imagen');
+    return;
+  }
 
-    setSubiendoImagenes(true);
-    setError('');
+  setSubiendoImagenes(true);
+  setError('');
 
-    try {
-      const token = localStorage.getItem("token");
-      const formData = new FormData();
-      
-      formData.append('mantenimiento_id', observacionConImagenes.mantenimiento_id.toString());
-      formData.append('descripcion', observacionConImagenes.descripcion);
-      formData.append('cargo_a', observacionConImagenes.cargo_a);
-      formData.append('es_evidencia', 'true');
-      formData.append('estado_resolucion', 'resuelto');
-      
-      // Incluir técnico asignado si existe
-      if (observacionConImagenes.tecnico_asignado_id) {
-        formData.append('tecnico_asignado_id', observacionConImagenes.tecnico_asignado_id);
+  try {
+    const token = localStorage.getItem("token");
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    const formData = new FormData();
+    
+    formData.append('mantenimiento_id', observacionConImagenes.mantenimiento_id.toString());
+    formData.append('descripcion', observacionConImagenes.descripcion);
+    formData.append('cargo_a', observacionConImagenes.cargo_a);
+    formData.append('es_evidencia', 'true');
+    formData.append('estado_resolucion', 'resuelto');
+    
+    // Incluir técnico asignado (el usuario actual)
+    formData.append('tecnico_asignado_id', userData.id);
+
+    imagenesObservacion.forEach((imagen, index) => {
+      formData.append('imagenes', imagen.file);
+    });
+
+    const response = await fetch(
+      `${process.env.REACT_APP_API_URL}/api/refacciones`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
       }
+    );
 
-      imagenesObservacion.forEach((imagen, index) => {
-        formData.append('imagenes', imagen.file);
-      });
+    const data = await response.json();
 
-      const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/api/refacciones`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formData
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Error al subir observación con imágenes');
-      }
-
-      setSuccess(`✅ Observación completada con ${imagenesObservacion.length} imagen(es)`);
-      setImagenesObservacion([]);
-      setObservacionConImagenes(null);
-      fetchObservaciones(mantenimientoSeleccionado.id);
-      
-    } catch (err) {
-      console.error('Error al subir observación con imágenes:', err);
-      setError(err.message);
-    } finally {
-      setSubiendoImagenes(false);
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || 'Error al subir observación con imágenes');
     }
-  };
+
+    setSuccess(`✅ Observación completada con ${imagenesObservacion.length} imagen(es)`);
+    setImagenesObservacion([]);
+    setObservacionConImagenes(null);
+    fetchObservaciones(mantenimientoSeleccionado.id);
+    
+  } catch (err) {
+    console.error('Error al subir observación con imágenes:', err);
+    setError(err.message);
+  } finally {
+    setSubiendoImagenes(false);
+  }
+};
 
   // FUNCIÓN: Agregar imágenes a observación existente
   const agregarImagenesAObservacion = (observacion) => {
