@@ -19,7 +19,7 @@ export default function RefaccionesCargo({ montacargas }) {
   const [formData, setFormData] = useState({
     descripcion: '',
     cargo_a: 'empresa',
-    tecnico_asignado_id: '' // NUEVO: Para asignar técnico
+    tecnico_asignado_id: '' // Para asignar técnico
   });
   const [editandoObservacion, setEditandoObservacion] = useState(null);
   
@@ -37,7 +37,7 @@ export default function RefaccionesCargo({ montacargas }) {
 
   // Estado para el rol del usuario y lista de técnicos
   const [userRole, setUserRole] = useState('user');
-  const [tecnicos, setTecnicos] = useState([]); // NUEVO: Lista de técnicos para asignar
+  const [tecnicos, setTecnicos] = useState([]); // Lista de técnicos para asignar
   const [loadingTecnicos, setLoadingTecnicos] = useState(false);
 
   const fileInputRef = useRef(null);
@@ -53,7 +53,7 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   }, []);
 
-  // NUEVA FUNCIÓN: Obtener lista de técnicos
+  // FUNCIÓN: Obtener lista de técnicos
   const fetchTecnicos = async () => {
     setLoadingTecnicos(true);
     try {
@@ -104,7 +104,7 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   }, [mantenimientoSeleccionado]);
 
-  // FUNCIONES PARA VERIFICAR ROLES - MODIFICADAS
+  // FUNCIONES PARA VERIFICAR ROLES
   const isTecnico = () => userRole === 'tecnico';
   const isAdmin = () => userRole === 'admin';
   const canAddRefacciones = () => isAdmin(); // SOLO admins pueden agregar
@@ -112,18 +112,27 @@ export default function RefaccionesCargo({ montacargas }) {
   const canEditObservaciones = () => isAdmin(); // SOLO admins pueden editar
   const canViewObservaciones = () => isAdmin() || isTecnico(); // Admins y técnicos pueden ver
 
-  // FUNCIÓN: Obtener observaciones filtradas por técnico
+  // FUNCIÓN CORREGIDA: Obtener observaciones filtradas por técnico
   const getObservacionesFiltradas = () => {
+    console.log('🔍 Filtrando observaciones para rol:', userRole);
+    
     if (isAdmin()) {
       // Admin ve todas las observaciones
+      console.log('👑 Admin - Mostrando TODAS las observaciones:', observaciones.length);
       return observaciones;
     } else if (isTecnico()) {
       // Técnico solo ve las observaciones asignadas a él
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
-      return observaciones.filter(obs => 
-        obs.tecnico_asignado_id === userData.id || 
-        obs.resuelto_por === userData.id
-      );
+      console.log('🔧 Técnico ID:', userData.id, '- Filtrando observaciones asignadas');
+      
+      const observacionesFiltradas = observaciones.filter(obs => {
+        const esAsignado = obs.tecnico_asignado_id === userData.id;
+        console.log(`📋 Observación ${obs.id}: tecnico_asignado_id=${obs.tecnico_asignado_id}, esAsignado=${esAsignado}`);
+        return esAsignado;
+      });
+      
+      console.log('✅ Técnico - Observaciones asignadas:', observacionesFiltradas.length, 'de', observaciones.length);
+      return observacionesFiltradas;
     }
     return [];
   };
@@ -389,7 +398,7 @@ export default function RefaccionesCargo({ montacargas }) {
       formData.append('es_evidencia', 'true');
       formData.append('estado_resolucion', 'resuelto');
       
-      // NUEVO: Incluir técnico asignado si existe
+      // Incluir técnico asignado si existe
       if (observacionConImagenes.tecnico_asignado_id) {
         formData.append('tecnico_asignado_id', observacionConImagenes.tecnico_asignado_id);
       }
@@ -436,6 +445,37 @@ export default function RefaccionesCargo({ montacargas }) {
     }
     setObservacionConImagenes(observacion);
     setImagenesObservacion([]);
+  };
+
+  // FUNCIÓN: Manejar selección de imágenes
+  const handleImagenesSelect = (e) => {
+    const files = Array.from(e.target.files);
+    const nuevasImagenes = [];
+
+    files.forEach(file => {
+      if (imagenesObservacion.length + nuevasImagenes.length >= 3) {
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        nuevasImagenes.push({
+          file,
+          preview: e.target.result,
+          name: file.name
+        });
+
+        if (nuevasImagenes.length === Math.min(files.length, 3 - imagenesObservacion.length)) {
+          setImagenesObservacion(prev => [...prev, ...nuevasImagenes]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // FUNCIÓN: Eliminar imagen de la lista
+  const removeImagen = (index) => {
+    setImagenesObservacion(prev => prev.filter((_, i) => i !== index));
   };
 
   // FUNCIÓN: Eliminar imagen específica de una observación
@@ -656,7 +696,7 @@ export default function RefaccionesCargo({ montacargas }) {
         cargo_a: formData.cargo_a,
         es_evidencia: 'false',
         estado_resolucion: 'pendiente',
-        // NUEVO: Incluir técnico asignado si se seleccionó uno
+        // Incluir técnico asignado si se seleccionó uno
         tecnico_asignado_id: formData.tecnico_asignado_id || null
       };
 
@@ -723,7 +763,7 @@ export default function RefaccionesCargo({ montacargas }) {
         cargo_a: editandoObservacion.cargo_a,
         estado_resolucion: editandoObservacion.estado_resolucion || 'pendiente',
         es_evidencia: editandoObservacion.es_evidencia || 'false',
-        // NUEVO: Incluir técnico asignado en la edición
+        // Incluir técnico asignado en la edición
         tecnico_asignado_id: editandoObservacion.tecnico_asignado_id || null
       };
 
@@ -947,6 +987,15 @@ export default function RefaccionesCargo({ montacargas }) {
         <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-6">
           <p className="text-sm">
             <strong>Modo técnico:</strong> Solo puede ver las observaciones asignadas a usted y completarlas con firma digital.
+          </p>
+        </div>
+      )}
+
+      {/* Resumen de asignaciones para técnicos */}
+      {isTecnico() && observacionesFiltradas.length > 0 && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-6">
+          <p className="text-sm">
+            <strong>📊 Resumen de asignaciones:</strong> Tiene {observacionesFiltradas.length} observación(es) asignada(s) para este mantenimiento.
           </p>
         </div>
       )}
@@ -1180,7 +1229,7 @@ export default function RefaccionesCargo({ montacargas }) {
                         </div>
                       )}
 
-                      {/* NUEVO: Selector de técnico para asignar */}
+                      {/* Selector de técnico para asignar */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Asignar a Técnico
@@ -1307,7 +1356,7 @@ export default function RefaccionesCargo({ montacargas }) {
                                 📷 Evidencia
                               </span>
                             )}
-                            {/* NUEVO: Badge de técnico asignado */}
+                            {/* Badge de técnico asignado */}
                             {observacion.tecnico_asignado_nombre && (
                               <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border border-purple-200">
                                 👤 {observacion.tecnico_asignado_nombre}
@@ -1395,7 +1444,7 @@ export default function RefaccionesCargo({ montacargas }) {
                             </p>
                           )}
                           
-                          {/* NUEVO: Información de técnico asignado */}
+                          {/* Información de técnico asignado */}
                           {observacion.tecnico_asignado_nombre && (
                             <p>
                               Asignado a: {observacion.tecnico_asignado_nombre}
@@ -1458,7 +1507,7 @@ export default function RefaccionesCargo({ montacargas }) {
                   <p className="text-gray-500">
                     {isAdmin() 
                       ? 'No se han registrado observaciones para este mantenimiento.'
-                      : 'No tiene observaciones asignadas para este mantenimiento.'}
+                      : 'No tiene observaciones asignadas para este mantenimiento. Contacte al administrador si esperaba ver observaciones aquí.'}
                   </p>
                 </div>
               )
