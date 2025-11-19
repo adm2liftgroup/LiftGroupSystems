@@ -58,24 +58,33 @@ router.get("/", async (req, res) => {
   }
 });
 
-// BLOQUE 2: Obtener observaciones de un mantenimiento específico - ACTUALIZADO CON TÉCNICO ASIGNADO
+// BLOQUE 2: Obtener observaciones de un mantenimiento específico - ACTUALIZADO CON DEBUG
 router.get("/mantenimiento/:mantenimientoId", async (req, res) => {
   try {
     const { mantenimientoId } = req.params;
     
     console.log('🔍 Obteniendo observaciones para mantenimiento:', mantenimientoId);
-    console.log('👤 Usuario haciendo la petición:', req.user?.id, req.user?.rol);
+    console.log('👤 Usuario haciendo la petición:', req.user);
+    console.log('🔑 Headers de autorización:', req.headers.authorization);
+    
+    // Debug temporal: simular un usuario técnico si no hay autenticación
+    let usuarioId = req.user?.id;
+    if (!usuarioId) {
+      console.log('⚠️ No hay usuario autenticado, usando debug...');
+      // Para debug, puedes simular un usuario técnico específico
+      // usuarioId = 10; // ID del técnico "Prueba 3"
+    }
 
     const q = await pool.query(
       `SELECT 
         om.*,
         u1.nombre as tecnico_nombre,
         u2.nombre as resuelto_por_nombre,
-        u3.nombre as tecnico_asignado_nombre  -- NUEVO
+        u3.nombre as tecnico_asignado_nombre
        FROM observaciones_mantenimiento om
        LEFT JOIN "Usuarios" u1 ON om.creado_por = u1.id
        LEFT JOIN "Usuarios" u2 ON om.resuelto_por = u2.id
-       LEFT JOIN "Usuarios" u3 ON om.tecnico_asignado_id = u3.id  -- NUEVO JOIN
+       LEFT JOIN "Usuarios" u3 ON om.tecnico_asignado_id = u3.id
        WHERE om.mantenimiento_id = $1
        ORDER BY om.creado_en DESC`,
       [mantenimientoId]
@@ -88,8 +97,10 @@ router.get("/mantenimiento/:mantenimientoId", async (req, res) => {
       console.log(`📋 Observación ${index + 1}:`, {
         id: obs.id,
         tecnico_asignado_id: obs.tecnico_asignado_id,
+        tipo_tecnico_asignado_id: typeof obs.tecnico_asignado_id,
         tecnico_asignado_nombre: obs.tecnico_asignado_nombre,
-        estado: obs.estado_resolucion
+        estado: obs.estado_resolucion,
+        descripcion: obs.descripcion?.substring(0, 30) + '...'
       });
     });
 
@@ -165,6 +176,9 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
       // Convertir a número entero
       tecnicoAsignadoId = parseInt(tecnico_asignado_id);
       
+      console.log('🆔 tecnico_asignado_id recibido:', tecnico_asignado_id, 'Tipo:', typeof tecnico_asignado_id);
+      console.log('🆔 tecnico_asignado_id convertido:', tecnicoAsignadoId, 'Tipo:', typeof tecnicoAsignadoId);
+
       const tecnicoCheck = await pool.query(
         'SELECT id, nombre FROM "Usuarios" WHERE id = $1',
         [tecnicoAsignadoId]
@@ -340,6 +354,9 @@ router.put("/:id", async (req, res) => {
       // Convertir a número entero
       tecnicoAsignadoId = parseInt(tecnico_asignado_id);
       
+      console.log('🆔 tecnico_asignado_id recibido:', tecnico_asignado_id, 'Tipo:', typeof tecnico_asignado_id);
+      console.log('🆔 tecnico_asignado_id convertido:', tecnicoAsignadoId, 'Tipo:', typeof tecnicoAsignadoId);
+
       const tecnicoCheck = await pool.query(
         'SELECT id, nombre FROM "Usuarios" WHERE id = $1',
         [tecnicoAsignadoId]
@@ -362,7 +379,6 @@ router.put("/:id", async (req, res) => {
                  SET descripcion = $1, cargo_a = $2, estado_resolucion = $3, es_evidencia = $4, tecnico_asignado_id = $5`;  // NUEVO
     let params = [descripcion, cargo_a, estado_resolucion, esEvidenciaBool, tecnicoAsignadoId]; // NUEVO: usar variable convertida
     let paramCount = 6;
-
 
     // Procesar firma digital si está presente
     let firma_url = null;
