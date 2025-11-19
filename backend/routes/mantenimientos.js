@@ -653,7 +653,11 @@ router.get("/checklists/completados", async (req, res) => {
         m."Modelo" as montacargas_modelo,
         m."Serie" as montacargas_serie,
         m."Ubicacion" as montacargas_ubicacion,
-        m."Planta" as montacargas_planta
+        m."Planta" as montacargas_planta,
+        -- INCLUIR EXPLÍCITAMENTE LOS CAMPOS DE FIRMA
+        cc.firma_cliente_url,
+        cc.firma_cliente_nombre,
+        cc.firma_cliente_fecha
       FROM checklists_completados cc
       JOIN mantenimientos_programados mp ON cc.mantenimiento_id = mp.id
       JOIN "Montacargas" m ON mp.montacargas_id = m.numero
@@ -665,6 +669,18 @@ router.get("/checklists/completados", async (req, res) => {
     const result = await pool.query(query, [mesActual, anioActual]);
     
     console.log(`Encontrados ${result.rows.length} checklists completados para ${mesActual}/${anioActual}`);
+    
+    // DEBUG: Verificar si hay firmas en los resultados
+    const checklistsConFirma = result.rows.filter(row => row.firma_cliente_url);
+    console.log(`Checklists con firma: ${checklistsConFirma.length}`);
+    checklistsConFirma.forEach((checklist, index) => {
+      console.log(`Checklist ${index + 1}:`, {
+        id: checklist.id,
+        firma_url: checklist.firma_cliente_url,
+        firma_nombre: checklist.firma_cliente_nombre,
+        firma_fecha: checklist.firma_cliente_fecha
+      });
+    });
     
     res.json({
       success: true,
