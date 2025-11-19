@@ -2113,7 +2113,7 @@ const Perfil = () => {
 
     console.log('Incidencias filtradas:', respuestasIncidencias);
 
-    // 2. Preparar datos para enviar al backend
+    // 2. Preparar datos para enviar al backend - INCLUYENDO FIRMA DEL CLIENTE
     const datosEnvio = {
       status: 'completado',
       tecnico_id: userData?.id,
@@ -2126,10 +2126,14 @@ const Perfil = () => {
       partes_faltantes: checklistData.partesFaltantes,
       golpes_unidad: checklistData.golpesUnidad,
       condiciones_pintura: checklistData.condicionesPintura,
-      respuestas_incidencias: Object.keys(respuestasIncidencias).length > 0 ? respuestasIncidencias : null
+      respuestas_incidencias: Object.keys(respuestasIncidencias).length > 0 ? respuestasIncidencias : null,
+      // INCLUIR DATOS DE LA FIRMA DEL CLIENTE
+      firma_cliente_data: checklistData.firma_cliente_data,
+      firma_cliente_nombre: checklistData.firma_cliente_nombre
     };
 
     console.log('Datos a enviar al backend:', datosEnvio);
+    console.log('¿Incluye firma del cliente?', !!checklistData.firma_cliente_data);
 
     // 3. Llamar a la API
     const token = localStorage.getItem("token");
