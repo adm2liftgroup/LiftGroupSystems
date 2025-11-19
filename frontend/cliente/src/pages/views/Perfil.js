@@ -2094,35 +2094,50 @@ const Perfil = () => {
   try {
     console.log('Checklist completado - Datos recibidos:', checklistData);
 
-    // 1. Filtrar SOLO las incidencias (EXCLUYENDO los campos de firma)
+    // 1. Filtrar SOLO las incidencias (EXCLUYENDO EXPLÍCITAMENTE campos de firma y otros no relacionados)
     const respuestasIncidencias = {};
     
+    // Lista de campos que NO son incidencias
+    const camposExcluidos = [
+      'firma_cliente_data', 'firma_cliente_nombre',
+      'observaciones', 'actividadesPendientes', 'partesFaltantes', 
+      'golpesUnidad', 'condicionesPintura', 'horaInicio', 'horaTermino',
+      'tecnico', 'fecha', 'mantenimientoId'
+    ];
+    
     Object.entries(checklistData).forEach(([key, value]) => {
-      // EXCLUIR campos de firma explícitamente
-      const esCampoFirma = key === 'firma_cliente_data' || key === 'firma_cliente_nombre';
+      // EXCLUIR campos específicos que no son incidencias
+      const esCampoExcluido = camposExcluidos.includes(key);
       
-      // Solo guardar si es una incidencia Y NO es un campo de firma
-      const esIncidencia = 
-        !esCampoFirma && (
+      // Solo procesar números de ítem del checklist (1-84) y mediciones específicas
+      const esItemChecklist = 
+        !esCampoExcluido && (
+          // Es un número entre 1-84
+          (/^\d+$/.test(key) && parseInt(key) >= 1 && parseInt(key) <= 84) ||
+          // O es una medición de llantas (50_FD, 50_FI, etc.)
+          (/^50_(FD|FI|TD|TI)$/.test(key))
+        );
+      
+      if (esItemChecklist) {
+        const esIncidencia = 
           value === "Reemplazo" || 
           value === "Si" || 
           value === false ||
-          (typeof value === 'string' && value.includes('mm')) ||
-          key.includes('_FD') || key.includes('_FI') || key.includes('_TD') || key.includes('_TI')
-        );
-      
-      if (esIncidencia && value !== undefined && value !== null) {
-        respuestasIncidencias[key] = value;
+          (typeof value === 'string' && /^\d+$/.test(value) && parseInt(value) < 10); // Mediciones < 10mm
+        
+        if (esIncidencia && value !== undefined && value !== null) {
+          respuestasIncidencias[key] = value;
+        }
       }
     });
 
     console.log('Incidencias filtradas (sin firma):', respuestasIncidencias);
-    console.log('Datos de firma:', {
-      firma_cliente_data: checklistData.firma_cliente_data ? 'PRESENTE' : 'AUSENTE',
-      firma_cliente_nombre: checklistData.firma_cliente_nombre
+    console.log('Datos de firma separados:', {
+      firma_data: checklistData.firma_cliente_data ? 'PRESENTE' : 'AUSENTE',
+      firma_nombre: checklistData.firma_cliente_nombre
     });
 
-    // 2. Preparar datos para enviar al backend - INCLUYENDO FIRMA DEL CLIENTE
+    // 2. Preparar datos para enviar al backend
     const datosEnvio = {
       status: 'completado',
       tecnico_id: userData?.id,
@@ -2136,13 +2151,16 @@ const Perfil = () => {
       golpes_unidad: checklistData.golpesUnidad,
       condiciones_pintura: checklistData.condicionesPintura,
       respuestas_incidencias: Object.keys(respuestasIncidencias).length > 0 ? respuestasIncidencias : null,
-      // INCLUIR DATOS DE LA FIRMA DEL CLIENTE SEPARADAMENTE
+      // FIRMA SEPARADA
       firma_cliente_data: checklistData.firma_cliente_data,
       firma_cliente_nombre: checklistData.firma_cliente_nombre
     };
 
-    console.log('Datos a enviar al backend:', datosEnvio);
-    console.log('¿Incluye firma del cliente?', !!checklistData.firma_cliente_data);
+    console.log('✅ Datos finales a enviar:', {
+      incidencias_count: Object.keys(respuestasIncidencias).length,
+      tiene_firma: !!checklistData.firma_cliente_data,
+      firma_en_incidencias: 'firma_cliente_data' in respuestasIncidencias
+    });
 
   
 

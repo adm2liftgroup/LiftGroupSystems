@@ -381,6 +381,7 @@ router.get("/mes-actual", async (req, res) => {
 // FIN DEL BLOQUE 7: Obtener mantenimientos del mes actual
 
 // NUEVO BLOQUE 8: Actualizar estado del mantenimiento
+// NUEVO BLOQUE 8: Actualizar estado del mantenimiento - VERSIÓN CORREGIDA
 router.patch("/:id/estado", async (req, res) => {
   try {
     const { id } = req.params;
@@ -402,10 +403,11 @@ router.patch("/:id/estado", async (req, res) => {
       firma_cliente_nombre
     } = req.body;
 
-    console.log("Actualizando estado del mantenimiento con checklist:", { 
+    console.log("📥 Actualizando estado del mantenimiento con checklist:", { 
       id, status, tecnico_id, tecnico_nombre, observaciones,
       hora_inicio, hora_termino, actividades_pendientes, partes_faltantes,
-      golpes_unidad, condiciones_pintura, respuestas_incidencias,
+      golpes_unidad, condiciones_pintura,
+      respuestas_incidencias_count: respuestas_incidencias ? Object.keys(respuestas_incidencias).length : 0,
       firma_cliente_data: firma_cliente_data ? 'PRESENTE' : 'AUSENTE',
       firma_cliente_nombre
     });
@@ -433,29 +435,83 @@ router.patch("/:id/estado", async (req, res) => {
       }
     }
 
+    // VALIDACIÓN CRÍTICA: Limpiar respuestas_incidencias ANTES de procesar
+    let respuestasIncidenciasLimpio = null;
+    if (respuestas_incidencias) {
+      respuestasIncidenciasLimpio = { ...respuestas_incidencias };
+      
+      // ELIMINAR campos que no son incidencias reales del checklist
+      const camposNoIncidencia = [
+        'firma_cliente_data', 'firma_cliente_nombre',
+        'observaciones', 'actividadesPendientes', 'partesFaltantes', 
+        'golpesUnidad', 'condicionesPintura', 'horaInicio', 'horaTermino',
+        'tecnico', 'fecha', 'mantenimientoId'
+      ];
+      
+      camposNoIncidencia.forEach(campo => {
+        if (respuestasIncidenciasLimpio[campo]) {
+          console.warn(`⚠️ Eliminando campo no incidencia de respuestas_incidencias: ${campo}`);
+          delete respuestasIncidenciasLimpio[campo];
+        }
+      });
+
+      console.log('🔍 Respuestas incidencias después de limpiar:', {
+        original_count: Object.keys(respuestas_incidencias).length,
+        limpio_count: Object.keys(respuestasIncidenciasLimpio).length,
+        campos_eliminados: camposNoIncidencia.filter(campo => respuestas_incidencias[campo])
+      });
+    }
+
     // Procesar firma del cliente si está presente
     let firma_cliente_url = null;
     if (firma_cliente_data && firma_cliente_nombre) {
       try {
         console.log('✍️ Procesando firma del cliente...');
         
+        // VALIDACIÓN EXTRA: Verificar que NO esté en incidencias después de limpiar
+        if (respuestasIncidenciasLimpio && respuestasIncidenciasLimpio.firma_cliente_data) {
+          console.warn('🚨 ADVERTENCIA CRÍTICA: firma_cliente_data todavía en incidencias después de limpiar. Eliminando...');
+          delete respuestasIncidenciasLimpio.firma_cliente_data;
+        }
+        
+        // Validar formato de firma
+        if (!firma_cliente_data.startsWith('data:image/')) {
+          throw new Error('Formato de firma inválido. Debe ser data URL de imagen.');
+        }
+        
         // Convertir base64 a buffer
         const base64Data = firma_cliente_data.replace(/^data:image\/\w+;base64,/, '');
         const firmaBuffer = Buffer.from(base64Data, 'base64');
         
-        // Subir firma a S3 (usa la misma función que para las observaciones)
+        // Validar tamaño del buffer
+        if (firmaBuffer.length === 0) {
+          throw new Error('La firma está vacía');
+        }
+        
+        console.log(`✅ Firma válida. Tamaño: ${firmaBuffer.length} bytes, Nombre: ${firma_cliente_nombre}`);
+        
+        // Subir firma a S3
         firma_cliente_url = await uploadImageToS3(
           firmaBuffer,
-          `firma-cliente-${Date.now()}.png`,
+          `firma-cliente-${Date.now()}-${firma_cliente_nombre.replace(/[^a-zA-Z0-9]/g, '_')}.png`,
           'image/png'
         );
         
         console.log('✅ Firma del cliente subida a S3:', firma_cliente_url);
       } catch (firmaError) {
         console.error('❌ Error subiendo firma del cliente a S3:', firmaError);
-        // No detenemos el proceso por error en la firma
+        // No detenemos el proceso por error en la firma, pero registramos el problema
       }
     }
+
+    // LOG FINAL PARA DEPURACIÓN
+    console.log('📊 RESUMEN ANTES DE GUARDAR:', {
+      incidencias_count: respuestasIncidenciasLimpio ? Object.keys(respuestasIncidenciasLimpio).length : 0,
+      incidencias_keys: respuestasIncidenciasLimpio ? Object.keys(respuestasIncidenciasLimpio) : [],
+      firma_url: firma_cliente_url,
+      firma_nombre: firma_cliente_nombre,
+      firma_en_incidencias: respuestasIncidenciasLimpio && 'firma_cliente_data' in respuestasIncidenciasLimpio
+    });
 
     // INICIO TRANSACCIÓN - Actualizar mantenimiento Y guardar checklist
     const client = await pool.connect();
@@ -525,14 +581,27 @@ router.patch("/:id/estado", async (req, res) => {
           partes_faltantes,
           golpes_unidad,
           condiciones_pintura,
-          respuestas_incidencias ? JSON.stringify(respuestas_incidencias) : null,
+          respuestasIncidenciasLimpio ? JSON.stringify(respuestasIncidenciasLimpio) : null, // USAR LA VERSIÓN LIMPIA
           firma_cliente_url,
           firma_cliente_nombre,
           firma_cliente_url ? new Date() : null
         ];
 
+        console.log('💾 Guardando checklist en BD con:', {
+          incidencias: respuestasIncidenciasLimpio ? Object.keys(respuestasIncidenciasLimpio).length : 0,
+          firma_url_presente: !!firma_cliente_url,
+          firma_nombre: firma_cliente_nombre
+        });
+
         checklistResult = await client.query(queryChecklist, paramsChecklist);
-        console.log("Checklist guardado con firma del cliente:", checklistResult.rows[0]);
+        
+        // LOG DETALLADO DEL RESULTADO
+        console.log("✅ Checklist guardado en BD:", {
+          id: checklistResult.rows[0].id,
+          firma_cliente_url: checklistResult.rows[0].firma_cliente_url,
+          firma_cliente_nombre: checklistResult.rows[0].firma_cliente_nombre,
+          incidencias_count: checklistResult.rows[0].respuestas_incidencias ? Object.keys(checklistResult.rows[0].respuestas_incidencias).length : 0
+        });
       }
 
       await client.query('COMMIT');
@@ -555,17 +624,26 @@ router.patch("/:id/estado", async (req, res) => {
         }
       }
 
+      // LOG FINAL DE ÉXITO
+      console.log('🎉 OPERACIÓN COMPLETADA EXITOSAMENTE:', {
+        mantenimiento_id: id,
+        checklist_guardado: !!checklistResult,
+        firma_incluida: !!firma_cliente_url,
+        incidencias_guardadas: respuestasIncidenciasLimpio ? Object.keys(respuestasIncidenciasLimpio).length : 0
+      });
+
       res.json(response);
 
     } catch (error) {
       await client.query('ROLLBACK');
+      console.error('❌ Error en transacción:', error);
       throw error;
     } finally {
       client.release();
     }
 
   } catch (err) {
-    console.error("Error actualizando estado del mantenimiento:", err);
+    console.error("❌ Error actualizando estado del mantenimiento:", err);
     
     if (err.code === '22P02') {
       return res.status(400).json({ 
