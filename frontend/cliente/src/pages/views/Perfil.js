@@ -2094,24 +2094,33 @@ const Perfil = () => {
   try {
     console.log('Checklist completado - Datos recibidos:', checklistData);
 
-    // 1. Filtrar SOLO las incidencias (no "Bueno" ni "Efectuado")
+    // 1. Filtrar SOLO las incidencias (EXCLUYENDO los campos de firma)
     const respuestasIncidencias = {};
     
     Object.entries(checklistData).forEach(([key, value]) => {
-      // Solo guardar si es una incidencia (Reemplazo, Si, false, o mediciones)
+      // EXCLUIR campos de firma explícitamente
+      const esCampoFirma = key === 'firma_cliente_data' || key === 'firma_cliente_nombre';
+      
+      // Solo guardar si es una incidencia Y NO es un campo de firma
       const esIncidencia = 
-        value === "Reemplazo" || 
-        value === "Si" || 
-        value === false ||
-        (typeof value === 'string' && value.includes('mm')) ||
-        key.includes('_FD') || key.includes('_FI') || key.includes('_TD') || key.includes('_TI');
+        !esCampoFirma && (
+          value === "Reemplazo" || 
+          value === "Si" || 
+          value === false ||
+          (typeof value === 'string' && value.includes('mm')) ||
+          key.includes('_FD') || key.includes('_FI') || key.includes('_TD') || key.includes('_TI')
+        );
       
       if (esIncidencia && value !== undefined && value !== null) {
         respuestasIncidencias[key] = value;
       }
     });
 
-    console.log('Incidencias filtradas:', respuestasIncidencias);
+    console.log('Incidencias filtradas (sin firma):', respuestasIncidencias);
+    console.log('Datos de firma:', {
+      firma_cliente_data: checklistData.firma_cliente_data ? 'PRESENTE' : 'AUSENTE',
+      firma_cliente_nombre: checklistData.firma_cliente_nombre
+    });
 
     // 2. Preparar datos para enviar al backend - INCLUYENDO FIRMA DEL CLIENTE
     const datosEnvio = {
@@ -2127,13 +2136,15 @@ const Perfil = () => {
       golpes_unidad: checklistData.golpesUnidad,
       condiciones_pintura: checklistData.condicionesPintura,
       respuestas_incidencias: Object.keys(respuestasIncidencias).length > 0 ? respuestasIncidencias : null,
-      // INCLUIR DATOS DE LA FIRMA DEL CLIENTE
+      // INCLUIR DATOS DE LA FIRMA DEL CLIENTE SEPARADAMENTE
       firma_cliente_data: checklistData.firma_cliente_data,
       firma_cliente_nombre: checklistData.firma_cliente_nombre
     };
 
     console.log('Datos a enviar al backend:', datosEnvio);
     console.log('¿Incluye firma del cliente?', !!checklistData.firma_cliente_data);
+
+  
 
     // 3. Llamar a la API
     const token = localStorage.getItem("token");
