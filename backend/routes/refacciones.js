@@ -33,21 +33,21 @@ const enviarNotificacionObservacion = async (tecnicoEmail, tecnicoNombre, observ
       return false;
     }
 
-    // USAR EL MISMO SERVICIO QUE EN MANTENIMIENTOS
+    // USAR EL NUEVO SERVICIO ESPECÍFICO PARA OBSERVACIONES
     const emailService = require('../services/emailService');
     
-    // Crear objeto técnico similar al que usa mantenimientos
+    // Crear objeto técnico
     const tecnico = {
       email: tecnicoEmail,
       nombre: tecnicoNombre
     };
 
-    console.log('📤 [OBSERVACIONES] Usando emailService para enviar notificación...');
+    console.log('📤 [OBSERVACIONES] Usando emailService para enviar notificación de observación...');
     
-    // Usar la misma función que funciona en mantenimientos
-    await emailService.enviarAsignacionTecnico(tecnico, mantenimientoData);
+    // Usar la nueva función específica para observaciones
+    await emailService.enviarAsignacionObservacion(tecnico, observacionData, mantenimientoData);
     
-    console.log('✅ [OBSERVACIONES] Notificación enviada exitosamente a:', tecnicoEmail);
+    console.log('✅ [OBSERVACIONES] Notificación de observación enviada exitosamente a:', tecnicoEmail);
     return true;
     
   } catch (error) {
@@ -332,7 +332,7 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
         console.log('📤 [OBSERVACIONES] Usando emailService para enviar notificación...');
         
         // Usar la misma función que funciona en mantenimientos
-        await emailService.enviarAsignacionTecnico(tecnico, mantenimientoInfo);
+        await emailService.enviarAsignacionTecnico(tecnico, mantenimientoInfo, mantenimientoInfo);
         
         notificacionEnviada = true;
         console.log('✅ [OBSERVACIONES] Notificación enviada exitosamente a:', tecnicoInfo.email);
@@ -568,7 +568,11 @@ router.put("/:id", async (req, res) => {
         };
 
         // Enviar notificación usando el mismo servicio
-        await emailService.enviarAsignacionTecnico(tecnico, mantenimientoInfo);
+        await emailService.enviarAsignacionObservacion(tecnico, {
+  descripcion: descripcion,
+  cargo_a: cargo_a,
+  estado_resolucion: estado_resolucion
+}, mantenimientoInfo);
         
         notificacionEnviada = true;
         console.log('✅ [OBSERVACIONES] Notificación de reasignación enviada a:', tecnicoInfo.email);
