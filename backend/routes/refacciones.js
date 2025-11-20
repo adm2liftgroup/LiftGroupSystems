@@ -8,11 +8,11 @@ const nodemailer = require('nodemailer');
 // Configurar el transporter para Brevo (Sendinblue)
 // Configurar el transporter para Brevo (Sendinblue) - MISMA CONFIGURACIÓN QUE EN MANTENIMIENTOS
 const transporter = nodemailer.createTransport({
-  host: 'smtp-relay.brevo.com',
-  port: 587,
+  host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+  port: process.env.SMTP_PORT || 587,
   auth: {
-    user: process.env.BREVO_SMTP_USER,
-    pass: process.env.BREVO_SMTP_PASS
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
   }
 });
 
@@ -27,7 +27,7 @@ const enviarNotificacionObservacion = async (tecnicoEmail, tecnicoNombre, observ
       return false;
     }
 
-    if (!process.env.BREVO_SMTP_USER || !process.env.BREVO_SMTP_PASS) {
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
       console.log('❌ [OBSERVACIONES] Credenciales de Brevo no configuradas');
       return false;
     }
