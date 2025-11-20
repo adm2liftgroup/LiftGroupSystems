@@ -22,7 +22,6 @@ const upload = multer({
 });
 
 // FUNCIÓN MEJORADA: Enviar notificación de asignación de observación
-// USA EL MISMO SERVICIO QUE EN MANTENIMIENTOS
 const enviarNotificacionObservacion = async (tecnicoEmail, tecnicoNombre, observacionData, mantenimientoData) => {
   try {
     console.log('📧 [OBSERVACIONES] Enviando notificación a:', tecnicoEmail);
@@ -307,7 +306,7 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
 
     console.log('✅ Observación guardada correctamente con', req.files?.length || 0, 'imágenes');
 
-    // NUEVO: Enviar notificación por correo si se asignó a un técnico - USANDO EL MISMO SERVICIO
+    // CORREGIDO: Enviar notificación por correo si se asignó a un técnico - USANDO LA NUEVA FUNCIÓN ESPECÍFICA
     let notificacionEnviada = false;
     if (tecnicoAsignadoId && tecnicoInfo) {
       try {
@@ -320,19 +319,8 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
         console.log('📧 [OBSERVACIONES] Preparando envío de notificación a:', tecnicoInfo.email);
         console.log('👤 [OBSERVACIONES] Técnico:', tecnicoInfo.nombre);
         
-        // USAR EL MISMO SERVICIO QUE EN MANTENIMIENTOS
-        const emailService = require('../services/emailService');
-        
-        // Crear objeto técnico similar al que usa mantenimientos
-        const tecnico = {
-          email: tecnicoInfo.email,
-          nombre: tecnicoInfo.nombre
-        };
-
-        console.log('📤 [OBSERVACIONES] Usando emailService para enviar notificación...');
-        
-        // Usar la misma función que funciona en mantenimientos
-        await emailService.enviarAsignacionTecnico(tecnico, mantenimientoInfo, mantenimientoInfo);
+        // CORRECIÓN: Usar la función específica para observaciones
+        await enviarNotificacionObservacion(tecnicoInfo.email, tecnicoInfo.nombre, observacionData, mantenimientoInfo);
         
         notificacionEnviada = true;
         console.log('✅ [OBSERVACIONES] Notificación enviada exitosamente a:', tecnicoInfo.email);
@@ -552,27 +540,20 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // NUEVO: Enviar notificación por correo si se cambió el técnico asignado - USANDO EL MISMO SERVICIO
+    // CORREGIDO: Enviar notificación por correo si se cambió el técnico asignado - USANDO LA NUEVA FUNCIÓN ESPECÍFICA
     let notificacionEnviada = false;
     if (tecnicoAsignadoCambiado && tecnicoInfo && mantenimientoInfo) {
       try {
         console.log('📧 [OBSERVACIONES] Enviando notificación de reasignación a:', tecnicoInfo.email);
         
-        // USAR EL MISMO SERVICIO QUE EN MANTENIMIENTOS
-        const emailService = require('../services/emailService');
-        
-        // Crear objeto técnico
-        const tecnico = {
-          email: tecnicoInfo.email,
-          nombre: tecnicoInfo.nombre
+        const observacionData = {
+          descripcion: descripcion,
+          cargo_a: cargo_a,
+          estado_resolucion: estado_resolucion
         };
 
-        // Enviar notificación usando el mismo servicio
-        await emailService.enviarAsignacionObservacion(tecnico, {
-  descripcion: descripcion,
-  cargo_a: cargo_a,
-  estado_resolucion: estado_resolucion
-}, mantenimientoInfo);
+        // CORRECIÓN: Usar la función específica para observaciones
+        await enviarNotificacionObservacion(tecnicoInfo.email, tecnicoInfo.nombre, observacionData, mantenimientoInfo);
         
         notificacionEnviada = true;
         console.log('✅ [OBSERVACIONES] Notificación de reasignación enviada a:', tecnicoInfo.email);
