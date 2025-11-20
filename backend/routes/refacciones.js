@@ -21,13 +21,22 @@ const enviarNotificacionObservacion = async (tecnicoEmail, tecnicoNombre, observ
   try {
     console.log('📧 [OBSERVACIONES] Enviando notificación a:', tecnicoEmail);
     
+    // USAR LAS VARIABLES QUE SÍ FUNCIONAN
+    const brevoUser = process.env.BREVO_SMTP_USER || process.env.SMTP_USER;
+    const brevoPass = process.env.BREVO_SMTP_PASS || process.env.SMTP_PASS;
+    
+    console.log('🔧 [OBSERVACIONES] Credenciales cargadas:', {
+      user: brevoUser ? '✅' : '❌',
+      pass: brevoPass ? '✅' : '❌'
+    });
+
     // Validaciones críticas
     if (!tecnicoEmail || !tecnicoEmail.includes('@')) {
       console.log('❌ [OBSERVACIONES] Email inválido:', tecnicoEmail);
       return false;
     }
 
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    if (!brevoUser || !brevoPass) {
       console.log('❌ [OBSERVACIONES] Credenciales de Brevo no configuradas');
       return false;
     }
@@ -117,21 +126,64 @@ const enviarNotificacionObservacion = async (tecnicoEmail, tecnicoNombre, observ
 
     console.log('📤 [OBSERVACIONES] Configurando envío de correo...');
     
-    // Verificar conexión con el transporter
-    await transporter.verify();
+    // CONFIGURACIÓN MEJORADA CON TIMEOUT
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+      port: process.env.SMTP_PORT || 587,
+      secure: false, // true para 465, false para otros puertos
+      auth: {
+        user: brevoUser,
+        pass: brevoPass
+      },
+      // CONFIGURACIONES DE TIMEOUT
+      connectionTimeout: 10000, // 10 segundos
+      greetingTimeout: 10000,   // 10 segundos
+      socketTimeout: 15000,     // 15 segundos
+      // CONFIGURACIONES ADICIONALES
+      tls: {
+        rejectUnauthorized: false // Importante para algunos entornos
+      }
+    });
+
+    console.log('⏰ [OBSERVACIONES] Verificando conexión con timeout de 10 segundos...');
+    
+    // Verificar conexión con timeout personalizado
+    await Promise.race([
+      transporter.verify(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout verificando conexión')), 10000)
+      )
+    ]);
+    
     console.log('✅ [OBSERVACIONES] Conexión con servidor de correo verificada');
 
-    const info = await transporter.sendMail(mailOptions);
+    console.log('📨 [OBSERVACIONES] Enviando correo con timeout de 15 segundos...');
+    
+    // Enviar correo con timeout
+    const info = await Promise.race([
+      transporter.sendMail(mailOptions),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout enviando correo')), 15000)
+      )
+    ]);
+    
     console.log('✅ [OBSERVACIONES] Notificación enviada:', info.messageId);
     console.log('✅ [OBSERVACIONES] Correo aceptado por:', info.accepted);
     
     return true;
   } catch (error) {
-    console.error('❌ [OBSERVACIONES] Error enviando notificación:', error);
-    console.error('❌ [OBSERVACIONES] Detalles del error:', {
-      message: error.message,
-      code: error.code
-    });
+    console.error('❌ [OBSERVACIONES] Error enviando notificación:', error.message);
+    
+    if (error.message.includes('Timeout')) {
+      console.error('⏰ [OBSERVACIONES] El servidor se está tomando demasiado tiempo para responder');
+    } else if (error.code === 'ETIMEDOUT') {
+      console.error('🔌 [OBSERVACIONES] Timeout de conexión - El servidor SMTP no responde');
+    } else if (error.code === 'ECONNREFUSED') {
+      console.error('🚫 [OBSERVACIONES] Conexión rechazada - Verifica host y puerto');
+    } else if (error.code === 'EAUTH') {
+      console.error('🔑 [OBSERVACIONES] Error de autenticación - Verifica credenciales');
+    }
+    
     return false;
   }
 };
