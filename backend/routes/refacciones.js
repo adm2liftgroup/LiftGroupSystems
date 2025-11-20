@@ -6,6 +6,7 @@ const { uploadImageToS3, deleteFromS3 } = require('../aws-s3');
 const nodemailer = require('nodemailer');
 
 // Configurar el transporter para Brevo (Sendinblue)
+// Configurar el transporter para Brevo (Sendinblue) - MISMA CONFIGURACIÓN QUE EN MANTENIMIENTOS
 const transporter = nodemailer.createTransport({
   host: 'smtp-relay.brevo.com',
   port: 587,
@@ -15,11 +16,22 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// FUNCIÓN: Enviar notificación de asignación de observación
+// FUNCIÓN: Enviar notificación de asignación de observación - VERSIÓN MEJORADA
 const enviarNotificacionObservacion = async (tecnicoEmail, tecnicoNombre, observacionData, mantenimientoData) => {
   try {
-    console.log('📧 Enviando notificación de observación asignada a:', tecnicoEmail);
+    console.log('📧 [OBSERVACIONES] Enviando notificación a:', tecnicoEmail);
     
+    // Validaciones críticas
+    if (!tecnicoEmail || !tecnicoEmail.includes('@')) {
+      console.log('❌ [OBSERVACIONES] Email inválido:', tecnicoEmail);
+      return false;
+    }
+
+    if (!process.env.BREVO_SMTP_USER || !process.env.BREVO_SMTP_PASS) {
+      console.log('❌ [OBSERVACIONES] Credenciales de Brevo no configuradas');
+      return false;
+    }
+
     const fechaProgramada = new Date(mantenimientoData.fecha).toLocaleDateString('es-ES', {
       weekday: 'long',
       year: 'numeric',
@@ -103,11 +115,23 @@ const enviarNotificacionObservacion = async (tecnicoEmail, tecnicoNombre, observ
       `
     };
 
+    console.log('📤 [OBSERVACIONES] Configurando envío de correo...');
+    
+    // Verificar conexión con el transporter
+    await transporter.verify();
+    console.log('✅ [OBSERVACIONES] Conexión con servidor de correo verificada');
+
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Notificación de observación enviada:', info.messageId);
+    console.log('✅ [OBSERVACIONES] Notificación enviada:', info.messageId);
+    console.log('✅ [OBSERVACIONES] Correo aceptado por:', info.accepted);
+    
     return true;
   } catch (error) {
-    console.error('❌ Error enviando notificación de observación:', error);
+    console.error('❌ [OBSERVACIONES] Error enviando notificación:', error);
+    console.error('❌ [OBSERVACIONES] Detalles del error:', {
+      message: error.message,
+      code: error.code
+    });
     return false;
   }
 };
@@ -225,7 +249,6 @@ router.get("/mantenimiento/:mantenimientoId", async (req, res) => {
   }
 });
 
-// BLOQUE 3: Agregar nueva observación con hasta 3 imágenes - ACTUALIZADO CON TÉCNICO ASIGNADO
 // BLOQUE 3: Agregar nueva observación con hasta 3 imágenes - ACTUALIZADO CON NOTIFICACIÓN POR CORREO
 router.post("/", upload.array('imagenes', 3), async (req, res) => {
   try {
@@ -404,7 +427,7 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
 
     console.log('✅ Observación guardada correctamente con', req.files?.length || 0, 'imágenes');
 
-    // NUEVO: Enviar notificación por correo si se asignó a un técnico
+    // NUEVO: Enviar notificación por correo si se asignó a un técnico - VERSIÓN MEJORADA
     let notificacionEnviada = false;
     if (tecnicoAsignadoId && tecnicoInfo) {
       try {
@@ -414,28 +437,33 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
           estado_resolucion: estado_resolucion
         };
 
-        console.log('📧 Preparando envío de notificación a:', tecnicoInfo.email);
+        console.log('📧 [OBSERVACIONES] Preparando envío de notificación a:', tecnicoInfo.email);
+        console.log('👤 [OBSERVACIONES] Técnico:', tecnicoInfo.nombre);
+        console.log('📋 [OBSERVACIONES] Observación:', observacionData.descripcion.substring(0, 50) + '...');
         
-        // Enviar notificación en segundo plano (no esperar respuesta)
-        enviarNotificacionObservacion(
+        // LOGS DE DEBUG
+        console.log('🔧 [OBSERVACIONES] Configuración de Brevo:', {
+          user: process.env.BREVO_SMTP_USER ? '✅ Configurado' : '❌ No configurado',
+          pass: process.env.BREVO_SMTP_PASS ? '✅ Configurado' : '❌ No configurado',
+          from: process.env.EMAIL_FROM || 'No configurado'
+        });
+
+        // Enviar notificación y ESPERAR la respuesta
+        notificacionEnviada = await enviarNotificacionObservacion(
           tecnicoInfo.email,
           tecnicoInfo.nombre,
           observacionData,
           mantenimientoInfo
-        ).then(success => {
-          if (success) {
-            console.log('✅ Notificación enviada exitosamente a:', tecnicoInfo.email);
-          } else {
-            console.log('⚠️ No se pudo enviar notificación a:', tecnicoInfo.email);
-          }
-        }).catch(emailError => {
-          console.error('❌ Error en envío de notificación:', emailError);
-        });
+        );
 
-        notificacionEnviada = true;
+        if (notificacionEnviada) {
+          console.log('✅ [OBSERVACIONES] Notificación enviada exitosamente a:', tecnicoInfo.email);
+        } else {
+          console.log('⚠️ [OBSERVACIONES] No se pudo enviar notificación a:', tecnicoInfo.email);
+        }
         
       } catch (notifError) {
-        console.error('❌ Error preparando notificación:', notifError);
+        console.error('❌ [OBSERVACIONES] Error preparando notificación:', notifError);
         // No fallar la operación principal por error en notificación
       }
     }
@@ -472,7 +500,7 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
   }
 });
 
-// BLOQUE 4: Actualizar observación/refacción - ACTUALIZADO CON TÉCNICO ASIGNADO
+// BLOQUE 4: Actualizar observación/refacción - ACTUALIZADO CON TÉCNICO ASIGNADO Y NOTIFICACIÓN MEJORADA
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -652,7 +680,7 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // NUEVO: Enviar notificación por correo si se cambió el técnico asignado
+    // NUEVO: Enviar notificación por correo si se cambió el técnico asignado - VERSIÓN MEJORADA
     let notificacionEnviada = false;
     if (tecnicoAsignadoCambiado && tecnicoInfo && mantenimientoInfo) {
       try {
@@ -662,28 +690,30 @@ router.put("/:id", async (req, res) => {
           estado_resolucion: estado_resolucion
         };
 
-        console.log('📧 Enviando notificación de reasignación a:', tecnicoInfo.email);
+        console.log('📧 [OBSERVACIONES] Enviando notificación de reasignación a:', tecnicoInfo.email);
         
-        // Enviar notificación en segundo plano
-        enviarNotificacionObservacion(
+        // LOGS DE DEBUG
+        console.log('🔧 [OBSERVACIONES] Configuración de Brevo para reasignación:', {
+          user: process.env.BREVO_SMTP_USER ? '✅ Configurado' : '❌ No configurado',
+          pass: process.env.BREVO_SMTP_PASS ? '✅ Configurado' : '❌ No configurado'
+        });
+
+        // Enviar notificación y ESPERAR la respuesta
+        notificacionEnviada = await enviarNotificacionObservacion(
           tecnicoInfo.email,
           tecnicoInfo.nombre,
           observacionData,
           mantenimientoInfo
-        ).then(success => {
-          if (success) {
-            console.log('✅ Notificación de reasignación enviada a:', tecnicoInfo.email);
-          } else {
-            console.log('⚠️ No se pudo enviar notificación de reasignación a:', tecnicoInfo.email);
-          }
-        }).catch(emailError => {
-          console.error('❌ Error en envío de notificación de reasignación:', emailError);
-        });
+        );
 
-        notificacionEnviada = true;
+        if (notificacionEnviada) {
+          console.log('✅ [OBSERVACIONES] Notificación de reasignación enviada a:', tecnicoInfo.email);
+        } else {
+          console.log('⚠️ [OBSERVACIONES] No se pudo enviar notificación de reasignación a:', tecnicoInfo.email);
+        }
         
       } catch (notifError) {
-        console.error('❌ Error preparando notificación de reasignación:', notifError);
+        console.error('❌ [OBSERVACIONES] Error preparando notificación de reasignación:', notifError);
       }
     }
 
