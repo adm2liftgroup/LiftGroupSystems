@@ -389,71 +389,71 @@ export default function RefaccionesCargo({ montacargas }) {
 
   // FUNCIÓN: Subir observación con imágenes
   const subirObservacionConImagenes = async () => {
-  if (!isTecnico()) {  // Cambiar esto
-    setError('❌ Solo los técnicos pueden agregar imágenes a observaciones');
-    return;
-  }
-
-  if (!observacionConImagenes) {
-    setError('No hay observación seleccionada');
-    return;
-  }
-
-  if (imagenesObservacion.length === 0) {
-    setError('Debe agregar al menos una imagen');
-    return;
-  }
-
-  setSubiendoImagenes(true);
-  setError('');
-
-  try {
-    const token = localStorage.getItem("token");
-    const userData = JSON.parse(localStorage.getItem('user') || '{}');
-    const formData = new FormData();
-    
-    formData.append('mantenimiento_id', observacionConImagenes.mantenimiento_id.toString());
-    formData.append('descripcion', observacionConImagenes.descripcion);
-    formData.append('cargo_a', observacionConImagenes.cargo_a);
-    formData.append('es_evidencia', 'true');
-    formData.append('estado_resolucion', 'resuelto');
-    
-    // Incluir técnico asignado (el usuario actual)
-    formData.append('tecnico_asignado_id', userData.id);
-
-    imagenesObservacion.forEach((imagen, index) => {
-      formData.append('imagenes', imagen.file);
-    });
-
-    const response = await fetch(
-      `${process.env.REACT_APP_API_URL}/api/refacciones`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || 'Error al subir observación con imágenes');
+    if (!isTecnico()) {
+      setError('❌ Solo los técnicos pueden agregar imágenes a observaciones');
+      return;
     }
 
-    setSuccess(`✅ Observación completada con ${imagenesObservacion.length} imagen(es)`);
-    setImagenesObservacion([]);
-    setObservacionConImagenes(null);
-    fetchObservaciones(mantenimientoSeleccionado.id);
-    
-  } catch (err) {
-    console.error('Error al subir observación con imágenes:', err);
-    setError(err.message);
-  } finally {
-    setSubiendoImagenes(false);
-  }
-};
+    if (!observacionConImagenes) {
+      setError('No hay observación seleccionada');
+      return;
+    }
+
+    if (imagenesObservacion.length === 0) {
+      setError('Debe agregar al menos una imagen');
+      return;
+    }
+
+    setSubiendoImagenes(true);
+    setError('');
+
+    try {
+      const token = localStorage.getItem("token");
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      const formData = new FormData();
+      
+      formData.append('mantenimiento_id', observacionConImagenes.mantenimiento_id.toString());
+      formData.append('descripcion', observacionConImagenes.descripcion);
+      formData.append('cargo_a', observacionConImagenes.cargo_a);
+      formData.append('es_evidencia', 'true');
+      formData.append('estado_resolucion', 'resuelto');
+      
+      // Incluir técnico asignado (el usuario actual)
+      formData.append('tecnico_asignado_id', userData.id);
+
+      imagenesObservacion.forEach((imagen, index) => {
+        formData.append('imagenes', imagen.file);
+      });
+
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/api/refacciones`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Error al subir observación con imágenes');
+      }
+
+      setSuccess(`✅ Observación completada con ${imagenesObservacion.length} imagen(es)`);
+      setImagenesObservacion([]);
+      setObservacionConImagenes(null);
+      fetchObservaciones(mantenimientoSeleccionado.id);
+      
+    } catch (err) {
+      console.error('Error al subir observación con imágenes:', err);
+      setError(err.message);
+    } finally {
+      setSubiendoImagenes(false);
+    }
+  };
 
   // FUNCIÓN: Agregar imágenes a observación existente
   const agregarImagenesAObservacion = (observacion) => {
@@ -471,7 +471,7 @@ export default function RefaccionesCargo({ montacargas }) {
     const nuevasImagenes = [];
 
     files.forEach(file => {
-      if (imagenesObservacion.length + nuevasImagenes.length >= 3) {
+      if (imagenesObservacion.length + nuevasImagenes.length >= 5) {
         return;
       }
 
@@ -483,7 +483,7 @@ export default function RefaccionesCargo({ montacargas }) {
           name: file.name
         });
 
-        if (nuevasImagenes.length === Math.min(files.length, 3 - imagenesObservacion.length)) {
+        if (nuevasImagenes.length === Math.min(files.length, 5 - imagenesObservacion.length)) {
           setImagenesObservacion(prev => [...prev, ...nuevasImagenes]);
         }
       };
@@ -542,7 +542,7 @@ export default function RefaccionesCargo({ montacargas }) {
   // FUNCIÓN: Obtener URLs de imágenes de una observación
   const obtenerImagenesObservacion = (observacion) => {
     const imagenes = [];
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 1; i <= 5; i++) {
       const url = observacion[`imagen_url_${i}`];
       const nombre = observacion[`imagen_nombre_${i}`];
       if (url) {
@@ -1412,7 +1412,7 @@ export default function RefaccionesCargo({ montacargas }) {
                         {/* MOSTRAR MÚLTIPLES IMÁGENES SI EXISTEN */}
                         {imagenes.length > 0 && (
                           <div className="mb-3">
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-3 gap-2">
                               {imagenes.map((imagen) => (
                                 <div key={imagen.numero} className="relative">
                                   <img 
@@ -1499,7 +1499,7 @@ export default function RefaccionesCargo({ montacargas }) {
                         {/* BOTONES DE ACCIÓN SEGÚN ROL */}
                         <div className="flex justify-end gap-2 mt-3 pt-2 border-t">
                           {/* BOTÓN: Agregar imágenes a observación existente (SOLO TÉCNICOS) */}
-                          {isTecnico() && observacion.estado_resolucion !== 'resuelto' && imagenes.length < 3 && (
+                          {isTecnico() && observacion.estado_resolucion !== 'resuelto' && imagenes.length < 5 && (
                             <button
                               onClick={() => agregarImagenesAObservacion(observacion)}
                               className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700"
@@ -1601,8 +1601,8 @@ export default function RefaccionesCargo({ montacargas }) {
 
             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
               <p className="text-sm text-yellow-800">
-                <strong>Importante:</strong> Puede agregar hasta {3 - imagenesObservacion.length} imagen(es) más.
-                {imagenesObservacion.length === 0 && ' Mínimo 1 imagen, máximo 3 por observación.'}
+                <strong>Importante:</strong> Puede agregar hasta {5 - imagenesObservacion.length} imagen(es) más.
+                {imagenesObservacion.length === 0 && ' Mínimo 1 imagen, máximo 5 por observación.'}
               </p>
             </div>
 
@@ -1616,18 +1616,18 @@ export default function RefaccionesCargo({ montacargas }) {
                 className="hidden"
                 id="imagenes-observacion-input"
                 ref={fileInputRef}
-                disabled={subiendoImagenes || imagenesObservacion.length >= 3}
+                disabled={subiendoImagenes || imagenesObservacion.length >= 5}
               />
               
               <label
                 htmlFor="imagenes-observacion-input"
                 className={`block w-full border border-gray-300 rounded-md py-3 px-4 text-center cursor-pointer mb-3 ${
-                  subiendoImagenes || imagenesObservacion.length >= 3
+                  subiendoImagenes || imagenesObservacion.length >= 5
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                {imagenesObservacion.length >= 3 ? '✅ Máximo alcanzado (3)' : '📸 Seleccionar Imágenes (Máx. 3)'}
+                {imagenesObservacion.length >= 5 ? '✅ Máximo alcanzado (5)' : '📸 Seleccionar Imágenes (Máx. 5)'}
               </label>
 
               {/* Vista previa de imágenes */}
@@ -1664,7 +1664,7 @@ export default function RefaccionesCargo({ montacargas }) {
 
               <div className="flex justify-between items-center mt-2">
                 <p className="text-xs text-gray-500">
-                  {imagenesObservacion.length}/3 imágenes seleccionadas
+                  {imagenesObservacion.length}/5 imágenes seleccionadas
                 </p>
                 {imagenesObservacion.length > 0 && (
                   <button

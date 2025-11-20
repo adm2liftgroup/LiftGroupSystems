@@ -130,8 +130,8 @@ router.get("/mantenimiento/:mantenimientoId", async (req, res) => {
   }
 });
 
-// BLOQUE 3: Agregar nueva observación con hasta 3 imágenes - ACTUALIZADO CON NOTIFICACIÓN POR CORREO
-router.post("/", upload.array('imagenes', 3), async (req, res) => {
+// BLOQUE 3: Agregar nueva observación con hasta 5 imágenes - ACTUALIZADO CON NOTIFICACIÓN POR CORREO
+router.post("/", upload.array('imagenes', 5), async (req, res) => {
   try {
     console.log('📥 POST /api/refacciones recibido');
     console.log('📋 Body fields:', req.body);
@@ -213,15 +213,17 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
       console.log('✅ Técnico asignado válido:', tecnicoInfo.nombre, 'Email:', tecnicoInfo.email);
     }
 
-    // Inicializar campos de imágenes
+    // Inicializar campos de imágenes (5 imágenes)
     let imagen_url_1 = null, imagen_nombre_1 = null;
     let imagen_url_2 = null, imagen_nombre_2 = null;
     let imagen_url_3 = null, imagen_nombre_3 = null;
+    let imagen_url_4 = null, imagen_nombre_4 = null;
+    let imagen_url_5 = null, imagen_nombre_5 = null;
     let firma_url = null;
 
-    // Subir hasta 3 imágenes
+    // Subir hasta 5 imágenes
     if (req.files && req.files.length > 0) {
-      for (let i = 0; i < Math.min(req.files.length, 3); i++) {
+      for (let i = 0; i < Math.min(req.files.length, 5); i++) {
         const file = req.files[i];
         try {
           console.log(`📤 Subiendo imagen ${i+1}/${req.files.length} a AWS S3...`);
@@ -241,6 +243,12 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
           } else if (i === 2) {
             imagen_url_3 = imagen_url;
             imagen_nombre_3 = file.originalname;
+          } else if (i === 3) {
+            imagen_url_4 = imagen_url;
+            imagen_nombre_4 = file.originalname;
+          } else if (i === 4) {
+            imagen_url_5 = imagen_url;
+            imagen_nombre_5 = file.originalname;
           }
 
           console.log('✅ Imagen subida a S3:', imagen_url);
@@ -280,9 +288,11 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
     const result = await pool.query(
       `INSERT INTO observaciones_mantenimiento 
        (mantenimiento_id, descripcion, cargo_a, estado_resolucion, creado_por, 
-        imagen_url_1, imagen_nombre_1, imagen_url_2, imagen_nombre_2, imagen_url_3, imagen_nombre_3, 
-        es_evidencia, firma_url, firma_nombre, firma_fecha, tecnico_asignado_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        imagen_url_1, imagen_nombre_1, imagen_url_2, imagen_nombre_2, 
+        imagen_url_3, imagen_nombre_3, imagen_url_4, imagen_nombre_4,
+        imagen_url_5, imagen_nombre_5, es_evidencia, firma_url, firma_nombre, 
+        firma_fecha, tecnico_asignado_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
        RETURNING *`,
       [
         mantenimiento_id, 
@@ -290,12 +300,11 @@ router.post("/", upload.array('imagenes', 3), async (req, res) => {
         cargo_a, 
         estado_resolucion,
         req.user?.id || null, 
-        imagen_url_1, 
-        imagen_nombre_1,
-        imagen_url_2,
-        imagen_nombre_2,
-        imagen_url_3,
-        imagen_nombre_3,
+        imagen_url_1, imagen_nombre_1,
+        imagen_url_2, imagen_nombre_2,
+        imagen_url_3, imagen_nombre_3,
+        imagen_url_4, imagen_nombre_4,
+        imagen_url_5, imagen_nombre_5,
         esEvidenciaBool,
         firma_url,
         firma_nombre,
@@ -598,14 +607,14 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// BLOQUE 5: Eliminar observación/refacción - ACTUALIZADO PARA ELIMINAR FIRMA
+// BLOQUE 5: Eliminar observación/refacción - ACTUALIZADO PARA ELIMINAR FIRMA Y 5 IMÁGENES
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
     // Primero obtener la información para eliminar las imágenes Y firma
     const observacion = await pool.query(
-      'SELECT imagen_url_1, imagen_url_2, imagen_url_3, firma_url FROM observaciones_mantenimiento WHERE id = $1',
+      'SELECT imagen_url_1, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5, firma_url FROM observaciones_mantenimiento WHERE id = $1',
       [id]
     );
 
@@ -628,6 +637,8 @@ router.delete("/:id", async (req, res) => {
         obs.imagen_url_1, 
         obs.imagen_url_2, 
         obs.imagen_url_3,
+        obs.imagen_url_4,
+        obs.imagen_url_5,
         obs.firma_url
       ];
       
@@ -656,22 +667,22 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// BLOQUE 6: Eliminar imagen específica (1, 2 o 3)
+// BLOQUE 6: Eliminar imagen específica (1, 2, 3, 4 o 5)
 router.delete("/:id/imagen/:numero", async (req, res) => {
   try {
     const { id, numero } = req.params;
     const imagenNum = parseInt(numero);
 
-    if (imagenNum < 1 || imagenNum > 3) {
+    if (imagenNum < 1 || imagenNum > 5) {
       return res.status(400).json({ 
         success: false,
-        error: "Número de imagen debe ser 1, 2 o 3" 
+        error: "Número de imagen debe ser 1, 2, 3, 4 o 5" 
       });
     }
 
     // Obtener la observación
     const observacion = await pool.query(
-      `SELECT imagen_url_1, imagen_url_2, imagen_url_3 
+      `SELECT imagen_url_1, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5 
        FROM observaciones_mantenimiento WHERE id = $1`,
       [id]
     );
