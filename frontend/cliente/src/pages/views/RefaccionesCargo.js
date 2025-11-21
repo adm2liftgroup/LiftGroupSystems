@@ -1873,7 +1873,7 @@ export default function RefaccionesCargo({ montacargas }) {
                 type="text"
                 value={firmaNombre}
                 onChange={(e) => setFirmaNombre(e.target.value)}
-                placeholder="Ingrese detalles de la resolución..."
+                //placeholder="Ingrese detalles de la resolución..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 required
               />
