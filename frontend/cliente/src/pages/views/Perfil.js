@@ -1885,7 +1885,7 @@ const ObservacionesResueltasPanel = ({ observaciones, loading, error, mes, anio 
             {/* SECCIÓN DE FIRMA DIGITAL - NUEVA */}
             {observacionDetalle.firma_url && (
               <div className="mb-4">
-                <h4 className="font-semibold mb-3">✍️ Firma de Completado</h4>
+                <h4 className="font-semibold mb-3">✍️ Detalles de resolución</h4>
                 <div className="bg-white border border-gray-300 rounded-lg p-4">
                   <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
                     <div className="flex-shrink-0">

@@ -1867,7 +1867,7 @@ export default function RefaccionesCargo({ montacargas }) {
             {/* Campo para nombre */}
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nombre completo *
+                Detalles de resolución - Informar qué se realizó
               </label>
               <input
                 type="text"
