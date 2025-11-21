@@ -1906,7 +1906,7 @@ const ObservacionesResueltasPanel = ({ observaciones, loading, error, mes, anio 
                     <div className="flex-1">
                       <div className="space-y-2">
                         <p className="text-sm">
-                          <strong>Nombre:</strong> {observacionDetalle.firma_nombre || "No especificado"}
+                          <strong>Informe:</strong> {observacionDetalle.firma_nombre || "No especificado"}
                         </p>
                         <p className="text-sm">
                           <strong>Fecha de firma:</strong> {formatDate(observacionDetalle.firma_fecha)}
