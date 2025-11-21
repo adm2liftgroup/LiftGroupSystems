@@ -11,12 +11,13 @@ export default function InversionInicial({ montacargasId }) {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [refaccionAEliminar, setRefaccionAEliminar] = useState(null);
-  const [userRole, setUserRole] = useState('user'); // Estado para el rol del usuario
+  const [userRole, setUserRole] = useState('user');
   const [formData, setFormData] = useState({
     descripcion: '',
     numero_parte: '',
     cantidad: 1,
-    costo_unitario: ''
+    costo_unitario: '',
+    fecha: ''
   });
 
   // Obtener el rol del usuario al cargar el componente
@@ -89,7 +90,8 @@ export default function InversionInicial({ montacargasId }) {
           descripcion: '', 
           numero_parte: '', 
           cantidad: 1, 
-          costo_unitario: '' 
+          costo_unitario: '',
+          fecha: ''
         });
         setShowForm(false);
         cargarRefacciones();
@@ -217,6 +219,18 @@ export default function InversionInicial({ montacargasId }) {
                   min="1"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fecha
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Enero 2024, 15-Feb-2024, etc."
+                  value={formData.fecha}
+                  onChange={(e) => setFormData({...formData, fecha: e.target.value})}
+                  className="border p-2 rounded w-full text-sm sm:text-base"
+                />
+              </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Costo Unitario *
@@ -280,6 +294,7 @@ export default function InversionInicial({ montacargasId }) {
                     <th className="p-3 text-left text-sm">Cantidad</th>
                     <th className="p-3 text-left text-sm">Costo Unitario</th>
                     <th className="p-3 text-left text-sm">Subtotal</th>
+                    <th className="p-3 text-left text-sm">Fecha</th>
                     {/* Columna de acciones solo para admin */}
                     {isAdmin() && <th className="p-3 text-left text-sm">Acciones</th>}
                   </tr>
@@ -294,6 +309,7 @@ export default function InversionInicial({ montacargasId }) {
                       <td className="p-3 text-sm font-semibold">
                         ${(refaccion.cantidad * parseFloat(refaccion.costo_unitario)).toLocaleString()}
                       </td>
+                      <td className="p-3 text-sm">{refaccion.fecha || 'N/A'}</td>
                       {/* Botón eliminar solo para admin */}
                       {isAdmin() && (
                         <td className="p-3">
@@ -332,6 +348,9 @@ export default function InversionInicial({ montacargasId }) {
                     <div className="font-semibold">
                       ${(refaccion.cantidad * parseFloat(refaccion.costo_unitario)).toLocaleString()}
                     </div>
+
+                    <div className="font-semibold">Fecha:</div>
+                    <div>{refaccion.fecha || 'N/A'}</div>
                   </div>
                   
                   {/* Botón eliminar solo para admin */}

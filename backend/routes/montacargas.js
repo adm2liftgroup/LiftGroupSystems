@@ -460,11 +460,11 @@ router.get("/:id/refacciones", async (req, res) => {
   }
 });
 
-// POST - Agregar nueva refacción (SOLO UNA VEZ)
+// POST - Agregar nueva refacción (ACTUALIZADO CON FECHA)
 router.post("/:id/refacciones", async (req, res) => {
   try {
     const { id } = req.params;
-    const { descripcion, numero_parte, cantidad, costo_unitario } = req.body;
+    const { descripcion, numero_parte, cantidad, costo_unitario, fecha } = req.body;
 
     // VALIDACIÓN CRÍTICA: Verificar que el ID sea un número válido
     const montacargasId = parseInt(id);
@@ -486,14 +486,14 @@ router.post("/:id/refacciones", async (req, res) => {
     }
 
     console.log('Agregando refacción para montacargas ID:', montacargasId);
-    console.log('Datos recibidos:', { descripcion, numero_parte, cantidad, costo_unitario: costo });
+    console.log('Datos recibidos:', { descripcion, numero_parte, cantidad, costo_unitario: costo, fecha });
 
     const result = await pool.query(
       `INSERT INTO refacciones_montacargas 
-       (montacargas_id, descripcion, numero_parte, cantidad, costo_unitario) 
-       VALUES ($1, $2, $3, $4, $5) 
+       (montacargas_id, descripcion, numero_parte, cantidad, costo_unitario, fecha) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING *`,
-      [montacargasId, descripcion, numero_parte || null, cantidad || 1, costo]
+      [montacargasId, descripcion, numero_parte || null, cantidad || 1, costo, fecha || null]
     );
 
     res.json({
@@ -511,19 +511,19 @@ router.post("/:id/refacciones", async (req, res) => {
   }
 });
 
-// PUT - Actualizar refacción
+// PUT - Actualizar refacción (ACTUALIZADO CON FECHA)
 router.put("/refacciones/:refaccionId", async (req, res) => {
   try {
     const { refaccionId } = req.params;
-    const { descripcion, numero_parte, cantidad, costo_unitario } = req.body;
+    const { descripcion, numero_parte, cantidad, costo_unitario, fecha } = req.body;
 
     const result = await pool.query(
       `UPDATE refacciones_montacargas 
        SET descripcion = $1, numero_parte = $2, cantidad = $3, 
-           costo_unitario = $4, actualizado_en = CURRENT_TIMESTAMP
-       WHERE id = $5 
+           costo_unitario = $4, fecha = $5, actualizado_en = CURRENT_TIMESTAMP
+       WHERE id = $6 
        RETURNING *`,
-      [descripcion, numero_parte, cantidad, costo_unitario, refaccionId]
+      [descripcion, numero_parte, cantidad, costo_unitario, fecha, refaccionId]
     );
 
     if (result.rows.length === 0) {
