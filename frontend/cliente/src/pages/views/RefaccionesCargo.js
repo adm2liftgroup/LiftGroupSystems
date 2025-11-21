@@ -28,6 +28,11 @@ export default function RefaccionesCargo({ montacargas }) {
   const [observacionConImagenes, setObservacionConImagenes] = useState(null);
   const [subiendoImagenes, setSubiendoImagenes] = useState(false);
 
+  // NUEVO: Estados para detalles del checklist
+  const [mostrarDetallesChecklist, setMostrarDetallesChecklist] = useState(false);
+  const [checklistDetalle, setChecklistDetalle] = useState(null);
+  const [loadingChecklist, setLoadingChecklist] = useState(false);
+
   // FIX: Inicializar con mes actual (1-12) en lugar de vacío
   const [filtros, setFiltros] = useState({
     anio: new Date().getFullYear(),
@@ -53,6 +58,149 @@ export default function RefaccionesCargo({ montacargas }) {
       fetchTecnicos();
     }
   }, []);
+
+  // ========== NUEVAS FUNCIONES PARA CHECKLIST ==========
+
+  // FUNCIÓN: Obtener detalles del checklist
+  const fetchDetallesChecklist = async (mantenimientoId) => {
+    setLoadingChecklist(true);
+    setError('');
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/api/mantenimientos/checklists/completados`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.checklists && data.checklists.length > 0) {
+          // Buscar el checklist específico para este mantenimiento
+          const checklistEncontrado = data.checklists.find(
+            checklist => checklist.mantenimiento_id === mantenimientoId
+          );
+          
+          if (checklistEncontrado) {
+            setChecklistDetalle(checklistEncontrado);
+            setMostrarDetallesChecklist(true);
+          } else {
+            setError('No se encontró checklist completado para este mantenimiento');
+          }
+        } else {
+          setError('No hay checklists completados disponibles');
+        }
+      } else {
+        throw new Error('Error al cargar detalles del checklist');
+      }
+    } catch (err) {
+      console.error('Error fetching checklist details:', err);
+      setError('Error al cargar detalles del checklist');
+    } finally {
+      setLoadingChecklist(false);
+    }
+  };
+
+  // FUNCIÓN: Traducir incidencias
+  const obtenerDescripcionIncidencia = (codigo, valor) => {
+    const descripciones = {
+      // Mediciones de llantas
+      '50_FD': { 
+        titulo: 'Medición de llanta delantera derecha fuera de rango', 
+        detalle: `Valor medido: ${valor} mm (debe estar entre 10-20 mm)` 
+      },
+      '50_FI': { 
+        titulo: 'Medición de llanta delantera izquierda fuera de rango', 
+        detalle: `Valor medido: ${valor} mm (debe estar entre 10-20 mm)` 
+      },
+      '50_TD': { 
+        titulo: 'Medición de llanta trasera derecha fuera de rango', 
+        detalle: `Valor medido: ${valor} mm (debe estar entre 10-20 mm)` 
+      },
+      '50_TI': { 
+        titulo: 'Medición de llanta trasera izquierda fuera de rango', 
+        detalle: `Valor medido: ${valor} mm (debe estar entre 10-20 mm)` 
+      },
+      
+      // Estados de componentes que necesitan reemplazo
+      '2': { titulo: 'Alarma de reversa - Requiere reemplazo' },
+      '3': { titulo: 'Claxón - Requiere reemplazo' },
+      '4': { titulo: 'Extintor o base - Requiere reemplazo' },
+      '10': { titulo: 'Tapas de masas de llantas traseras - Requiere reemplazo' },
+      '11': { titulo: 'Tornillos de parrilla y barra - Requieren reemplazo' },
+      '15': { titulo: 'Pistón del cofre - Requiere reemplazo' },
+      '17': { titulo: 'Tapate y piso - Requieren reemplazo' },
+      '19': { titulo: 'Terminales, bornes o protector de batería - Requieren reemplazo' },
+      '21': { titulo: 'Batería - Requiere reemplazo' },
+      '27': { titulo: 'Caja de fusibles o fusibles - Requieren reemplazo' },
+      '33': { titulo: 'Fugas en líneas de gas detectadas' },
+      '35': { titulo: 'Sistema de luces - Requiere reemplazo' },
+      '54': { titulo: 'Muelas del carro desplazador - Requieren reemplazo' },
+      '55': { titulo: 'Cuchillas - Requieren reemplazo' },
+      '56': { titulo: 'Empaque del cofre - Requiere reemplazo' },
+      '61': { titulo: 'Seguro o válvulas de tanque de gas - Requieren reemplazo' },
+      '64': { titulo: 'Filtro hidráulico - Requiere reemplazo' },
+      '65': { titulo: 'Filtro de aire - Requiere reemplazo' },
+      '66': { titulo: 'Aceite de diferencial - Nivel incorrecto' },
+      '67': { titulo: 'Bujías de motor - Requieren reemplazo' },
+      '70': { titulo: 'Juego en ruedas o balatas - Requiere ajuste/reemplazo' },
+      '72': { titulo: 'Banda o bomba de agua - Requieren reemplazo' },
+      '75': { titulo: 'Válvula de gas o línea principal - Requieren atención' },
+      '78': { titulo: 'Retrovisores - Requieren reemplazo' },
+      
+      // Respuestas Sí/No
+      '39': { titulo: 'Partes o piezas faltantes identificadas' },
+      '82': { titulo: 'Golpes en la unidad identificados' },
+      
+      // Valores booleanos (false)
+      'false': { titulo: 'Actividad no efectuada o pendiente' }
+    };
+
+    // Si es un número simple (sin sufijo)
+    if (descripciones[codigo]) {
+      return descripciones[codigo];
+    }
+
+    // Si es un valor "Si"
+    if (valor === "Si") {
+      return { 
+        titulo: `Item ${codigo} - Requiere atención`, 
+        detalle: 'Se reportó una incidencia en este punto del checklist' 
+      };
+    }
+
+    // Si es un valor "Reemplazo"
+    if (valor === "Reemplazo") {
+      return { 
+        titulo: `Item ${codigo} - Necesita reemplazo`, 
+        detalle: 'El componente requiere ser reemplazado' 
+      };
+    }
+
+    // Por defecto
+    return { 
+      titulo: `Incidencia en item ${codigo}`, 
+      detalle: `Valor reportado: ${valor}` 
+    };
+  };
+
+  // FUNCIÓN: Formatear fecha para checklist
+  const formatDateChecklist = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // ========== FUNCIONES EXISTENTES ==========
 
   // FUNCIÓN: Obtener lista de técnicos
   const fetchTecnicos = async () => {
@@ -1470,7 +1618,7 @@ export default function RefaccionesCargo({ montacargas }) {
           </div>
         )}
 
-        {/* Columna 3: Lista de observaciones existentes */}
+        {/* Columna 3: Lista de observaciones existentes - MODIFICADA */}
         <div className={`${isAdmin() ? 'lg:col-span-1' : 'lg:col-span-3'}`}>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-4">
@@ -1478,9 +1626,34 @@ export default function RefaccionesCargo({ montacargas }) {
                 {isAdmin() ? 'Observaciones Registradas' : 'Mis Observaciones Asignadas'}
               </h3>
               {mantenimientoSeleccionado && (
-                <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                  {observacionesFiltradas.length} registros
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    {observacionesFiltradas.length} registros
+                  </span>
+                  
+                  {/* NUEVO BOTÓN: Ver Detalles del Checklist (solo para admin y mantenimientos completados) */}
+                  {isAdmin() && mantenimientoSeleccionado.status === 'completado' && (
+                    <button
+                      onClick={() => fetchDetallesChecklist(mantenimientoSeleccionado.id)}
+                      disabled={loadingChecklist}
+                      className="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {loadingChecklist ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                          Cargando...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Ver Checklist
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 
@@ -1698,6 +1871,174 @@ export default function RefaccionesCargo({ montacargas }) {
         </div>
       </div>
 
+      {/* ========== NUEVO MODAL: Detalles del Checklist ========== */}
+      {mostrarDetallesChecklist && checklistDetalle && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Detalle del Checklist Completado</h3>
+              <button
+                onClick={() => {
+                  setMostrarDetallesChecklist(false);
+                  setChecklistDetalle(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="font-semibold text-blue-800 mb-2">Información del Equipo</h4>
+                <div className="space-y-1 text-sm">
+                  <p><strong>No. Económico:</strong> #{checklistDetalle.montacargas_numero}</p>
+                  <p><strong>Marca/Modelo:</strong> {checklistDetalle.montacargas_marca} {checklistDetalle.montacargas_modelo}</p>
+                  <p><strong>Serie:</strong> {checklistDetalle.montacargas_serie}</p>
+                  <p><strong>Ubicación:</strong> {checklistDetalle.montacargas_ubicacion}</p>
+                  <p><strong>Planta:</strong> {checklistDetalle.montacargas_planta}</p>
+                </div>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <h4 className="font-semibold text-green-800 mb-2">Información del Servicio</h4>
+                <div className="space-y-1 text-sm">
+                  <p><strong>Técnico:</strong> {checklistDetalle.tecnico_nombre}</p>
+                  <p><strong>Fecha:</strong> {formatDateChecklist(checklistDetalle.creado_en)}</p>
+                  <p><strong>Horario:</strong> {checklistDetalle.hora_inicio} - {checklistDetalle.hora_termino}</p>
+                  <p><strong>Tipo de Mantenimiento:</strong> {checklistDetalle.tipo_mantenimiento}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* SECCIÓN DE FIRMA DEL CLIENTE */}
+            {checklistDetalle.firma_cliente_url && (
+              <div className="mb-4">
+                <h4 className="font-semibold mb-3">✍️ Firma del Cliente</h4>
+                <div className="bg-white border border-gray-300 rounded-lg p-4">
+                  <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                    <div className="flex-shrink-0">
+                      <img 
+                        src={checklistDetalle.firma_cliente_url} 
+                        alt="Firma del cliente"
+                        className="h-24 w-48 border border-gray-300 rounded bg-white object-contain"
+                        onError={(e) => {
+                          console.error('Error cargando firma del cliente:', checklistDetalle.firma_cliente_url);
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'block';
+                        }}
+                      />
+                      <div className="hidden text-red-500 text-sm mt-1">
+                        ❌ Error al cargar la firma del cliente
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="space-y-2">
+                        <p className="text-sm">
+                          <strong>Nombre del cliente:</strong> {checklistDetalle.firma_cliente_nombre || "No especificado"}
+                        </p>
+                        <p className="text-sm">
+                          <strong>Fecha de firma:</strong> {formatDateChecklist(checklistDetalle.firma_cliente_fecha)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          El cliente firmó para aceptar el servicio realizado.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {checklistDetalle.observaciones && (
+              <div className="mb-4">
+                <h4 className="font-semibold mb-2">Observaciones Generales</h4>
+                <p className="bg-gray-50 p-3 rounded border border-gray-200">{checklistDetalle.observaciones}</p>
+              </div>
+            )}
+
+            {checklistDetalle.actividades_pendientes && (
+              <div className="mb-4">
+                <h4 className="font-semibold mb-2">Actividades Pendientes</h4>
+                <p className="bg-yellow-50 p-3 rounded border border-yellow-200">{checklistDetalle.actividades_pendientes}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              {checklistDetalle.partes_faltantes && (
+                <div className="bg-red-50 p-3 rounded border border-red-200">
+                  <h4 className="font-semibold text-red-800 mb-1">Partes Faltantes</h4>
+                  <p className="text-sm">{checklistDetalle.partes_faltantes}</p>
+                </div>
+              )}
+              
+              {checklistDetalle.golpes_unidad && (
+                <div className="bg-orange-50 p-3 rounded border border-orange-200">
+                  <h4 className="font-semibold text-orange-800 mb-1">Golpes en Unidad</h4>
+                  <p className="text-sm">{checklistDetalle.golpes_unidad}</p>
+                </div>
+              )}
+              
+              <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                <h4 className="font-semibold text-blue-800 mb-1">Condiciones de Pintura</h4>
+                <p className="text-sm">{checklistDetalle.condiciones_pintura}</p>
+              </div>
+            </div>
+
+            {/* SECCIÓN DE INCIDENCIAS */}
+            {checklistDetalle.respuestas_incidencias && Object.keys(checklistDetalle.respuestas_incidencias).length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-semibold mb-3 text-red-700">📋 Incidencias Detectadas ({Object.keys(checklistDetalle.respuestas_incidencias).length})</h4>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="space-y-3">
+                    {Object.entries(checklistDetalle.respuestas_incidencias).map(([key, value]) => {
+                      const descripcion = obtenerDescripcionIncidencia(key, value);
+                      return (
+                        <div key={key} className="flex items-start space-x-3 p-3 bg-white rounded border border-red-100">
+                          <div className="flex-shrink-0 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold mt-0.5">
+                            ⚠️
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-red-800">{descripcion.titulo}</p>
+                            {descripcion.detalle && (
+                              <p className="text-sm text-red-600 mt-1">{descripcion.detalle}</p>
+                            )}
+                            <p className="text-xs text-gray-500 mt-1">Código: {key}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end space-x-3">
+              {checklistDetalle.firma_cliente_url && (
+                <button
+                  onClick={() => window.open(checklistDetalle.firma_cliente_url, '_blank')}
+                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  Ver Firma Completa
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setMostrarDetallesChecklist(false);
+                  setChecklistDetalle(null);
+                }}
+                className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal para agregar imágenes a observación existente */}
       {observacionConImagenes && isTecnico() && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -1873,7 +2214,6 @@ export default function RefaccionesCargo({ montacargas }) {
                 type="text"
                 value={firmaNombre}
                 onChange={(e) => setFirmaNombre(e.target.value)}
-                //placeholder="Ingrese detalles de la resolución..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 required
               />
