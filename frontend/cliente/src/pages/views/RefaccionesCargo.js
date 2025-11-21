@@ -28,9 +28,10 @@ export default function RefaccionesCargo({ montacargas }) {
   const [observacionConImagenes, setObservacionConImagenes] = useState(null);
   const [subiendoImagenes, setSubiendoImagenes] = useState(false);
 
+  // FIX: Inicializar con mes actual (1-12) en lugar de vacío
   const [filtros, setFiltros] = useState({
     anio: new Date().getFullYear(),
-    mes: '',
+    mes: new Date().getMonth() + 1, // Mes actual (1-12)
     tipo: '',
     status: ''
   });
@@ -51,14 +52,6 @@ export default function RefaccionesCargo({ montacargas }) {
     if (userData.rol === 'admin') {
       fetchTecnicos();
     }
-  }, []);
-
-  // Debug: verificar datos del usuario
-  useEffect(() => {
-    const userData = JSON.parse(localStorage.getItem('user') || '{}');
-    console.log('👤 Datos del usuario en localStorage:', userData);
-    console.log('🔧 ID del técnico:', userData.id, 'Tipo:', typeof userData.id);
-    console.log('🎭 Rol del usuario:', userData.rol);
   }, []);
 
   // FUNCIÓN: Obtener lista de técnicos
@@ -100,9 +93,45 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   }, [montacargas]);
 
+  // EFECTO MEJORADO: Aplicar filtros y seleccionar mantenimiento más reciente
   useEffect(() => {
     aplicarFiltros();
   }, [filtros, mantenimientos]);
+
+  // EFECTO NUEVO: Inicializar con mes actual cuando se cargan mantenimientos
+  useEffect(() => {
+    if (mantenimientos.length > 0) {
+      const mesActual = new Date().getMonth() + 1;
+      const anioActual = new Date().getFullYear();
+      
+      // Verificar si existe mantenimiento para el mes actual
+      const existeMantenimientoActual = mantenimientos.some(
+        m => m.mes === mesActual && m.anio === anioActual
+      );
+      
+      if (existeMantenimientoActual && !filtros.mes) {
+        setFiltros(prev => ({
+          ...prev,
+          mes: mesActual,
+          anio: anioActual
+        }));
+      } else if (!filtros.mes) {
+        // Si no hay mantenimiento para el mes actual, seleccionar el más reciente
+        const mantenimientoMasReciente = [...mantenimientos].sort((a, b) => {
+          if (b.anio !== a.anio) return b.anio - a.anio;
+          return b.mes - a.mes;
+        })[0];
+        
+        if (mantenimientoMasReciente) {
+          setFiltros(prev => ({
+            ...prev,
+            mes: mantenimientoMasReciente.mes,
+            anio: mantenimientoMasReciente.anio
+          }));
+        }
+      }
+    }
+  }, [mantenimientos]);
 
   useEffect(() => {
     if (mantenimientoSeleccionado) {
@@ -122,35 +151,19 @@ export default function RefaccionesCargo({ montacargas }) {
 
   // FUNCIÓN CORREGIDA: Obtener observaciones filtradas por técnico
   const getObservacionesFiltradas = () => {
-    console.log('🔍 Filtrando observaciones para rol:', userRole);
-    
     if (isAdmin()) {
       // Admin ve todas las observaciones
-      console.log('👑 Admin - Mostrando TODAS las observaciones:', observaciones.length);
       return observaciones;
     } else if (isTecnico()) {
       // Técnico solo ve las observaciones asignadas a él
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       const userId = parseInt(userData.id);
       
-      console.log('🔧 Técnico ID:', userId, 'Nombre:', userData.nombre);
-      console.log('📋 Total de observaciones recibidas:', observaciones.length);
-      
       const observacionesFiltradas = observaciones.filter(obs => {
-        // Convertir ambos a número para comparación estricta
         const tecnicoId = obs.tecnico_asignado_id ? parseInt(obs.tecnico_asignado_id) : null;
-        
-        const esAsignado = userId === tecnicoId;
-        console.log(`🔍 Comparando: userId=${userId} vs tecnicoId=${tecnicoId} -> ${esAsignado}`);
-        
-        if (esAsignado) {
-          console.log(`✅ ENCONTRADA: Observación ${obs.id} asignada a técnico ${tecnicoId}`);
-        }
-        
-        return esAsignado;
+        return userId === tecnicoId;
       });
       
-      console.log('✅ Técnico - Observaciones asignadas:', observacionesFiltradas.length, 'de', observaciones.length);
       return observacionesFiltradas;
     }
     return [];
@@ -582,12 +595,6 @@ export default function RefaccionesCargo({ montacargas }) {
             });
           
           setMantenimientos(mantenimientosOrdenados);
-          
-          if (mantenimientosOrdenados.length > 0) {
-            setMantenimientoSeleccionado(mantenimientosOrdenados[0]);
-          } else {
-            setMantenimientoSeleccionado(null);
-          }
         } else {
           throw new Error(data.error || 'Error al cargar mantenimientos');
         }
@@ -605,6 +612,7 @@ export default function RefaccionesCargo({ montacargas }) {
     }
   };
 
+  // FUNCIÓN MEJORADA: Aplicar filtros
   const aplicarFiltros = () => {
     let filtrados = [...mantenimientos];
 
@@ -626,8 +634,19 @@ export default function RefaccionesCargo({ montacargas }) {
 
     setMantenimientosFiltrados(filtrados);
 
-    if (mantenimientoSeleccionado && !filtrados.find(m => m.id === mantenimientoSeleccionado.id)) {
-      setMantenimientoSeleccionado(filtrados.length > 0 ? filtrados[0] : null);
+    // SELECCIÓN AUTOMÁTICA MEJORADA
+    if (filtrados.length > 0) {
+      // Si el mantenimiento seleccionado actual no está en los filtrados, o no hay selección
+      if (!mantenimientoSeleccionado || !filtrados.find(m => m.id === mantenimientoSeleccionado.id)) {
+        // Seleccionar el mantenimiento más reciente de los filtrados
+        const mantenimientoMasReciente = [...filtrados].sort((a, b) => {
+          if (b.anio !== a.anio) return b.anio - a.anio;
+          return b.mes - a.mes;
+        })[0];
+        setMantenimientoSeleccionado(mantenimientoMasReciente);
+      }
+    } else {
+      setMantenimientoSeleccionado(null);
     }
   };
 
@@ -639,10 +658,14 @@ export default function RefaccionesCargo({ montacargas }) {
     }));
   };
 
+  // FUNCIÓN MEJORADA: Limpiar filtros
   const limpiarFiltros = () => {
+    const mesActual = new Date().getMonth() + 1;
+    const anioActual = new Date().getFullYear();
+    
     setFiltros({
-      anio: new Date().getFullYear(),
-      mes: '',
+      anio: anioActual,
+      mes: mesActual, // FIX: Usar mes actual
       tipo: '',
       status: ''
     });
@@ -949,9 +972,12 @@ export default function RefaccionesCargo({ montacargas }) {
     return anios.sort((a, b) => b - a);
   };
 
-  const obtenerMesesUnicos = () => {
-    const meses = [...new Set(mantenimientos.map(m => m.mes))];
-    return meses.sort((a, b) => a - b);
+  // FUNCIÓN MEJORADA: Obtener meses únicos con mantenimientos
+  const obtenerMesesDisponibles = () => {
+    if (!mantenimientos.length) return [];
+    
+    const mesesConMantenimientos = [...new Set(mantenimientos.map(m => m.mes))];
+    return mesesConMantenimientos.sort((a, b) => a - b);
   };
 
   const nombresMeses = {
@@ -959,17 +985,22 @@ export default function RefaccionesCargo({ montacargas }) {
     7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
   };
 
+  // FUNCIÓN NUEVA: Verificar si es el mes actual
+  const esMesActual = (mes, anio) => {
+    const ahora = new Date();
+    return mes === ahora.getMonth() + 1 && anio === ahora.getFullYear();
+  };
+
+  // FUNCIÓN NUEVA: Obtener texto descriptivo del filtro actual
+  const getFiltroActualTexto = () => {
+    if (filtros.mes && filtros.anio) {
+      return `${nombresMeses[filtros.mes]} ${filtros.anio}`;
+    }
+    return 'Todos los períodos';
+  };
+
   // Obtener observaciones filtradas según el rol
   const observacionesFiltradas = getObservacionesFiltradas();
-
-  // Debug del estado actual
-  useEffect(() => {
-    console.log('🎯 Estado actual del componente:');
-    console.log('- userRole:', userRole);
-    console.log('- observaciones totales:', observaciones.length);
-    console.log('- observaciones filtradas:', observacionesFiltradas.length);
-    console.log('- mantenimiento seleccionado:', mantenimientoSeleccionado?.id);
-  }, [observaciones, observacionesFiltradas, mantenimientoSeleccionado, userRole]);
 
   if (!montacargas) {
     return (
@@ -984,12 +1015,29 @@ export default function RefaccionesCargo({ montacargas }) {
 
   return (
     <div className="p-6">
-      {/* Encabezado con indicador de rol */}
+      {/* Encabezado MEJORADO con información del filtro actual */}
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2 sm:mb-0">
-            Gestión de Observaciones - Montacargas #{montacargas.numero}
-          </h2>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              Gestión de Observaciones - Montacargas #{montacargas.numero}
+            </h2>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                📅 {getFiltroActualTexto()}
+                {filtros.mes && esMesActual(filtros.mes, filtros.anio) && (
+                  <span className="ml-1 bg-green-100 text-green-800 px-1 rounded text-xs">
+                    Actual
+                  </span>
+                )}
+              </span>
+              {mantenimientoSeleccionado && (
+                <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                  ✅ Mantenimiento seleccionado
+                </span>
+              )}
+            </div>
+          </div>
           <div className={`px-3 py-1 rounded-full text-sm font-medium ${
             isAdmin() 
               ? 'bg-green-100 text-green-800 border border-green-200' 
@@ -1000,6 +1048,28 @@ export default function RefaccionesCargo({ montacargas }) {
             {isAdmin() ? 'Administrador' : isTecnico() ? 'Técnico' : 'Usuario'}
           </div>
         </div>
+        
+        {/* Información del período actual */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-blue-800 font-medium">
+                {filtros.mes ? `Período seleccionado: ${nombresMeses[filtros.mes]} ${filtros.anio}` : 'Todos los períodos'}
+              </p>
+              <p className="text-blue-600 text-sm">
+                {mantenimientosFiltrados.length} mantenimiento(s) encontrado(s)
+                {mantenimientoSeleccionado && ` • 1 seleccionado`}
+              </p>
+            </div>
+            <button
+              onClick={limpiarFiltros}
+              className="bg-blue-100 text-blue-700 px-3 py-1 rounded-md hover:bg-blue-200 text-sm"
+            >
+              ↺ Ver Mes Actual
+            </button>
+          </div>
+        </div>
+
         <p className="text-gray-600">
           {isAdmin() 
             ? 'Gestión de observaciones, fallas y refacciones de mantenimientos. Asigne observaciones a técnicos específicos.' 
@@ -1062,17 +1132,24 @@ export default function RefaccionesCargo({ montacargas }) {
         {/* Columna 1: Filtros y Selección de mantenimiento - SOLO PARA ADMINS */}
         {isAdmin() && (
           <div className="lg:col-span-1">
-            {/* Panel de Filtros */}
+            {/* Panel de Filtros MEJORADO */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                Filtros de Búsqueda
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Filtros de Búsqueda
+                </h3>
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                  {mantenimientosFiltrados.length} resultados
+                </span>
+              </div>
               
               <div className="space-y-4">
-                {/* Filtro por Año */}
+                {/* Filtro por Año MEJORADO */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Año
+                    Año {filtros.anio === new Date().getFullYear() && (
+                      <span className="text-green-600 text-xs">(Actual)</span>
+                    )}
                   </label>
                   <select
                     name="anio"
@@ -1082,15 +1159,23 @@ export default function RefaccionesCargo({ montacargas }) {
                   >
                     <option value="">Todos los años</option>
                     {obtenerAniosUnicos().map(anio => (
-                      <option key={anio} value={anio}>{anio}</option>
+                      <option 
+                        key={anio} 
+                        value={anio}
+                        className={anio === new Date().getFullYear() ? 'font-semibold text-green-600' : ''}
+                      >
+                        {anio} {anio === new Date().getFullYear() && '🎯'}
+                      </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Filtro por Mes */}
+                {/* Filtro por Mes MEJORADO */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Mes
+                    Mes {filtros.mes === new Date().getMonth() + 1 && (
+                      <span className="text-green-600 text-xs">(Actual)</span>
+                    )}
                   </label>
                   <select
                     name="mes"
@@ -1099,10 +1184,20 @@ export default function RefaccionesCargo({ montacargas }) {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">Todos los meses</option>
-                    {obtenerMesesUnicos().map(mes => (
-                      <option key={mes} value={mes}>{nombresMeses[mes]}</option>
+                    {obtenerMesesDisponibles().map(mes => (
+                      <option 
+                        key={mes} 
+                        value={mes}
+                        className={esMesActual(mes, filtros.anio) ? 'font-semibold text-green-600' : ''}
+                      >
+                        {nombresMeses[mes]} 
+                        {esMesActual(mes, filtros.anio) && ' 🎯'}
+                      </option>
                     ))}
                   </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {filtros.mes ? `Mostrando mantenimientos de ${nombresMeses[filtros.mes]}` : 'Mostrando todos los meses'}
+                  </p>
                 </div>
 
                 {/* Filtro por Tipo */}
@@ -1141,21 +1236,21 @@ export default function RefaccionesCargo({ montacargas }) {
                   </select>
                 </div>
 
-                {/* Botón Limpiar Filtros */}
+                {/* Botón Limpiar Filtros MEJORADO */}
                 <button
                   onClick={limpiarFiltros}
-                  className="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                  className="w-full bg-blue-100 text-blue-700 py-2 px-4 rounded-md hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
                 >
-                  Limpiar Filtros
+                  🎯 Ver Mes Actual
                 </button>
               </div>
             </div>
 
-            {/* Lista de Mantenimientos Filtrados */}
+            {/* Lista de Mantenimientos Filtrados MEJORADA */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">
-                  Mantenimientos
+                  Mantenimientos {filtros.mes && `- ${nombresMeses[filtros.mes]}`}
                 </h3>
                 <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
                   {mantenimientosFiltrados.length} de {mantenimientos.length}
@@ -1164,41 +1259,57 @@ export default function RefaccionesCargo({ montacargas }) {
               
               {mantenimientosFiltrados.length > 0 ? (
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {mantenimientosFiltrados.map((mantenimiento) => (
-                    <div
-                      key={mantenimiento.id}
-                      className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                        mantenimientoSeleccionado?.id === mantenimiento.id
-                          ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                      }`}
-                      onClick={() => setMantenimientoSeleccionado(mantenimiento)}
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getTipoColor(mantenimiento.tipo)}`}>
-                              {mantenimiento.tipo}
-                            </span>
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getEstadoColor(mantenimiento.status)}`}>
-                              {mantenimiento.status}
-                            </span>
+                  {mantenimientosFiltrados.map((mantenimiento) => {
+                    const esMantenimientoActual = esMesActual(mantenimiento.mes, mantenimiento.anio);
+                    return (
+                      <div
+                        key={mantenimiento.id}
+                        className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                          mantenimientoSeleccionado?.id === mantenimiento.id
+                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        } ${esMantenimientoActual ? 'ring-1 ring-green-200' : ''}`}
+                        onClick={() => setMantenimientoSeleccionado(mantenimiento)}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getTipoColor(mantenimiento.tipo)}`}>
+                                {mantenimiento.tipo}
+                              </span>
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getEstadoColor(mantenimiento.status)}`}>
+                                {mantenimiento.status}
+                              </span>
+                              {esMantenimientoActual && (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 border border-green-200">
+                                  🎯 Actual
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {nombresMeses[mantenimiento.mes]} {mantenimiento.anio}
+                              {esMantenimientoActual && ' • Este mes'}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {new Date(mantenimiento.fecha).toLocaleDateString('es-ES')}
+                            </p>
                           </div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {nombresMeses[mantenimiento.mes]} {mantenimiento.anio}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {new Date(mantenimiento.fecha).toLocaleDateString('es-ES')}
-                          </p>
+                          {mantenimientoSeleccionado?.id === mantenimiento.id && (
+                            <span className="bg-blue-500 text-white p-1 rounded-full">
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            </span>
+                          )}
                         </div>
+                        {mantenimiento.tecnico_nombre && (
+                          <p className="text-sm text-gray-600 mt-1">
+                            Técnico: <span className="font-medium">{mantenimiento.tecnico_nombre}</span>
+                          </p>
+                        )}
                       </div>
-                      {mantenimiento.tecnico_nombre && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          Técnico: <span className="font-medium">{mantenimiento.tecnico_nombre}</span>
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 !loading && (
@@ -1206,9 +1317,15 @@ export default function RefaccionesCargo({ montacargas }) {
                     <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
-                    <p className="text-gray-500">
-                      No hay mantenimientos que coincidan con los filtros.
+                    <p className="text-gray-500 mb-2">
+                      No hay mantenimientos para {filtros.mes ? nombresMeses[filtros.mes] : 'estos filtros'}.
                     </p>
+                    <button
+                      onClick={limpiarFiltros}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    >
+                      Ver mantenimientos del mes actual
+                    </button>
                   </div>
                 )
               )}
@@ -1237,6 +1354,11 @@ export default function RefaccionesCargo({ montacargas }) {
                     <p className={`text-sm font-medium ${getEstadoColor(mantenimientoSeleccionado.status)} px-2 py-1 rounded-full inline-block mt-1`}>
                       Estado: {mantenimientoSeleccionado.status}
                     </p>
+                    {esMesActual(mantenimientoSeleccionado.mes, mantenimientoSeleccionado.anio) && (
+                      <p className="text-sm text-green-600 font-medium mt-1">
+                        🎯 Mantenimiento del mes actual
+                      </p>
+                    )}
                   </div>
 
                   <form onSubmit={editandoObservacion ? handleEditarObservacion : handleSubmitObservacion}>
@@ -1374,6 +1496,11 @@ export default function RefaccionesCargo({ montacargas }) {
                 <p className={`text-sm font-medium ${getEstadoColor(mantenimientoSeleccionado.status)} px-2 py-1 rounded-full inline-block mt-1`}>
                   Estado: {mantenimientoSeleccionado.status}
                 </p>
+                {esMesActual(mantenimientoSeleccionado.mes, mantenimientoSeleccionado.anio) && (
+                  <p className="text-sm text-green-600 font-medium mt-1">
+                    🎯 Mantenimiento del mes actual
+                  </p>
+                )}
               </div>
             )}
 
