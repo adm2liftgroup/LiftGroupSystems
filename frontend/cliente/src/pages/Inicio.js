@@ -555,7 +555,7 @@ export default function Inicio() {
       [
         "Información del equipo",
         "Servicios Preventivos Historial", 
-        "Inversión Habilitar",
+        "Historial Refacciones",
         "Inversión Inicial",
         "Refacciones con Cargo",
         "Programas Preventivos"
